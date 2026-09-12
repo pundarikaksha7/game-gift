@@ -1,0 +1,32 @@
+name: Gamegift checks
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gamegift_test
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: gamegift_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gamegift_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run format:check
+      - run: npm test
+        env:
+          TEST_DATABASE_URL: postgresql://gamegift_test:test-only-password@localhost:5432/gamegift_test
+
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm audit --omit=dev --audit-level=high

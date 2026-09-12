@@ -1,0 +1,51 @@
+{
+  "name": "gamegift-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "concurrently -k \"node --env-file-if-exists=.env --import tsx --watch server/index.ts\" \"vite --host 0.0.0.0\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "node --env-file-if-exists=.env --import tsx server/index.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "check": "npm run test && npm run build",
+    "format": "prettier --write src shared server tests docs README.md package.json tsconfig.json vite.config.ts index.html playwright.config.ts",
+    "format:check": "prettier --check src shared server tests docs README.md package.json tsconfig.json vite.config.ts index.html playwright.config.ts",
+    "account:reset": "node --env-file-if-exists=.env --import tsx server/reset-password.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.3.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "lucide-react": "^0.468.0",
+    "multer": "^2.0.2",
+    "pg": "^8.16.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "sharp": "^0.35.4",
+    "tsx": "^4.20.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^5.0.1",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^9.1.2",
+    "prettier": "^3.9.6",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

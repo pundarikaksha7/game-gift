@@ -1,0 +1,65 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATA_DIR: /app/.data
+      APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
+      DATABASE_URL: postgresql://gamegift:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/gamegift
+      TRUST_PROXY: 1
+      REGISTRATION_CODE: ${REGISTRATION_CODE:?Set a random invitation code in .env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+    volumes:
+      - media:/app/.data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [web, data]
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gamegift
+      POSTGRES_DB: gamegift
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U gamegift -d gamegift]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [data]
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy_config:/config
+    depends_on: [app]
+    networks: [web]
+networks:
+  web:
+  data:
+    internal: true
+volumes:
+  database:
+  media:
+  certificates:
+  caddy_config:
