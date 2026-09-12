@@ -18,6 +18,11 @@ Explore as a guest; a valid guest draft is stored on that browser. Create an acc
 
 ## What works
 
+- Guided builder: game settings → characters → levels → story → sounds → animations → review and share. Back/Next navigation preserves your draft.
+- Movement presets, adjustable speed/jump/gravity/health, and optional double/triple jumps.
+- Chapter background PNG/JPEG/WebP uploads, plus meadow, sunset, and midnight starter atmospheres.
+- Optional Google OAuth sign-in with invitation-protected registration and a recovery password.
+
 - Character editor: custom names, hero/friend/enemy roles, uploaded art, scale and accent colors. Exactly one playable hero; enemy appearances cycle through enemy characters, and all friends appear near the goal.
 - Level editor: add/remove/reorder up to 12 chapters, choose atmosphere, set length and enemies, place platforms visually, edit coordinates and moving-platform behavior.
 - Story editor: opening, chapter introductions and conclusions, and a personalized ending.
@@ -44,7 +49,7 @@ Explore as a guest; a valid guest draft is stored on that browser. Create an acc
 
 ## Deploy
 
-Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Docker, PostgreSQL, HTTPS, backups, upgrades and staging checks. The included deployment targets **one application instance** with a persistent media volume. Do not deploy it as an ephemeral serverless function.
+Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for exact GitHub Actions → Render → Supabase deployment steps, domain DNS, and Google sign-in setup. `render.yaml` provisions a native Node service with a persistent media disk. Local development needs no Docker.
 
 ## Verify
 

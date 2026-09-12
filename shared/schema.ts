@@ -36,6 +36,7 @@ export const levelSchema = z
     id,
     name: z.string().min(1).max(80),
     theme: z.enum(['meadow', 'sunset', 'midnight']),
+    background: assetUrl.optional(),
     width: z.number().int().min(1200).max(10000),
     enemyCount: z.number().int().min(0).max(30),
     platforms: z.array(platformSchema).max(80),
@@ -66,6 +67,7 @@ export const gameSchema = z
         speed: z.number().min(100).max(500),
         jump: z.number().min(350).max(850),
         gravity: z.number().min(800).max(2200),
+        airJumps: z.number().int().min(0).max(2).optional(),
         health: z.number().int().min(1).max(10),
       })
       .strict(),
@@ -156,6 +158,7 @@ export function applyProposal(game: Game, raw: unknown): Game {
 export function assetReferences(game: Game): { url: string; kind: 'image' | 'audio' }[] {
   return [
     ...game.characters.map((c) => ({ url: c.sprite, kind: 'image' as const })),
+    ...game.levels.map((l) => ({ url: l.background || '', kind: 'image' as const })),
     ...game.animation.frames.map((url) => ({ url, kind: 'image' as const })),
     ...(['music', 'jump', 'hit', 'win'] as const).map((k) => ({
       url: game.sounds[k],

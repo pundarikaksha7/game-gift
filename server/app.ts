@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { googleEnabled, googleFlow } from './google';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -11,9 +12,9 @@ import path from 'node:path';
 import { z, ZodError } from 'zod';
 import type { DB } from './db';
 import { gameSchema, assetReferences, type Game } from '../shared/schema';
-import { createTemplate } from '../shared/template';
+import { createTemplate, upgradeStarter } from '../shared/template';
 import { propose } from './ai';
-import { validateEnvironment } from './config';
+import { validateEnvironment, trustedOrigin } from './config';
 const hashToken = (s: string) => createHash('sha256').update(s).digest('hex');
 const scryptAsync = promisify(scrypt);
 async function passwordHash(password: string, salt = randomBytes(16).toString('hex')) {
@@ -22,7 +23,7 @@ async function passwordHash(password: string, salt = randomBytes(16).toString('h
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 const present = (p: any) => ({
   id: p.id,
-  game: JSON.parse(p.game),
+  game: upgradeStarter(JSON.parse(p.game)),
   revision: p.revision,
   updatedAt: p.updated_at,
   publishedId: p.published_id,
@@ -59,8 +60,7 @@ export function createApp(db: DB) {
     res.set('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin;
-      const expected = process.env.APP_ORIGIN || 'http://localhost:5173';
-      if (origin && origin !== expected) return next(fail(403, 'Untrusted request origin'));
+      if (origin && !trustedOrigin(origin)) return next(fail(403, 'Untrusted request origin'));
       if (!req.headers['x-gamegift-request']) return next(fail(403, 'Missing request header'));
     }
     next();
@@ -71,6 +71,7 @@ export function createApp(db: DB) {
   });
   app.get('/api/config', (_req, res) =>
     res.json({
+      googleEnabled: googleEnabled(),
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
       registrationCodeRequired: !!process.env.REGISTRATION_CODE,
     }),
@@ -91,7 +92,7 @@ export function createApp(db: DB) {
     name: z.string().trim().min(1).max(60).optional(),
     registrationCode: z.string().max(256).optional(),
   });
-  async function session(user: any, res: express.Response) {
+  async function session(user: any, res: express.Response, redirect = false) {
     await db.query('DELETE FROM sessions WHERE expires<$1', [Date.now()]);
     const token = randomBytes(32).toString('hex');
     await db.query('INSERT INTO sessions(token,user_id,expires) VALUES ($1,$2,$3)', [
@@ -106,8 +107,66 @@ export function createApp(db: DB) {
       maxAge: 7 * 86400000,
       path: '/',
     });
-    res.json({ user: { id: user.id, name: user.name, email: user.email } });
+    if (redirect) res.redirect(303, '/');
+    else res.json({ user: { id: user.id, name: user.name, email: user.email } });
   }
+  const google = googleFlow();
+  app.post('/api/auth/google/start', authLimit, async (req, res) => {
+    if (!googleEnabled()) throw fail(503, 'Google sign-in is not configured');
+    const input = z
+      .object({
+        password: z.string().min(10).max(128).optional(),
+        registrationCode: z.string().max(256).optional(),
+      })
+      .parse(req.body);
+    const invited =
+      !process.env.REGISTRATION_CODE ||
+      timingSafeEqual(
+        Buffer.from(hashToken(input.registrationCode || '')),
+        Buffer.from(hashToken(process.env.REGISTRATION_CODE)),
+      );
+    res.json({
+      url: google.start(res, input.password ? await passwordHash(input.password) : '', invited),
+    });
+  });
+  app.get('/api/auth/google/callback', authLimit, async (req, res) => {
+    if (!googleEnabled()) throw fail(503, 'Google sign-in is not configured');
+    try {
+      const profile = await google.finish(req, res);
+      let [user] = await db.query('SELECT * FROM users WHERE google_sub=$1', [profile.sub]);
+      if (!user) {
+        if (!profile.invited)
+          throw new Error('A valid invitation code is required to create an account.');
+        if (!profile.password)
+          throw new Error(
+            'Choose Create account and set a recovery password before your first Google sign-in.',
+          );
+        const [existing] = await db.query('SELECT id FROM users WHERE email=$1', [profile.email]);
+        if (existing)
+          throw new Error('This email already has a password account. Sign in with your password.');
+        user = { id: randomUUID(), email: profile.email, name: profile.name };
+        await db.query(
+          'INSERT INTO users(id,email,password,name,google_sub) VALUES ($1,$2,$3,$4,$5)',
+          [user.id, user.email, profile.password, user.name, profile.sub],
+        );
+      }
+      await session(user, res, true);
+    } catch (e) {
+      const message = (e as Error).message;
+      res.redirect(
+        303,
+        '/?authError=' +
+          encodeURIComponent(
+            message.startsWith('Google') ||
+              message.startsWith('A valid') ||
+              message.startsWith('Choose Create') ||
+              message.startsWith('This email')
+              ? message
+              : 'Google sign-in failed. Please try again.',
+          ),
+      );
+    }
+  });
   app.post('/api/auth/register', authLimit, async (req, res) => {
     const input = credentials.parse(req.body);
     if (
@@ -202,7 +261,7 @@ export function createApp(db: DB) {
       req.params.id,
     ]);
     if (!p?.published_game) throw fail(404, 'This game is not published');
-    res.json({ game: JSON.parse(p.published_game) });
+    res.json({ game: upgradeStarter(JSON.parse(p.published_game)) });
   });
   const uploads = path.resolve(process.env.DATA_DIR || '.data', 'uploads');
   app.get('/api/assets/:id', async (req, res) => {

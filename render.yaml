@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: gamegift-studio
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    disk:
+      name: gamegift-media
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: TRUST_PROXY
+        value: '1'
+      - key: APP_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REGISTRATION_CODE
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

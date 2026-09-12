@@ -10,7 +10,7 @@ jobs:
           POSTGRES_USER: gamegift_test
           POSTGRES_PASSWORD: test-only-password
           POSTGRES_DB: gamegift_test
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U gamegift_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
@@ -30,3 +30,25 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm audit --omit=dev --audit-level=high
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Deploy the checked commit to Render
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo 'Configure RENDER_DEPLOY_HOOK_URL in the production environment first.'
+            exit 1
+          fi
+          curl --fail --silent --show-error --output /dev/null --request POST "${DEPLOY_HOOK}&ref=${COMMIT_SHA}"

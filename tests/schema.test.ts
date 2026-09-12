@@ -75,3 +75,19 @@ test('riders travel with moving platforms and release on jump', () => {
   assert.equal(body.grounded, false);
   assert.equal(body.supportId, undefined);
 });
+
+test('background uploads participate in asset authorization and movement options are bounded', async () => {
+  const { assetReferences } = await import('../shared/schema');
+  const game = createTemplate();
+  game.levels[0].background = '/api/assets/12345678-1234-1234-1234-123456789abc';
+  game.physics.airJumps = 2;
+  const parsed = gameSchema.parse(game);
+  assert.ok(
+    assetReferences(parsed).some((a) => a.url === game.levels[0].background && a.kind === 'image'),
+  );
+  game.physics.airJumps = 3;
+  assert.equal(gameSchema.safeParse(game).success, false);
+  game.physics.airJumps = 0;
+  game.levels[0].background = 'https://untrusted.example/image.png';
+  assert.equal(gameSchema.safeParse(game).success, false);
+});

@@ -37,7 +37,7 @@ import {
   type Project,
   type Proposal,
 } from '../shared/schema';
-import { createTemplate } from '../shared/template';
+import { createTemplate, upgradeStarter } from '../shared/template';
 import { api } from './api';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
@@ -51,26 +51,27 @@ import {
   SettingsEditor,
 } from './components/Editors';
 const navigation = [
+  { id: 'settings', label: 'Game settings', icon: Settings2 },
   { id: 'characters', label: 'Characters', icon: Users },
   { id: 'levels', label: 'Levels', icon: Layers3 },
   { id: 'story', label: 'Story', icon: BookOpen },
   { id: 'sounds', label: 'Sounds', icon: Music2 },
   { id: 'animations', label: 'Animations', icon: WandSparkles },
-  { id: 'settings', label: 'Game settings', icon: Settings2 },
+  { id: 'review', label: 'Review & share', icon: Check },
 ] as const;
 type Tab = (typeof navigation)[number]['id'];
 type User = { id: string; name: string; email: string };
 function initial() {
   try {
     const raw = localStorage.getItem('gamegift-guest');
-    return raw ? gameSchema.parse(JSON.parse(raw)) : createTemplate();
+    return raw ? upgradeStarter(gameSchema.parse(JSON.parse(raw))) : createTemplate();
   } catch {
     return createTemplate();
   }
 }
 export default function App() {
   const [game, setGame] = useState<Game>(initial),
-    [tab, setTab] = useState<Tab>('characters'),
+    [tab, setTab] = useState<Tab>('settings'),
     [level, setLevel] = useState(0),
     [grid, setGrid] = useState(false),
     [camera, setCamera] = useState(0),
@@ -90,6 +91,7 @@ export default function App() {
     [proposal, setProposal] = useState<Proposal | null>(null),
     [proposalBase, setProposalBase] = useState(''),
     [prompt, setPrompt] = useState(''),
+    [googleEnabled, setGoogleEnabled] = useState(false),
     [aiEnabled, setAiEnabled] = useState(false),
     [registrationCodeRequired, setRegistrationCodeRequired] = useState(false),
     [undo, setUndo] = useState<Game[]>([]),
@@ -114,6 +116,12 @@ export default function App() {
         .catch((e) => setPublicError(e.message));
       return;
     }
+    const oauthError = new URLSearchParams(location.search).get('authError');
+    if (oauthError) {
+      setAuthError(oauthError);
+      setModal('auth');
+      history.replaceState(null, '', location.pathname);
+    }
     api('/auth/me')
       .then(async (d) => {
         setUser(d.user);
@@ -131,6 +139,7 @@ export default function App() {
     api('/config')
       .then((d) => {
         setAiEnabled(d.aiEnabled);
+        setGoogleEnabled(d.googleEnabled);
         setRegistrationCodeRequired(d.registrationCodeRequired);
       })
       .catch(() => {});
@@ -142,15 +151,12 @@ export default function App() {
   }, [toast]);
   useEffect(() => {
     if (publicId || project || user) return;
-    const timer = setTimeout(() => {
-      if (gameSchema.safeParse(game).success)
-        try {
-          localStorage.setItem('gamegift-guest', JSON.stringify(game));
-        } catch {
-          notify('Browser storage is full. Export your game to keep a copy.');
-        }
-    }, 500);
-    return () => clearTimeout(timer);
+    if (gameSchema.safeParse(game).success)
+      try {
+        localStorage.setItem('gamegift-guest', JSON.stringify(game));
+      } catch {
+        notify('Browser storage is full. Export your game to keep a copy.');
+      }
   }, [game, project, user, publicId]);
   useEffect(() => {
     const listener = (e: BeforeUnloadEvent) => {
@@ -302,9 +308,9 @@ export default function App() {
           <ChevronRight size={14} />
         </button>
         <div className="nav-divider" />
-        <span className="nav-label">MAKE IT YOURS</span>
+        <span className="nav-label">BUILD YOUR GAME</span>
         <nav>
-          {navigation.map((n) => (
+          {navigation.map((n, index) => (
             <button
               key={n.id}
               className={`nav-item ${tab === n.id ? 'active' : ''}`}
@@ -313,7 +319,9 @@ export default function App() {
                 setPlacing(false);
               }}
             >
-              <n.icon size={18} />
+              <span className="step-number" aria-hidden="true">
+                {index + 1}
+              </span>
               {n.label}
               {n.id === 'characters' || n.id === 'levels' ? (
                 <span className="nav-count">{game[n.id].length}</span>
@@ -459,20 +467,16 @@ export default function App() {
           </div>
           <div className="studio-grid">
             <section className="editor-panel">
-              <div className="editor-tabs">
-                {navigation.slice(0, 5).map((n) => (
-                  <button
-                    key={n.id}
-                    className={tab === n.id ? 'active' : ''}
-                    onClick={() => {
-                      setTab(n.id);
-                      setPlacing(false);
-                    }}
-                  >
-                    <n.icon size={15} />
-                    {n.label}
-                  </button>
-                ))}
+              <div className="wizard-heading">
+                <span>
+                  STEP {navigation.findIndex((n) => n.id === tab) + 1} OF {navigation.length}
+                </span>
+                <strong>{navigation.find((n) => n.id === tab)?.label}</strong>
+                <progress
+                  aria-label="Builder progress"
+                  value={navigation.findIndex((n) => n.id === tab) + 1}
+                  max={navigation.length}
+                />
               </div>
               <div className="editor-content">
                 {tab === 'characters' ? (
@@ -494,9 +498,58 @@ export default function App() {
                   <SoundsEditor {...props} />
                 ) : tab === 'animations' ? (
                   <AnimationsEditor {...props} />
+                ) : tab === 'review' ? (
+                  <div className="form-card">
+                    <h2>Ready for your first player?</h2>
+                    <p>
+                      {game.title} · {game.levels.length} chapters · {game.characters.length}{' '}
+                      characters
+                    </p>
+                    <p>
+                      Play every chapter, check your jumps and messages, then save and publish a
+                      shareable link.
+                    </p>
+                    <button
+                      className="secondary"
+                      disabled={!validation.success}
+                      onClick={() => setModal('play')}
+                    >
+                      Playtest from selected chapter
+                    </button>
+                    <button
+                      className="primary"
+                      disabled={busy || !validation.success}
+                      onClick={publish}
+                    >
+                      Save & publish
+                    </button>
+                  </div>
                 ) : (
                   <SettingsEditor {...props} />
                 )}
+              </div>
+              <div className="wizard-actions">
+                <button
+                  className="secondary"
+                  disabled={tab === 'settings'}
+                  onClick={() => {
+                    setTab(navigation[navigation.findIndex((n) => n.id === tab) - 1].id);
+                    setPlacing(false);
+                  }}
+                >
+                  Back
+                </button>
+                <span>Your draft stays with you between steps.</span>
+                <button
+                  className="primary"
+                  disabled={tab === 'review' || !validation.success}
+                  onClick={() => {
+                    setTab(navigation[navigation.findIndex((n) => n.id === tab) + 1].id);
+                    setPlacing(false);
+                  }}
+                >
+                  Next step <ChevronRight size={16} />
+                </button>
               </div>
             </section>
             <aside className="preview-column">
@@ -683,6 +736,12 @@ export default function App() {
           <p className="modal-copy">
             Save your worlds, upload your own art, and share a game made just for them.
           </p>
+          {googleEnabled && (
+            <p className="modal-copy">
+              For a new Google account, choose a recovery password below. You can use it for account
+              settings and password sign-in.
+            </p>
+          )}
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -704,6 +763,37 @@ export default function App() {
               }
             }}
           >
+            {googleEnabled && (
+              <button
+                type="button"
+                className="secondary full-width"
+                disabled={busy}
+                onClick={async (e) => {
+                  const data = new FormData(e.currentTarget.form!);
+                  setBusy(true);
+                  setAuthError('');
+                  try {
+                    const result = await api('/auth/google/start', {
+                      method: 'POST',
+                      body: JSON.stringify(
+                        authMode === 'register'
+                          ? {
+                              password: data.get('password'),
+                              registrationCode: data.get('registrationCode') || undefined,
+                            }
+                          : {},
+                      ),
+                    });
+                    location.assign(result.url);
+                  } catch (err) {
+                    setAuthError((err as Error).message);
+                    setBusy(false);
+                  }
+                }}
+              >
+                Continue with Google
+              </button>
+            )}
             {authMode === 'register' && (
               <Field label="Your name">
                 <input name="name" required maxLength={60} autoComplete="name" />

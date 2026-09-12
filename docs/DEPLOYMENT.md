@@ -1,140 +1,107 @@
-# Deployment and operations
+# Deploy from GitHub to your domain
 
-## 1. Prepare a server
+Recommended setup: **GitHub Actions → Render Node web service → Supabase PostgreSQL**. The same Render service serves the React build, API, sessions, and uploaded media. Google sign-in is implemented directly in the API. Supabase supplies the database; you do not need Supabase Auth or a Supabase service-role API key.
 
-Use a Linux server with Docker Engine and Docker Compose v2. Point an owned domain's A/AAAA records at it. Allow inbound TCP 80/443 (and optionally UDP 443 for HTTP/3). Do not expose PostgreSQL or the application's port directly. Keep this directory as the application's repository/build root.
+No local Docker, Caddy, or database containers are required. Render requires a paid service for the persistent upload disk. Keep one instance: uploads and pending Google sign-ins are local to that instance.
 
-The included Caddy configuration obtains and renews TLS certificates and redirects HTTP to HTTPS when the hostname resolves correctly. See [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https).
+## 1. Push the code
 
-## 2. Configure
-
-```sh
-cp .env.production.example .env
-openssl rand -hex 32
-```
-
-Edit `.env`: set `DOMAIN` to your hostname and `POSTGRES_PASSWORD` to the generated value. Generate a second random value with `openssl rand -hex 32` for `REGISTRATION_CODE`. Production refuses to start without an invitation code of at least 32 characters. Give this code only to invited creators; public game visitors do not need it. The password is interpolated into a PostgreSQL URI, so use the recommended hexadecimal format. Leave AI values blank initially. Protect the file with `chmod 600 .env` and keep it out of Git and image builds.
-
-Compose passes variables explicitly into containers; `.env` by itself is used for interpolation. See [Compose environment precedence](https://docs.docker.com/compose/how-tos/environment-variables/envvars-precedence/).
-
-## 3. Build and start
+The repository is `https://github.com/pundarikaksha7/game-gift`. Use Node 24 or newer locally.
 
 ```sh
 npm ci
 npm run check
-# On the deployment server:
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100 app
-```
-
-Node 24 is required when running tests outside Docker. The build container includes Node 24. Migrations run transactionally at application startup; PostgreSQL uses an advisory lock to coordinate migrations.
-
-Visit `https://YOUR_DOMAIN/api/health`; expect `{"ok":true}`. Visit the root URL, register with your invitation code, save a test adventure and reopen it under **My games**. Publish that test game and verify its link in a signed-out browser.
-
-Persistent volumes:
-
-- `database`: PostgreSQL data.
-- `media`: normalized image/audio files, mounted at `/app/.data`.
-- `certificates` and `caddy_config`: Caddy state.
-
-Never use `docker compose down -v` on an installation whose data you want to keep.
-
-## 4. Enable optional AI
-
-Set `OPENAI_API_KEY` and `OPENAI_MODEL` in the server `.env`. Choose a model available to your account that supports Responses and Structured Outputs. Restart with `docker compose up -d app`. Keys never go into frontend variables, game documents or browser bundles.
-
-The implementation uses the [official Structured Outputs contract](https://developers.openai.com/api/docs/guides/structured-outputs), a 45-second timeout, no tools, `store:false`, at most 30 changes, and independent application validation. The current game text and user prompt are sent to the provider when **Suggest changes** is pressed; uploaded media bytes are not sent. `store:false` is not a blanket zero-retention guarantee. Review your provider's data terms for your deployment.
-
-The app currently allows 20 AI requests/hour/IP. Configure an independent provider project spending cap. Rate limiting is process-local, so deploy one application instance unless you replace the limiter with a shared store.
-
-## 5. Staging acceptance checklist
-
-- [ ] Run `npm run check` and `npm run format:check` on Node 24.
-- [ ] Set `TEST_DATABASE_URL` to a disposable PostgreSQL database and run `npm test`. Its role needs permission to create/drop schemas.
-- [ ] Register two accounts; verify each sees only its own projects and private media.
-- [ ] Edit each of the five content categories. Save, reload, reopen and verify.
-- [ ] Upload valid art and audio; try an unsupported file and an oversized image.
-- [ ] Open a project in two tabs and confirm a stale save reports a conflict.
-- [ ] Restore a historical version, save it and verify a new revision appears.
-- [ ] Play all chapters on desktop and a real touch device; verify audio after a user gesture.
-- [ ] Publish, change the draft, verify the public link remains unchanged, then republish.
-- [ ] Unpublish and verify both the public game and exclusively public asset access disappear.
-- [ ] Check Secure/HttpOnly/SameSite cookies and HTTPS behavior behind your actual proxy.
-- [ ] Test AI success, provider refusal/error/timeout, review, undo, and stale proposals using a live configured model.
-- [ ] Restart containers and verify data/media survive.
-- [ ] Complete the backup/restore drill below and configure external health monitoring.
-
-Validation includes SQLite HTTP integration, production configuration guards, content/AI constraints, physics, TypeScript compilation, production frontend build, and a Playwright desktop/mobile acceptance suite (`npm run test:e2e` after `npx playwright install chromium`). CI also exercises PostgreSQL. Container deployment, real TLS, a restore drill, physical touch devices, and paid live AI must be verified in staging.
-
-## 6. Backups and restore
-
-Back up **both** PostgreSQL and media; database-only backups do not include character art or sound files. Run these from the application root. A brief write outage gives a consistent pair:
-
-```sh
-mkdir -p backups
-chmod 700 backups
-docker compose stop app
-docker compose exec -T db pg_dump -U gamegift -d gamegift -Fc > backups/gamegift.dump
-docker compose run --rm --no-deps --entrypoint tar app -C /app/.data -czf - uploads > backups/media.tar.gz
-docker compose start app
-```
-
-Ensure `app` is restarted even if a backup command fails. Encrypt and copy backups off the server, rotate them according to your retention policy, and alert on backup failures. Database dumps contain account records and private game content. See [PostgreSQL SQL dump documentation](https://www.postgresql.org/docs/current/backup-dump.html).
-
-Restore first into a fresh, isolated deployment with empty database and media volumes:
-
-```sh
-docker compose up -d db
-docker compose exec -T db pg_restore -U gamegift -d gamegift --no-owner --exit-on-error < backups/gamegift.dump
-docker compose run --rm --no-deps --entrypoint tar app -C /app/.data -xzf - < backups/media.tar.gz
-docker compose up -d
-```
-
-Use the same application version that created the backup, then test before upgrading. Never test restoration against a live production database. JSON exports from the studio are a convenience; they are not a substitute for these backups.
-
-## 7. Updates
-
-Back up first. Review and append migrations rather than changing previously applied ones. Run tests, then `docker compose up -d --build app`. Check health and logs. Image tags currently pin major releases; pin tested image digests for reproducible production releases. Roll back the application image only if it is compatible with the installed schema; otherwise restore the matching database/media backup into a separate deployment and switch traffic after verification.
-
-## Other hosting arrangements
-
-A container host may run this app with a managed PostgreSQL database and a persistent volume mounted at `DATA_DIR`. Set:
-
-| Variable                         | Value                                                                      |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| `NODE_ENV`                       | `production`                                                               |
-| `DATABASE_URL`                   | Provider connection URI, with TLS verification as required by the provider |
-| `APP_ORIGIN`                     | Exact public HTTPS origin, no trailing slash                               |
-| `DATA_DIR`                       | Persistent writable mount                                                  |
-| `PORT`                           | Host-assigned HTTP port                                                    |
-| `TRUST_PROXY`                    | Exact number of trusted reverse-proxy hops                                 |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Optional, server-only                                                      |
-
-Do not set `TRUST_PROXY` blindly or expose the API around the proxy. Keep certificate verification enabled for external databases. Configure a CA through your provider's supported Node/PostgreSQL settings if required.
-
-## Public-launch work still required
-
-This release supports controlled deployments, not every operational feature of a mature consumer SaaS. Production is invitation-only. Before open public registration, integrate verified email recovery or a managed identity provider, moderation/reporting, centralized monitoring, and independent security/accessibility testing. Password change and account deletion are available in My games → Account settings. Deletion revokes access immediately and queues physical media removal; maintenance retries every minute, 100 files per batch. Monitor maintenance errors. Backups retain deleted data until your backup retention expires. Media quotas are 100 MB/account with 10 MB/request; each account can have 50 projects and each project retains its latest 100 revisions. The history UI shows the latest 50 versions. Disk and database growth need monitoring.
-
-Images are decoded with a 16-megapixel cap, resized within 2048×2048, and re-encoded to WebP. Audio is signature-checked and size-limited; malformed audio may fail to play, and codec support varies by browser. No transcoding service is included. Published games and their referenced assets are accessible to anyone with the link. Unpublishing prevents future origin requests but cannot revoke copies someone already downloaded.
-
-## Invited-account recovery
-
-Verify the person's identity using your existing private relationship, then run on the server:
-
-```sh
-docker compose exec app npm run account:reset -- user@example.com
-```
-
-This generates a random password and revokes all existing sessions. The command prints the new password once: deliver it through a private channel and ask the person to change it in Account settings. Do not send it to an unverified email claimant or save the command output in shared logs. The app does not claim to verify email ownership.
-
-## Browser acceptance suite
-
-```sh
-npm run build
-npx playwright install chromium
+npm run format:check
 npm run test:e2e
+git add .
+git commit -m "Guide game creation and add managed deployment"
+git push origin main
 ```
 
-The suite starts a temporary SQLite-backed server on port 4173, uses a test invitation, and exercises desktop/mobile registration, editing, persistence, publication, signed-out play, unpublishing, password changes and deletion. It never connects to the configured production database. On a workstation with Chrome installed, `PLAYWRIGHT_CHROME_PATH` can select its executable instead of downloading Chromium.
+Never add `.env` or `.data`; both are ignored. If this change has already been committed and pushed, skip the commit commands. The GitHub check job validates the app, browser workflow, and PostgreSQL migrations. The deployment job requires the production secret configured in step 4; its first run will fail clearly until that secret exists.
+
+## 2. Create Supabase PostgreSQL
+
+1. Create a Supabase project in a region close to your Render service and save its database password.
+2. In the project **Connect** dialog choose **Session pooler** (port **5432**, IPv4 compatible). Copy the exact connection URI, replacing the password placeholder with your URL-encoded database password. Do not use the transaction pooler on port 6543.
+3. Append `?sslmode=verify-full` (or `&sslmode=verify-full` when the URI already has query parameters). If your project requires a custom CA, configure the Supabase CA with `NODE_EXTRA_CA_CERTS`; do not disable certificate verification.
+4. **Disable the Supabase Data API** in the project's API settings for this dedicated project. This app accesses Postgres only from its server, and its migrations create application tables in the default schema. Do not expose those tables through a public REST API. No browser database credentials are needed.
+5. Set this URI as `DATABASE_URL` in Render. The API runs versioned migrations on startup. Existing local SQLite games do not automatically migrate; export their data and upload media again on the hosted account.
+
+Reference: [Supabase database connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
+
+## 3. Create the hosted Node service
+
+1. In Render choose **New → Blueprint**, connect GitHub, and select `pundarikaksha7/game-gift`, branch `main`. Render reads `render.yaml`.
+2. Confirm the paid plan and 1 GB persistent disk. Set `DATABASE_URL` from step 2. For `APP_ORIGIN`, enter the exact assigned HTTPS service origin, for example `https://gamegift-studio-xxxx.onrender.com`, without a trailing slash. If the assigned URL is not yet available, set a placeholder, then replace it with the assigned origin and redeploy before signing in.
+3. Leave `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` empty until step 6, or enter existing web-client credentials. The sign-in button appears only when both are configured.
+4. The blueprint generates `REGISTRATION_CODE`. Copy it privately from Render's environment settings; new users need it to register, including through Google. Keep `TRUST_PROXY=1`, `DATA_DIR=/var/data`, and `NODE_ENV=production`.
+5. Build command: `npm ci --include=dev && npm run build`. Start command: `npm start`. Runtime: Node 24. Health path: `/api/health`. Render sets `PORT` automatically. Do not change the runtime to Docker or Static Site.
+6. Check the deployment logs and open `https://YOUR-SERVICE.onrender.com/api/health`; expect `{"ok":true}`. Create an invited account, upload a PNG, save a game, publish it, and open the link in a private browser window.
+
+The blueprint turns off automatic deployments, so subsequent application deployments come from the checked GitHub Actions workflow. The initial Blueprint creation provisions and deploys the service once.
+
+References: [Render web services](https://render.com/docs/web-services), [persistent disks](https://render.com/docs/disks), [Blueprint configuration](https://render.com/docs/blueprint-spec).
+
+## 4. Wire GitHub Actions to Render
+
+1. Render service → **Settings → Deploy Hook**: copy its secret URL.
+2. GitHub repository → **Settings → Environments → New environment**: name it `production`. Limit deployment branches to `main`.
+3. Add environment secret **`RENDER_DEPLOY_HOOK_URL`** containing the complete URL.
+4. Push a commit to `main`. `.github/workflows/ci.yml` runs tests and the production build, then triggers Render with that exact checked commit SHA. Pull requests run checks without deploying.
+5. GitHub Actions → **Gamegift checks**: confirm the check and deploy jobs succeed. Then confirm the matching commit becomes **Live** in Render. A successful hook request means deployment was requested; it does not prove the subsequent Render build finished.
+
+Do not put the deploy hook in source code. If a deploy fails, inspect Render logs and redeploy the last working commit in Render. Database migrations are forward-only: inspect schema compatibility before rolling back application code. Back up Supabase and the Render media disk independently; a database backup does not include uploaded images/audio.
+
+Reference: [Render deploy hooks and GitHub Actions](https://render.com/docs/deploy-hooks).
+
+## 5. Connect a domain
+
+1. Buy or use a domain you control. Start with a subdomain such as `games.example.com`.
+2. Render service → **Settings → Custom Domains → Add Custom Domain**: enter `games.example.com`.
+3. At your DNS provider add a **CNAME** record with name `games` and value `YOUR-SERVICE.onrender.com` (no `https://` and no path). For an apex domain, follow Render's displayed ALIAS/ANAME or A-record instructions instead.
+4. Return to Render, verify DNS, and wait for the HTTPS certificate to become active.
+5. Change Render's `APP_ORIGIN` to `https://games.example.com` and redeploy. Use this as the canonical app URL thereafter. Requests from a different production origin are intentionally rejected.
+6. Add the custom-domain Google callback URI in step 6 before testing Google sign-in on this domain.
+
+References: [custom domains](https://render.com/docs/custom-domains), [DNS records](https://render.com/docs/configure-other-dns), [managed HTTPS](https://render.com/docs/tls).
+
+## 6. Enable Google sign-in
+
+1. Open Google Cloud Console, select/create a project, then configure **Google Auth Platform** branding, audience, and contact details. In testing mode, add your intended Google accounts as test users.
+2. Create an **OAuth client ID → Web application**.
+3. Add these exact **Authorized redirect URIs**, replacing the example host:
+   - `http://localhost:5173/api/auth/google/callback`
+   - `https://YOUR-SERVICE.onrender.com/api/auth/google/callback`
+   - `https://games.example.com/api/auth/google/callback`
+4. Copy the client ID and secret to Render's `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then redeploy. For local testing, put them in the ignored `.env`, keep `APP_ORIGIN=http://localhost:5173`, restart `npm run dev`, and open that exact URL.
+5. Open the app's sign-in dialog. For the first Google registration, fill a recovery password of at least 10 characters and the invitation code, then choose **Continue with Google**. Returning Google users can switch to **Sign in** and use the button without a password.
+6. Complete consent in a regular browser. The server validates a one-time, browser-bound OAuth state, exchanges the code, verifies Google's email, and creates the app's HTTP-only session. The recovery password supports password login, password changes, and account deletion.
+7. Existing password accounts are not automatically linked by matching email; use their existing password login. This avoids silently changing ownership. Google sign-in state expires after 10 minutes or an app restart; simply restart sign-in if needed.
+8. Before a public launch, complete Google's audience/publication requirements for your app. This application still uses invitations; publishing a Google consent screen does not remove the invitation requirement.
+
+Do not configure Supabase's Google provider for this implementation: it uses Google's web-server OAuth flow directly. Switching to Supabase Auth would require migrating the app's sessions and account ownership.
+
+References: [Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [Google identity profile](https://developers.google.com/identity/openid-connect/reference).
+
+## Local sign-in troubleshooting
+
+```sh
+nvm use 26 # or any installed Node 24+ version
+npm ci
+# Only if .env does not exist:
+cp .env.example .env
+npm run dev
+```
+
+Open `http://localhost:5173`. Local SQLite and uploads remain in `.data`. The API runs on 3001; Vite forwards `/api` requests. Development accepts exact HTTP loopback origins (`localhost`, `127.0.0.1`, and IPv6 loopback), including alternate ports. Vite now fails clearly if 5173 is occupied rather than silently choosing another port. Stop the old dev process if needed. Production still accepts only `APP_ORIGIN` and requires the app request header for writes.
+
+## Other hosting choices
+
+Railway can run the Node app with a persistent volume and Supabase connection; configure the same build/start commands and variables, then use a Railway-specific GitHub Actions deployment. The included workflow is for Render only. A static-only host cannot run this Express API. Deploying to Vercel/Netlify functions would first require moving uploads to object storage and adapting the server lifecycle and OAuth-state storage. Supabase alone hosts the database/auth/storage services, not this Node app.
+
+## Verification and limits
+
+Run `npm run check`, `npm run format:check`, and `npm run test:e2e` before pushing. CI also runs HTTP integration tests against PostgreSQL. Live Google consent and an actual Render/Supabase deployment require your credentials and must be verified after configuration. A deploy hook returning success is not a completed deployment.
+
+Levels still use a continuous floor and predefined platformer rules. Playtest every chapter: the editor does not prove reachability. Account recovery by email, distributed rate limiting, shared object storage, automatic backups, and multi-instance hosting are not implemented. Operators can reset a recovery password using `npm run account:reset -- email@example.com` from the service shell.

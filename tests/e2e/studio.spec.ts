@@ -47,3 +47,21 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   await expect(page.locator('dialog')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('guided builder preserves movement settings and walks through each step', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('STEP 1 OF 7')).toBeVisible();
+  await page.getByLabel('Game title').fill('My new world');
+  await page.getByRole('button', { name: 'Fast', exact: true }).click();
+  await page.getByLabel('Extra jumps in the air').selectOption('1');
+  for (let step = 2; step <= 7; step++) {
+    await page.getByRole('button', { name: 'Next step', exact: false }).click();
+    await expect(page.getByText(`STEP ${step} OF 7`)).toBeVisible();
+  }
+  await expect(page.getByText('Ready for your first player?')).toBeVisible();
+  await page.getByRole('button', { name: 'Game settings', exact: true }).click();
+  await expect(page.getByLabel('Movement speed')).toHaveValue('380');
+  await expect(page.getByLabel('Extra jumps in the air')).toHaveValue('1');
+  await page.reload();
+  await expect(page.getByLabel('Game title')).toHaveValue('My new world');
+});

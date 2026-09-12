@@ -24,4 +24,11 @@ export const migrations = [
     version: 3,
     statements: ['CREATE TABLE IF NOT EXISTS deleted_files (filename TEXT PRIMARY KEY)'],
   },
+  {
+    version: 4,
+    statements: [
+      'ALTER TABLE users ADD COLUMN google_sub TEXT',
+      'CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)',
+    ],
+  },
 ];

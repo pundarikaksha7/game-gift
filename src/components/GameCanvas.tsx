@@ -41,11 +41,16 @@ export function GameCanvas({
       health = game.physics.health,
       hurt = 0,
       attack = 0,
+      jumps = 0,
       jumpHeld = false;
     let cam = camera;
     const keys = new Set<string>(),
       images = new Map<string, HTMLImageElement>();
-    for (const url of [...game.characters.map((c) => c.sprite), ...game.animation.frames])
+    for (const url of [
+      ...game.characters.map((c) => c.sprite),
+      ...game.animation.frames,
+      level.background || '',
+    ])
       if (url && !images.has(url)) {
         const img = new Image();
         img.src = url;
@@ -105,7 +110,9 @@ export function GameCanvas({
         game.physics.speed;
       if (player.vx) facing = Math.sign(player.vx);
       const jump = pressed('Space', 'ArrowUp', 'KeyW');
-      if (jump && !jumpHeld && player.grounded) {
+      if (player.grounded) jumps = 0;
+      if (jump && !jumpHeld && (player.grounded || jumps < (game.physics.airJumps || 0))) {
+        if (!player.grounded) jumps++;
         player.vy = -game.physics.jump;
         sound.play('jump');
       }
@@ -152,7 +159,7 @@ export function GameCanvas({
         tick(1 / 60);
         acc -= 1 / 60;
       }
-      drawWorld(ctx, level, cam, elapsed, grid);
+      drawWorld(ctx, level, cam, elapsed, grid, images.get(level.background || ''));
       friends.forEach((friend, i) =>
         drawCharacter(
           ctx,

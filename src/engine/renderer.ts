@@ -32,6 +32,7 @@ export function drawWorld(
   camera: number,
   time: number,
   grid = false,
+  background?: HTMLImageElement,
 ) {
   const p = palettes[level.theme];
   ctx.fillStyle = p.sky;
@@ -79,6 +80,12 @@ export function drawWorld(
     ctx.lineTo(x + 7, 272);
     ctx.lineTo(x + 45, 352);
     ctx.fill();
+  }
+  if (background?.complete && background.naturalWidth) {
+    const scale = Math.max(960 / background.naturalWidth, 460 / background.naturalHeight);
+    const w = background.naturalWidth * scale,
+      h = background.naturalHeight * scale;
+    ctx.drawImage(background, (960 - w) / 2, (460 - h) / 2, w, h);
   }
   for (const plat of platformsAt(level, time)) {
     ctx.fillStyle = p.ground;

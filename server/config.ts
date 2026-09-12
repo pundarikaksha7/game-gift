@@ -10,3 +10,19 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
   if (!env.REGISTRATION_CODE || env.REGISTRATION_CODE.length < 32)
     throw new Error('Production requires a REGISTRATION_CODE of at least 32 characters');
 }
+
+/** Local loopback origins are allowed only during development; production remains exact. */
+export function trustedOrigin(origin: string, env: NodeJS.ProcessEnv = process.env) {
+  if (origin === (env.APP_ORIGIN || 'http://localhost:5173')) return true;
+  if (env.NODE_ENV === 'production') return false;
+  try {
+    const url = new URL(origin);
+    return (
+      url.origin === origin &&
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}

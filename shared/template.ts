@@ -20,13 +20,13 @@ export function newLevel(index: number): Level {
 export function createTemplate(): Game {
   return {
     schemaVersion: 1,
-    title: 'Ananya’s little adventure',
+    title: 'Your next adventure',
     description: 'A journey through the places, people, and little moments that make you, you.',
-    recipient: 'Ananya',
+    recipient: 'Player',
     characters: [
       {
         id: 'hero',
-        name: 'Ananya',
+        name: 'Player',
         role: 'hero',
         sprite: '/assets/hero.webp',
         color: '#a7b78f',
@@ -53,10 +53,30 @@ export function createTemplate(): Game {
     story: {
       opening:
         'Some gifts fit in a box. This one is a whole little world. Ready for an adventure made just for you?',
-      ending: 'Here’s to all the adventures still to come. Happy birthday, Ananya! ♡',
+      ending: 'Here’s to all the adventures still to come. Your next chapter awaits!',
     },
     physics: { speed: 270, jump: 590, gravity: 1500, health: 5 },
     sounds: { music: '', jump: '', hit: '', win: '', volume: 0.45 },
     animation: { preset: 'bounce', speed: 1, squash: 0.08, frames: [], fps: 8 },
   };
+}
+
+/** Upgrade untouched starter personalization when reopening an older draft. */
+export function upgradeStarter(game: Game): Game {
+  const recipient = game.recipient;
+  if (
+    !recipient ||
+    game.title !== `${recipient}’s little adventure` ||
+    game.story.ending !==
+      `Here’s to all the adventures still to come. Happy birthday, ${recipient}! ♡`
+  )
+    return game;
+  const next = structuredClone(game),
+    template = createTemplate();
+  next.title = template.title;
+  next.recipient = template.recipient;
+  next.story.ending = template.story.ending;
+  for (const character of next.characters)
+    if (character.role === 'hero' && character.name === recipient) character.name = 'Player';
+  return next;
 }

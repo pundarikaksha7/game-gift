@@ -10,8 +10,8 @@ export function SettingsEditor({ game, change }: EditorProps) {
     <>
       <div className="section-top">
         <div>
-          <h2>The finishing touches</h2>
-          <p>A name, a feeling, and just the right challenge.</p>
+          <h2>Start with your game</h2>
+          <p>Name your adventure, then choose how your player moves.</p>
         </div>
       </div>
       <div className="form-card">
@@ -41,6 +41,43 @@ export function SettingsEditor({ game, change }: EditorProps) {
       </div>
       <div className="form-card">
         <h3>How it feels to play</h3>
+        <div className="inline-actions">
+          {[
+            { name: 'Relaxed', speed: 220, jump: 650, gravity: 1200, health: 8 },
+            { name: 'Classic', speed: 270, jump: 590, gravity: 1500, health: 5 },
+            { name: 'Fast', speed: 380, jump: 700, gravity: 1800, health: 3 },
+          ].map(({ name, ...physics }) => (
+            <button
+              key={name}
+              className="secondary"
+              onClick={() =>
+                change((g) => {
+                  g.physics = { ...g.physics, ...physics };
+                })
+              }
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <Field label="Extra jumps in the air">
+          <select
+            value={game.physics.airJumps || 0}
+            onChange={(e) =>
+              change((g) => {
+                g.physics.airJumps = Number(e.target.value);
+              })
+            }
+          >
+            <option value={0}>Single jump</option>
+            <option value={1}>Double jump</option>
+            <option value={2}>Triple jump</option>
+          </select>
+        </Field>
+        <p className="muted">
+          Move: arrows or A/D · Jump: Space, W or ↑ · Attack: J/K. Touch controls appear in
+          playtest.
+        </p>
         <div className="form-grid">
           {(['speed', 'jump', 'gravity', 'health'] as const).map((k) => (
             <Field
@@ -57,6 +94,8 @@ export function SettingsEditor({ game, change }: EditorProps) {
             >
               <input
                 type="number"
+                min={{ speed: 100, jump: 350, gravity: 800, health: 1 }[k]}
+                max={{ speed: 500, jump: 850, gravity: 2200, health: 10 }[k]}
                 value={game.physics[k]}
                 onChange={(e) =>
                   change((g) => {

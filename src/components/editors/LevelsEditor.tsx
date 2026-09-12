@@ -8,6 +8,8 @@ import type { EditorProps } from './types';
 export function LevelsEditor({
   game,
   change,
+  notify,
+  authed,
   level,
   setLevel,
   placing,
@@ -152,6 +154,41 @@ export function LevelsEditor({
             />
           </Field>
         </div>
+        <Field
+          label="Chapter background"
+          hint="Choose an atmosphere above, or upload PNG, JPEG or WebP artwork. Artwork fills the sky; platforms stay visible."
+        >
+          <UploadButton
+            label="Upload background"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={!authed}
+            onFile={async (file) => {
+              const id = l.id;
+              try {
+                const url = await uploadAsset(file, 'image');
+                change((g) => {
+                  const chapter = g.levels.find((x) => x.id === id);
+                  if (chapter) chapter.background = url;
+                });
+              } catch (e) {
+                notify((e as Error).message);
+              }
+            }}
+          />
+        </Field>
+        {!authed && <p className="muted">Sign in to upload your own background artwork.</p>}
+        {l.background && (
+          <button
+            className="secondary"
+            onClick={() =>
+              change((g) => {
+                g.levels[level].background = '';
+              })
+            }
+          >
+            Use atmosphere background
+          </button>
+        )}
         <div className="section-top compact">
           <h3>Platforms</h3>
           <button
