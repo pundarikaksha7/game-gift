@@ -2,6 +2,7 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/manrope';
 import { Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import './landing.css';
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false };
   static getDerivedStateFromError() {
@@ -45,7 +46,7 @@ async function boot() {
   }
   const [{ default: App }] = await Promise.all([
     landing ? import('./Landing') : import('./Studio'),
-    landing ? import('./landing.css') : import('./studio.css'),
+    landing ? Promise.resolve() : import('./studio.css'),
   ]);
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
