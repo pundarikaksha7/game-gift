@@ -9,3 +9,6 @@ backups/
 .env.*
 !.env.example
 !.env.production.example
+
+certs/*
+!certs/prod-ca-2021.crt

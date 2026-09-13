@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
 import { newLevel } from '../../../shared/template';
-import { uploadAsset } from '../../api';
+import { attachAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function CharactersEditor({ game, change, notify, authed }: EditorProps) {
@@ -210,13 +210,13 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
           </div>
           <UploadButton
             label={busy ? 'Uploading…' : 'Upload character'}
-            disabled={busy || !authed}
+            disabled={busy}
             accept="image/png,image/jpeg,image/webp"
             onFile={async (f) => {
               setBusy(true);
               try {
                 const id = c.id;
-                const sprite = await uploadAsset(f, 'image');
+                const sprite = await attachAsset(f, 'image');
                 change((g) => {
                   const target = g.characters.find((x) => x.id === id);
                   if (target) target.sprite = sprite;
@@ -240,12 +240,12 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
           </div>
           <UploadButton
             label="Add character frame"
-            disabled={!authed || (c.frames?.length || 0) >= 24}
+            disabled={(c.frames?.length || 0) >= 24}
             accept="image/png,image/webp,image/jpeg"
             onFile={async (f) => {
               const id = c.id;
               try {
-                const url = await uploadAsset(f, 'image');
+                const url = await attachAsset(f, 'image');
                 change((g) => {
                   const target = g.characters.find((x) => x.id === id);
                   if (target) target.frames = [...(target.frames || []), url];
@@ -270,7 +270,11 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             </div>
           ))}
         </div>
-        {!authed && <small className="muted">Sign in to upload and store your own assets.</small>}
+        {!authed && (
+          <small className="muted">
+            Sign in and save to keep this art in your Gamegift account.
+          </small>
+        )}
       </div>
     </>
   );

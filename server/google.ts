@@ -5,15 +5,15 @@ export const googleEnabled = () =>
   !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 export function googleFlow() {
-  const pending = new Map<string, { expires: number; password: string; invited: boolean }>();
+  const pending = new Map<string, { expires: number; password: string }>();
   const callback = () =>
     `${process.env.APP_ORIGIN || 'http://localhost:5173'}/api/auth/google/callback`;
   return {
-    start(res: express.Response, password: string, invited: boolean) {
+    start(res: express.Response, password: string) {
       for (const [key, value] of pending) if (value.expires < Date.now()) pending.delete(key);
       if (pending.size >= 1000) throw new Error('Sign-in is busy. Try again shortly.');
       const state = randomBytes(32).toString('hex');
-      pending.set(digest(state), { expires: Date.now() + 600000, password, invited });
+      pending.set(digest(state), { expires: Date.now() + 600000, password });
       res.cookie('google_state', state, {
         httpOnly: true,
         sameSite: 'lax',

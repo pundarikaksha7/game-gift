@@ -10,7 +10,6 @@ services:
       APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
       DATABASE_URL: postgresql://game-gift:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/game-gift
       TRUST_PROXY: 1
-      REGISTRATION_CODE: ${REGISTRATION_CODE:?Set a random invitation code in .env}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
     volumes:

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
 import { newLevel } from '../../../shared/template';
-import { uploadAsset } from '../../api';
+import { attachAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function LevelsEditor({
@@ -162,11 +162,10 @@ export function LevelsEditor({
           <UploadButton
             label="Upload background"
             accept="image/png,image/jpeg,image/webp"
-            disabled={!authed}
             onFile={async (file) => {
               const id = l.id;
               try {
-                const url = await uploadAsset(file, 'image');
+                const url = await attachAsset(file, 'image');
                 change((g) => {
                   const chapter = g.levels.find((x) => x.id === id);
                   if (chapter) chapter.background = url;
@@ -177,7 +176,9 @@ export function LevelsEditor({
             }}
           />
         </Field>
-        {!authed && <p className="muted">Sign in to upload your own background artwork.</p>}
+        {!authed && (
+          <p className="muted">Sign in and save to keep this artwork in your Gamegift account.</p>
+        )}
         {l.background && (
           <button
             className="secondary"

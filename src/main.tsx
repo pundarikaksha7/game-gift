@@ -12,9 +12,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
   render() {
     return this.state.error ? (
       <main className="public-page">
-        <h1>Let’s get your studio back.</h1>
-        <p>Something unexpected happened. Reload to reopen the studio.</p>
-        <button onClick={() => location.reload()}>Reload studio</button>
+        <h1>Let’s get Gamegift back.</h1>
+        <p>Something unexpected happened. Reload to reopen Gamegift.</p>
+        <button onClick={() => location.reload()}>Reload Gamegift</button>
         <button
           onClick={() => {
             localStorage.removeItem('game-gift-draft-v2');

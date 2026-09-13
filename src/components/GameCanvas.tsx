@@ -229,6 +229,12 @@ function ClassicGameCanvas({
 
 export function GameCanvas(props: Parameters<typeof ClassicGameCanvas>[0]) {
   const game = useRuntimeMedia(props.game);
+  if (!game)
+    return (
+      <div className="adventure-game-frame" role="status">
+        Loading your art…
+      </div>
+    );
   return props.game.engine === 'classic' ? (
     <ClassicGameCanvas {...props} game={game} />
   ) : (

@@ -1,4 +1,4 @@
-# Deploy game-gift
+# Deploy Gamegift
 
 ## Architecture
 
@@ -10,17 +10,17 @@
 
 Create a Supabase project and a **private** `game-gift-media` bucket, allowing JPEG, PNG, WebP, and the audio MIME types accepted by the API. Use a 10 MB object limit. Set the following only on Render:
 
-| Variable                  | Value                                                     |
-| ------------------------- | --------------------------------------------------------- |
-| NODE_VERSION              | 24                                                        |
-| NODE_ENV                  | production                                                |
-| DATABASE_URL              | Supabase PostgreSQL session-pooler URL with TLS           |
-| APP_ORIGIN                | Exact canonical frontend HTTPS origin; no trailing slash  |
-| TRUST_PROXY               | 1 for direct Render; verify forwarding when adding Vercel |
-| REGISTRATION_CODE         | Random secret of at least 32 characters                   |
-| SUPABASE_URL              | Exact project HTTPS origin                                |
-| SUPABASE_SERVICE_ROLE_KEY | Server-only service role credential                       |
-| SUPABASE_STORAGE_BUCKET   | game-gift-media                                           |
+| Variable                  | Value                                                         |
+| ------------------------- | ------------------------------------------------------------- |
+| NODE_VERSION              | 24                                                            |
+| NODE_ENV                  | production                                                    |
+| DATABASE_URL              | Supabase PostgreSQL session-pooler URL with TLS               |
+| DATABASE_SSL_CA           | Optional path to a CA PEM; defaults to certs/prod-ca-2021.crt |
+| APP_ORIGIN                | Exact canonical frontend HTTPS origin; no trailing slash      |
+| TRUST_PROXY               | 1 for direct Render; verify forwarding when adding Vercel     |
+| SUPABASE_URL              | Exact project HTTPS origin                                    |
+| SUPABASE_SERVICE_ROLE_KEY | Server-only service role credential                           |
+| SUPABASE_STORAGE_BUCKET   | game-gift-media                                               |
 
 The storage key never reaches the browser. The API checks asset ownership or active publication before returning private media. Account deletion queues media removal for retry. When switching from local storage to Supabase, migrate all existing objects before setting the storage variables; the application does not copy them automatically.
 
@@ -34,10 +34,10 @@ Vercel external rewrites keep API calls on the browser's origin: [official routi
 
 ## Optional integrations
 
-Set `OPENAI_API_KEY` and `OPENAI_MODEL` on Render to enable reviewed AI changes. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to enable Google login, with the redirect URI `https://YOUR-FRONTEND/api/auth/google/callback`. New accounts still require an invitation and recovery password. Live provider flows require verification with configured credentials.
+Set `OPENAI_API_KEY` and `OPENAI_MODEL` on Render to enable reviewed AI changes. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to enable Google login, with the redirect URI `https://YOUR-FRONTEND/api/auth/google/callback`. New Google accounts still need a recovery password chosen on Create account. Live provider flows require verification with configured credentials.
 
 ## Release checklist
 
 Run unit/API tests, the production build, formatting checks, and desktop/mobile browser tests before deploying. Verify the live health endpoint, signup, save/reopen, media upload, publish/play/unpublish, and logs. Check that private media returns 404 to a different account. Confirm media survives a backend restart. Back up PostgreSQL and the storage bucket independently and test restoration.
 
-This release supports invitation-only creator workspaces. Public self-service billing, automated password recovery, abuse reporting, distributed rate limits, and multiple API replicas require additional implementation.
+Anyone can create a creator account. Public self-service billing, automated password recovery, abuse reporting, distributed rate limits, and multiple API replicas require additional implementation.

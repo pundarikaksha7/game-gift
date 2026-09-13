@@ -1,4 +1,4 @@
-# game-gift Studio
+# Gamegift
 
 A multi-project builder for creating, playtesting, and publishing interactive adventures. Start with an exploration game, a story journey, or an arcade challenge; customize the cast, level layouts, physics, encounters, audio, and narrative. Projects use a declarative content schema and a reusable runtime.
 
@@ -22,7 +22,7 @@ Open http://localhost:5173. The Express API runs on port 3001. Without cloud cre
 - Up to 12 chapters with moving platforms, pits, optional crossings, power-ups, and configurable bosses.
 - Keyboard and touch playtesting, chapter progression, retry, and final messages.
 - Undo/redo, validated JSON import/export, the latest 100 saved revisions, and optimistic concurrency.
-- Owner-scoped accounts and uploads, HTTP-only sessions, CSRF checks, invitation-protected registration, rate limits, and published snapshots.
+- Owner-scoped accounts and uploads, HTTP-only sessions, CSRF checks, open account registration, rate limits, and published snapshots.
 - Optional private Supabase object storage and PostgreSQL persistence.
 - Optional reviewed AI proposals, enabled by server-side provider credentials.
 
@@ -40,4 +40,4 @@ Browser tests cover desktop/mobile creation, editing, persistence, publish/play/
 
 See [deployment guide](docs/DEPLOYMENT.md). The intended topology is Vercel for the frontend, Render for the API, and Supabase for PostgreSQL plus a private media bucket. Vercel proxies `/api` to Render so cookies and media remain on the same browser origin. The Render service can also serve the complete app directly.
 
-Registration remains invitation protected. Billing, team roles, automated email recovery, and distributed rate limits are not implemented. Use one API instance until OAuth state and rate limits use a shared store. Playtest authored levels before publishing; schema validation does not establish reachability. JSON exports reference hosted assets rather than bundling them. Configure database/storage backups before a public launch.
+Anyone can create an account. Billing, team roles, automated email recovery, and distributed rate limits are not implemented. Use one API instance until OAuth state and rate limits use a shared store. Playtest authored levels before publishing; schema validation does not establish reachability. JSON exports reference hosted assets rather than bundling them. Configure database/storage backups before a public launch.

@@ -10,7 +10,7 @@ test('Google flow binds callback to browser, consumes state once, and checks ver
     },
     clearCookie: () => {},
   };
-  const url = new URL(flow.start(res, 'hashed-password', true));
+  const url = new URL(flow.start(res, 'hashed-password'));
   assert.equal(url.searchParams.get('state'), cookie);
   await assert.rejects(
     flow.finish(
@@ -26,7 +26,7 @@ test('Google flow binds callback to browser, consumes state once, and checks ver
     ),
     /expired/,
   );
-  flow.start(res, 'hashed-password', true);
+  flow.start(res, 'hashed-password');
   const original = globalThis.fetch;
   globalThis.fetch = (async (url: string) =>
     new Response(
@@ -43,8 +43,7 @@ test('Google flow binds callback to browser, consumes state once, and checks ver
     );
     assert.equal(result.email, 'user@example.com');
     assert.equal(result.sub, 'google-id');
-    assert.equal(result.invited, true);
-    flow.start(res, '', false);
+    flow.start(res, '');
     globalThis.fetch = (async (url: string) =>
       new Response(
         JSON.stringify(

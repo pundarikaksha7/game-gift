@@ -49,16 +49,6 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
   try {
     assert.equal((await request('/projects')).status, 401);
     process.env.REGISTRATION_CODE = 'a'.repeat(32);
-    assert.equal(
-      (
-        await request('/auth/register', 'POST', {
-          email: 'blocked@example.com',
-          password: 'a-long-password',
-        })
-      ).status,
-      403,
-    );
-    delete process.env.REGISTRATION_CODE;
     const first = await request('/auth/register', 'POST', {
       email: 'alice@example.com',
       name: 'Alice',
@@ -128,6 +118,12 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     malformed.physics.speed = 99999;
     assert.equal(
       (await request(`/projects/${id}`, 'PUT', { game: malformed, revision: 4 }, alice)).status,
+      400,
+    );
+    const localOnly = structuredClone(game);
+    localOnly.characters[0].sprite = 'blob:http://127.0.0.1/12345678-1234-1234-1234-123456789abc';
+    assert.equal(
+      (await request(`/projects/${id}`, 'PUT', { game: localOnly, revision: 4 }, alice)).status,
       400,
     );
     const form = new FormData();

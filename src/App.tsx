@@ -38,7 +38,8 @@ import {
   type Proposal,
 } from '../shared/schema';
 import { createTemplate, createStarter, starters, type StarterId } from '../shared/template';
-import { api } from './api';
+import { api, setUploadProject } from './api';
+import { hasLocalAssets, persistLocalAssets, stripLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
 import { Modal, Field, UploadButton } from './components/UI';
@@ -64,7 +65,7 @@ type User = { id: string; name: string; email: string };
 function initial() {
   try {
     const raw = localStorage.getItem('game-gift-draft-v2');
-    return raw ? gameSchema.parse(JSON.parse(raw)) : createTemplate();
+    return raw ? stripLocalAssets(gameSchema.parse(JSON.parse(raw))) : createTemplate();
   } catch {
     return createTemplate();
   }
@@ -93,7 +94,6 @@ export default function App() {
     [prompt, setPrompt] = useState(''),
     [googleEnabled, setGoogleEnabled] = useState(false),
     [aiEnabled, setAiEnabled] = useState(false),
-    [registrationCodeRequired, setRegistrationCodeRequired] = useState(false),
     [undo, setUndo] = useState<Game[]>([]),
     [redo, setRedo] = useState<Game[]>([]);
   const [cloudUnavailable, setCloudUnavailable] = useState(false);
@@ -150,10 +150,12 @@ export default function App() {
       .then((d) => {
         setAiEnabled(d.aiEnabled);
         setGoogleEnabled(d.googleEnabled);
-        setRegistrationCodeRequired(d.registrationCodeRequired);
       })
       .catch(() => setCloudUnavailable(true));
   }, [publicId]);
+  useEffect(() => {
+    setUploadProject(project?.id ?? null);
+  }, [project?.id]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), 6000);
@@ -163,7 +165,7 @@ export default function App() {
     if (publicId || project || user) return;
     if (gameSchema.safeParse(game).success)
       try {
-        localStorage.setItem('game-gift-draft-v2', JSON.stringify(game));
+        localStorage.setItem('game-gift-draft-v2', JSON.stringify(stripLocalAssets(game)));
       } catch {
         notify('Browser storage is full. Export your game to keep a copy.');
       }
@@ -214,16 +216,29 @@ export default function App() {
     const epoch = draftEpoch.current;
     setBusy(true);
     try {
-      const p = await api<Project>(project ? `/projects/${project.id}` : '/projects', {
-        method: project ? 'PUT' : 'POST',
-        body: JSON.stringify({ game, revision: project?.revision }),
+      let payload = parsed.data;
+      let current = project;
+      if (hasLocalAssets(payload) && !current) {
+        current = await api<Project>('/projects', {
+          method: 'POST',
+          body: JSON.stringify({ game: stripLocalAssets(payload) }),
+        });
+        setUploadProject(current.id);
+      } else if (current) setUploadProject(current.id);
+      if (hasLocalAssets(payload)) {
+        payload = await persistLocalAssets(payload);
+        if (epoch === draftEpoch.current) setGame(payload);
+      }
+      const p = await api<Project>(current ? `/projects/${current.id}` : '/projects', {
+        method: current ? 'PUT' : 'POST',
+        body: JSON.stringify({ game: payload, revision: current?.revision }),
       });
       if (epoch !== draftEpoch.current) return;
       setProject(p);
       try {
         localStorage.setItem(`game-gift-last-${user.id}`, p.id);
       } catch {}
-      setSaved(JSON.stringify(game));
+      setSaved(JSON.stringify(payload));
       notify('Your adventure is saved');
       return p;
     } catch (e) {
@@ -297,7 +312,7 @@ export default function App() {
           <span className="brand-mark">
             <Gamepad2 size={23} />
           </span>
-          game-gift<span className="brand-dot">studio</span>
+          Gamegift
         </a>
         {publicGame ? (
           <>
@@ -306,7 +321,7 @@ export default function App() {
             <PlayGame game={publicGame} />
             <p className="muted">
               A little world, made for {publicGame.recipient || 'you'} with <Heart size={12} />{' '}
-              game-gift.
+              Gamegift.
             </p>
           </>
         ) : (
@@ -321,7 +336,7 @@ export default function App() {
           <span className="brand-mark">
             <Gamepad2 size={22} />
           </span>
-          game-gift<span className="brand-dot">studio</span>
+          Gamegift
         </a>
         <button className="workspace-picker" onClick={showProjects}>
           <span className="workspace-icon">{user?.name[0].toUpperCase() || 'P'}</span>
@@ -735,7 +750,7 @@ export default function App() {
           </div>
           <footer className="studio-footer">
             <span>
-              <Heart size={12} /> game-gift Studio
+              <Heart size={12} /> Gamegift
             </span>
             <span>Create something worth playing.</span>
           </footer>
@@ -859,12 +874,7 @@ export default function App() {
                     const result = await api('/auth/google/start', {
                       method: 'POST',
                       body: JSON.stringify(
-                        authMode === 'register'
-                          ? {
-                              password: data.get('password'),
-                              registrationCode: data.get('registrationCode') || undefined,
-                            }
-                          : {},
+                        authMode === 'register' ? { password: data.get('password') } : {},
                       ),
                     });
                     location.assign(result.url);
@@ -880,17 +890,6 @@ export default function App() {
             {authMode === 'register' && (
               <Field label="Your name">
                 <input name="name" required maxLength={60} autoComplete="name" />
-              </Field>
-            )}
-            {authMode === 'register' && registrationCodeRequired && (
-              <Field label="Invitation code" hint="Ask the site owner for an invitation.">
-                <input
-                  name="registrationCode"
-                  type="password"
-                  required
-                  maxLength={256}
-                  autoComplete="off"
-                />
               </Field>
             )}
             <Field label="Email address">

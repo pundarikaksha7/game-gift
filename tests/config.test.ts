@@ -1,17 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateEnvironment } from '../server/config';
-test('production fails closed on missing invitations and invalid origin/proxy configuration', () => {
+test('production fails closed on missing auth storage and invalid origin/proxy configuration', () => {
   const valid = {
     NODE_ENV: 'production',
     DATABASE_URL: 'postgresql://localhost/test',
     APP_ORIGIN: 'https://games.example.com',
-    REGISTRATION_CODE: 'a'.repeat(32),
     TRUST_PROXY: '1',
+    AUTH_PROVIDER: 'supabase',
+    SUPABASE_URL: 'https://example.supabase.co',
+    SUPABASE_ANON_KEY: 'anon',
+    SUPABASE_SERVICE_ROLE_KEY: 'service',
   };
   assert.doesNotThrow(() => validateEnvironment(valid));
   for (const change of [
-    { REGISTRATION_CODE: '' },
+    { AUTH_PROVIDER: 'legacy' },
+    { SUPABASE_URL: '' },
     { APP_ORIGIN: 'http://games.example.com' },
     { APP_ORIGIN: 'https://games.example.com/' },
     { APP_ORIGIN: 'https://games.example.com/path' },

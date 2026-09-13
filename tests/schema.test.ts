@@ -90,6 +90,8 @@ test('background uploads participate in asset authorization and movement options
   game.physics.airJumps = 0;
   game.levels[0].background = 'https://untrusted.example/image.png';
   assert.equal(gameSchema.safeParse(game).success, false);
+  game.levels[0].background = 'blob:http://127.0.0.1:5173/12345678-1234-1234-1234-123456789abc';
+  assert.equal(gameSchema.safeParse(game).success, true);
 });
 
 test('every reusable starter validates and maps movement into runtime coordinates', async () => {

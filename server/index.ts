@@ -19,7 +19,7 @@ const maintenance = setInterval(async () => {
 }, 60000);
 maintenance.unref();
 const server = createApp(db).listen(Number(process.env.PORT || 3001), '0.0.0.0', () =>
-  console.log(`game-gift API listening on ${process.env.PORT || 3001}`),
+  console.log(`Gamegift API listening on ${process.env.PORT || 3001}`),
 );
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, () => {

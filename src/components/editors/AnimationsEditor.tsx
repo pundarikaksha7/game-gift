@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
 import { newLevel } from '../../../shared/template';
-import { uploadAsset } from '../../api';
+import { attachAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function AnimationsEditor({ game, change, notify, authed }: EditorProps) {
@@ -83,12 +83,12 @@ export function AnimationsEditor({ game, change, notify, authed }: EditorProps) 
           </div>
           <UploadButton
             label={busy ? 'Uploading…' : 'Add frame'}
-            disabled={!authed || busy || a.frames.length >= 24}
+            disabled={busy || a.frames.length >= 24}
             accept="image/png,image/webp,image/jpeg"
             onFile={async (f) => {
               setBusy(true);
               try {
-                const url = await uploadAsset(f, 'image');
+                const url = await attachAsset(f, 'image');
                 change((g) => g.animation.frames.push(url));
               } catch (e) {
                 notify((e as Error).message);

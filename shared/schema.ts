@@ -4,8 +4,11 @@ const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const text = z.string().max(2000);
 export const assetUrl = z
   .string()
-  .max(150)
-  .refine((v) => v === '' || /^\/api\/assets\/[a-f0-9-]{36}$/.test(v), 'Use an uploaded asset');
+  .max(256)
+  .refine(
+    (v) => v === '' || /^\/api\/assets\/[a-f0-9-]{36}$/.test(v) || /^blob:/i.test(v),
+    'Use an uploaded asset',
+  );
 export const characterSchema = z
   .object({
     id,

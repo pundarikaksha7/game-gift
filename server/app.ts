@@ -58,15 +58,28 @@ export function createApp(db: DB) {
   app.use((req, res, next) => {
     const origin = req.get('origin');
     if (origin && trustedOrigin(origin)) {
-      res.set('Access-Control-Allow-Origin', origin).set('Access-Control-Allow-Credentials', 'true').vary('Origin');
-      res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-game-gift-Request, X-Project-Id');
+      res
+        .set('Access-Control-Allow-Origin', origin)
+        .set('Access-Control-Allow-Credentials', 'true')
+        .vary('Origin');
+      res.set(
+        'Access-Control-Allow-Headers',
+        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id',
+      );
       res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     }
-    if (req.method === 'OPTIONS') { res.sendStatus(origin && trustedOrigin(origin) ? 204 : 403); return; }
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(origin && trustedOrigin(origin) ? 204 : 403);
+      return;
+    }
     next();
   });
   // Provider signatures cover exact bytes, before JSON parsing or browser CSRF middleware.
-  app.post('/api/webhooks/razorpay', express.raw({ type: 'application/json', limit: '256kb' }), paymentWebhook(db));
+  app.post(
+    '/api/webhooks/razorpay',
+    express.raw({ type: 'application/json', limit: '256kb' }),
+    paymentWebhook(db),
+  );
   app.use(express.json({ limit: '1mb' }), cookieParser());
   app.use(
     '/api',
@@ -77,7 +90,8 @@ export function createApp(db: DB) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin;
       if (origin && !trustedOrigin(origin)) return next(fail(403, 'Untrusted request origin'));
-      if (!supabaseAuthEnabled() && !req.headers['x-game-gift-request']) return next(fail(403, 'Missing request header'));
+      if (!supabaseAuthEnabled() && !req.headers['x-game-gift-request'])
+        return next(fail(403, 'Missing request header'));
     }
     next();
   });
@@ -90,7 +104,6 @@ export function createApp(db: DB) {
       googleEnabled: !supabaseAuthEnabled() && googleEnabled(),
       authProvider: supabaseAuthEnabled() ? 'supabase' : 'legacy',
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
-      registrationCodeRequired: !supabaseAuthEnabled() && !!process.env.REGISTRATION_CODE,
     }),
   );
   const authLimit = rateLimit({
@@ -107,7 +120,6 @@ export function createApp(db: DB) {
       .transform((s) => s.toLowerCase()),
     password: z.string().min(10).max(128),
     name: z.string().trim().min(1).max(60).optional(),
-    registrationCode: z.string().max(256).optional(),
   });
   async function session(user: any, res: express.Response, redirect = false) {
     await db.query('DELETE FROM sessions WHERE expires<$1', [Date.now()]);
@@ -128,7 +140,8 @@ export function createApp(db: DB) {
     else res.json({ user: { id: user.id, name: user.name, email: user.email } });
   }
   app.use('/api/auth', (req, _res, next) => {
-    if (supabaseAuthEnabled() && !['/me', '/account'].includes(req.path)) return next(fail(404, 'Use Supabase Auth'));
+    if (supabaseAuthEnabled() && !['/me', '/account'].includes(req.path))
+      return next(fail(404, 'Use Supabase Auth'));
     next();
   });
   const google = googleFlow();
@@ -137,17 +150,10 @@ export function createApp(db: DB) {
     const input = z
       .object({
         password: z.string().min(10).max(128).optional(),
-        registrationCode: z.string().max(256).optional(),
       })
       .parse(req.body);
-    const invited =
-      !process.env.REGISTRATION_CODE ||
-      timingSafeEqual(
-        Buffer.from(hashToken(input.registrationCode || '')),
-        Buffer.from(hashToken(process.env.REGISTRATION_CODE)),
-      );
     res.json({
-      url: google.start(res, input.password ? await passwordHash(input.password) : '', invited),
+      url: google.start(res, input.password ? await passwordHash(input.password) : ''),
     });
   });
   app.get('/api/auth/google/callback', authLimit, async (req, res) => {
@@ -156,8 +162,6 @@ export function createApp(db: DB) {
       const profile = await google.finish(req, res);
       let [user] = await db.query('SELECT * FROM users WHERE google_sub=$1', [profile.sub]);
       if (!user) {
-        if (!profile.invited)
-          throw new Error('A valid invitation code is required to create an account.');
         if (!profile.password)
           throw new Error(
             'Choose Create account and set a recovery password before your first Google sign-in.',
@@ -179,7 +183,6 @@ export function createApp(db: DB) {
         '/?authError=' +
           encodeURIComponent(
             message.startsWith('Google') ||
-              message.startsWith('A valid') ||
               message.startsWith('Choose Create') ||
               message.startsWith('This email')
               ? message
@@ -190,14 +193,6 @@ export function createApp(db: DB) {
   });
   app.post('/api/auth/register', authLimit, async (req, res) => {
     const input = credentials.parse(req.body);
-    if (
-      process.env.REGISTRATION_CODE &&
-      !timingSafeEqual(
-        Buffer.from(hashToken(input.registrationCode || '')),
-        Buffer.from(hashToken(process.env.REGISTRATION_CODE)),
-      )
-    )
-      throw fail(403, 'A valid invitation code is required');
     const user = {
       id: randomUUID(),
       email: input.email,
@@ -233,7 +228,8 @@ export function createApp(db: DB) {
   const auth: express.RequestHandler = async (req, res, next) => {
     if (supabaseAuthEnabled()) {
       res.locals.user = await authenticateSupabase(db, req.get('authorization'));
-      next(); return;
+      next();
+      return;
     }
     const [user] = await db.query(
       'SELECT users.id, users.name, users.email FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.token=$1 AND sessions.expires>$2',
@@ -268,11 +264,17 @@ export function createApp(db: DB) {
     await session(res.locals.user, res);
   });
   app.delete('/api/auth/account', authLimit, auth, async (req, res) => {
-    const password = supabaseAuthEnabled() ? '' : z.object({ password: passwordInput }).parse(req.body).password;
+    const password = supabaseAuthEnabled()
+      ? ''
+      : z.object({ password: passwordInput }).parse(req.body).password;
     await db.transaction(async (q) => {
       const id = res.locals.user.id;
       await q('UPDATE users SET name=name WHERE id=$1', [id]);
-      if (supabaseAuthEnabled()) await q('INSERT INTO deleted_accounts(id,created_at) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, new Date().toISOString()]);
+      if (supabaseAuthEnabled())
+        await q(
+          'INSERT INTO deleted_accounts(id,created_at) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [id, new Date().toISOString()],
+        );
       else await verifyPassword(id, password, q);
       await q('INSERT INTO deleted_files(filename) SELECT filename FROM assets WHERE owner_id=$1', [
         id,
@@ -285,9 +287,10 @@ export function createApp(db: DB) {
   });
 
   app.get('/api/play/:id', async (req, res) => {
-    const [p] = await db.query("SELECT published_game FROM projects WHERE (published_id=$1 OR slug=$2) AND publication_status='active'", [
-      req.params.id, req.params.id,
-    ]);
+    const [p] = await db.query(
+      "SELECT published_game FROM projects WHERE (published_id=$1 OR slug=$2) AND publication_status='active'",
+      [req.params.id, req.params.id],
+    );
     if (!p?.published_game) throw fail(404, 'This game is not published');
     res.json({ game: JSON.parse(p.published_game) });
   });
@@ -299,11 +302,15 @@ export function createApp(db: DB) {
       "SELECT projects.id FROM published_assets JOIN projects ON projects.id=published_assets.project_id WHERE published_assets.asset_id=$1 AND projects.published_id IS NOT NULL AND projects.publication_status='active'",
       [asset.id],
     );
-    const [legacyOwner] = await db.query('SELECT user_id FROM sessions WHERE token=$1 AND expires>$2', [
-      hashToken(req.cookies.session || ''),
-      Date.now(),
-    ]);
-    const owner = supabaseAuthEnabled() ? (req.get('authorization') ? { user_id: (await authenticateSupabase(db, req.get('authorization'))).id } : null) : legacyOwner;
+    const [legacyOwner] = await db.query(
+      'SELECT user_id FROM sessions WHERE token=$1 AND expires>$2',
+      [hashToken(req.cookies.session || ''), Date.now()],
+    );
+    const owner = supabaseAuthEnabled()
+      ? req.get('authorization')
+        ? { user_id: (await authenticateSupabase(db, req.get('authorization'))).id }
+        : null
+      : legacyOwner;
     if (!publicUse && owner?.user_id !== asset.owner_id) throw fail(404, 'Asset not found');
     res
       .type(asset.mime)
@@ -318,6 +325,8 @@ export function createApp(db: DB) {
   }
   async function validateAssets(game: Game, user: string) {
     for (const { url, kind } of assetReferences(game)) {
+      if (url.startsWith('blob:') || url.startsWith('data:'))
+        throw fail(400, 'Upload your media before saving');
       if (url.startsWith('/assets/')) {
         if (kind !== 'image') throw fail(400, 'Sound slots require an audio upload');
         continue;
@@ -429,12 +438,22 @@ export function createApp(db: DB) {
         res.locals.user.id,
       ]);
       const p = await owned(req.params.id, res.locals.user.id, q);
-      if (p.publication_status === 'disabled') throw fail(403, 'This game has been disabled by moderation');
+      if (p.publication_status === 'disabled')
+        throw fail(403, 'This game has been disabled by moderation');
       if (p.revision !== revision) throw fail(409, 'Save the latest version before publishing');
-      if (paymentsRequired() && !await entitled(q, p.id, res.locals.user.id)) throw fail(402, 'Payment required to publish this game');
+      if (paymentsRequired() && !(await entitled(q, p.id, res.locals.user.id)))
+        throw fail(402, 'Payment required to publish this game');
       gameSchema.parse(JSON.parse(p.game));
       const publishedId = p.published_id || randomUUID();
-      const slug = p.slug || ((JSON.parse(p.game).title as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'game') + '-' + randomBytes(9).toString('base64url');
+      const slug =
+        p.slug ||
+        ((JSON.parse(p.game).title as string)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 60) || 'game') +
+          '-' +
+          randomBytes(9).toString('base64url');
       const rows = await q(
         'UPDATE projects SET published_id=$1,published_game=game WHERE id=$2 AND owner_id=$3 AND revision=$4 RETURNING id',
         [publishedId, p.id, res.locals.user.id, revision],
@@ -450,8 +469,20 @@ export function createApp(db: DB) {
           p.id,
           url.split('/').at(-1),
         ]);
-      await q('UPDATE projects SET slug=$1,published_at=$2 WHERE id=$3', [slug, new Date().toISOString(), p.id]);
-      await q("INSERT INTO email_outbox(id,user_id,kind,payload,created_at) VALUES ($1,$2,'published',$3,$4) ON CONFLICT DO NOTHING", [`published-${p.id}-${revision}`, res.locals.user.id, JSON.stringify({ slug }), new Date().toISOString()]);
+      await q('UPDATE projects SET slug=$1,published_at=$2 WHERE id=$3', [
+        slug,
+        new Date().toISOString(),
+        p.id,
+      ]);
+      await q(
+        "INSERT INTO email_outbox(id,user_id,kind,payload,created_at) VALUES ($1,$2,'published',$3,$4) ON CONFLICT DO NOTHING",
+        [
+          `published-${p.id}-${revision}`,
+          res.locals.user.id,
+          JSON.stringify({ slug }),
+          new Date().toISOString(),
+        ],
+      );
       return { publishedId, slug };
     });
     res.json({ ...publishedId, url: `/g/${publishedId.slug}` });
@@ -513,7 +544,10 @@ export function createApp(db: DB) {
         }
       }
       const id = randomUUID();
-      const storagePath = process.env.SUPABASE_URL && projectId ? `users/${res.locals.user.id}/projects/${projectId}/${mime.startsWith('audio/') ? 'audio' : 'characters'}/${id}` : id;
+      const storagePath =
+        process.env.SUPABASE_URL && projectId
+          ? `users/${res.locals.user.id}/projects/${projectId}/${mime.startsWith('audio/') ? 'audio' : 'characters'}/${id}`
+          : id;
       await putAsset(storagePath, payload, mime);
       try {
         await db.transaction(async (q) => {
@@ -526,15 +560,18 @@ export function createApp(db: DB) {
           if (Number(total) + payload.length > 100 * 1024 * 1024)
             throw fail(413, 'Your 100 MB asset allowance is full');
           if (projectId) await owned(projectId, res.locals.user.id, q);
-          await q('INSERT INTO assets(id,owner_id,mime,filename,size,project_id,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)', [
-            id,
-            res.locals.user.id,
-            mime,
-            storagePath,
-            payload.length,
-            projectId || null,
-            new Date().toISOString(),
-          ]);
+          await q(
+            'INSERT INTO assets(id,owner_id,mime,filename,size,project_id,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            [
+              id,
+              res.locals.user.id,
+              mime,
+              storagePath,
+              payload.length,
+              projectId || null,
+              new Date().toISOString(),
+            ],
+          );
         });
       } catch (e) {
         await deleteAsset(storagePath);
@@ -552,11 +589,23 @@ export function createApp(db: DB) {
         .object({ game: gameSchema, prompt: z.string().min(4).max(2000) })
         .parse(req.body);
       const usageId = randomUUID();
-      await db.transaction(async q => {
+      await db.transaction(async (q) => {
         await q('UPDATE users SET name=name WHERE id=$1', [res.locals.user.id]);
-        const [{ total }] = await q('SELECT COUNT(*) AS total FROM ai_usage WHERE user_id=$1 AND created_at>$2', [res.locals.user.id, new Date(Date.now() - 86400000).toISOString()]);
-        if (Number(total) >= Number(process.env.AI_DAILY_LIMIT || 20)) throw fail(429, 'Daily AI allowance reached');
-        await q("INSERT INTO ai_usage(id,user_id,operation,model,status,created_at) VALUES ($1,$2,'proposal',$3,'started',$4)", [usageId, res.locals.user.id, process.env.OPENAI_MODEL || 'unconfigured', new Date().toISOString()]);
+        const [{ total }] = await q(
+          'SELECT COUNT(*) AS total FROM ai_usage WHERE user_id=$1 AND created_at>$2',
+          [res.locals.user.id, new Date(Date.now() - 86400000).toISOString()],
+        );
+        if (Number(total) >= Number(process.env.AI_DAILY_LIMIT || 20))
+          throw fail(429, 'Daily AI allowance reached');
+        await q(
+          "INSERT INTO ai_usage(id,user_id,operation,model,status,created_at) VALUES ($1,$2,'proposal',$3,'started',$4)",
+          [
+            usageId,
+            res.locals.user.id,
+            process.env.OPENAI_MODEL || 'unconfigured',
+            new Date().toISOString(),
+          ],
+        );
       });
       try {
         const proposal = await propose(input.game, input.prompt);

@@ -2,6 +2,7 @@ import { migrations } from './migrations';
 import { DatabaseSync } from 'node:sqlite';
 import { Pool } from 'pg';
 import { mkdirSync } from 'node:fs';
+import { postgresPoolConfig } from './postgres-ssl';
 export type Query = (sql: string, args?: unknown[]) => Promise<any[]>;
 export type DB = {
   query: Query;
@@ -11,7 +12,7 @@ export type DB = {
 export async function openDatabase(): Promise<DB> {
   let db: DB;
   if (process.env.DATABASE_URL) {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+    const pool = new Pool(postgresPoolConfig(process.env.DATABASE_URL));
     db = {
       query: async (s, a) => (await pool.query(s, a)).rows,
       transaction: async (fn) => {

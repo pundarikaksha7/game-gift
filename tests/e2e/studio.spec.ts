@@ -10,7 +10,6 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   await page.getByLabel('Your name').fill('Browser Creator');
   await page.getByLabel('Email address').fill(`browser-${Date.now()}@example.com`);
   await page.getByLabel('Password', { exact: false }).fill('browser-long-password');
-  await page.getByLabel('Invitation code').fill('browser-test-invitation-code-only');
   await page.getByRole('button', { name: 'Create your account' }).click();
   await expect(page.locator('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Game settings', exact: true }).click();

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
 import { newLevel } from '../../../shared/template';
-import { uploadAsset } from '../../api';
+import { attachAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function SoundsEditor({ game, change, notify, authed }: EditorProps) {
@@ -62,12 +62,12 @@ export function SoundsEditor({ game, change, notify, authed }: EditorProps) {
           <div className="inline-actions">
             <UploadButton
               label={busy === k ? 'Uploading…' : 'Upload audio'}
-              disabled={!authed || !!busy}
+              disabled={!!busy}
               accept="audio/mpeg,audio/wav,audio/ogg"
               onFile={async (f) => {
                 setBusy(k);
                 try {
-                  const url = await uploadAsset(f, 'audio');
+                  const url = await attachAsset(f, 'audio');
                   change((g) => {
                     g.sounds[k] = url;
                   });
@@ -96,7 +96,8 @@ export function SoundsEditor({ game, change, notify, authed }: EditorProps) {
         </div>
       ))}
       <p className="muted">
-        MP3, WAV or OGG · Up to 10 MB per file. {!authed && 'Sign in to upload.'}
+        MP3, WAV or OGG · Up to 10 MB per file.
+        {!authed && ' Sign in and save to keep audio in your Gamegift account.'}
       </p>
     </>
   );
