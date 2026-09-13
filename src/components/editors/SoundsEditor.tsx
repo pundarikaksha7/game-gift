@@ -1,3 +1,4 @@
+import { MediaImage, MediaAudio } from '../../media';
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
@@ -57,7 +58,7 @@ export function SoundsEditor({ game, change, notify, authed }: EditorProps) {
               </p>
             </div>
           </div>
-          {game.sounds[k] && <audio controls src={game.sounds[k]} preload="none" />}
+          {game.sounds[k] && <MediaAudio controls src={game.sounds[k]} preload="none" />}
           <div className="inline-actions">
             <UploadButton
               label={busy === k ? 'Uploading…' : 'Upload audio'}

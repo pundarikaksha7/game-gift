@@ -1,3 +1,4 @@
+import { saasMigration } from './saas-migration';
 /** Append migrations; never edit a version already deployed. */
 export const migrations = [
   {
@@ -31,4 +32,19 @@ export const migrations = [
       'CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub)',
     ],
   },
+  {
+    version: 5,
+    statements: [],
+    postgresStatements: [
+      'ALTER TABLE users ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE sessions ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE projects ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE revisions ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE assets ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE published_assets ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE deleted_files ENABLE ROW LEVEL SECURITY',
+      'ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY',
+    ],
+  },
+  saasMigration,
 ];

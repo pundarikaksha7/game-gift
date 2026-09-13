@@ -14,46 +14,47 @@ export function newLevel(index: number): Level {
       { id: 'p5', x: 1980, y: 340, width: 200, motion: 'none' },
     ],
     intro: 'Every great adventure starts with a little courage.',
-    outro: 'Another memory, another step closer.',
+    outro: 'Chapter complete. Continue to the next world.',
   };
 }
 export function createTemplate(): Game {
   return {
     schemaVersion: 1,
-    title: 'Your next adventure',
-    description: 'A journey through the places, people, and little moments that make you, you.',
-    recipient: 'Player',
+    engine: 'adventure',
+    title: 'Untitled experience',
+    description:
+      'An interactive adventure. Customize the world, cast, and story, then publish a playable link.',
+    recipient: '',
     characters: [
       {
         id: 'hero',
-        name: 'Player',
+        name: 'Explorer',
         role: 'hero',
-        sprite: '/assets/hero.webp',
+        sprite: '',
         color: '#a7b78f',
         scale: 1,
       },
       {
         id: 'friend',
-        name: 'Your bestie',
+        name: 'Companion',
         role: 'friend',
-        sprite: '/assets/friend.webp',
+        sprite: '',
         color: '#e8b69e',
         scale: 1,
       },
       {
         id: 'enemy',
-        name: 'The troublemaker',
+        name: 'Scout',
         role: 'enemy',
-        sprite: '/assets/enemy.webp',
+        sprite: '',
         color: '#b6add3',
         scale: 1,
       },
     ],
     levels: [newLevel(0), newLevel(1), newLevel(2)],
     story: {
-      opening:
-        'Some gifts fit in a box. This one is a whole little world. Ready for an adventure made just for you?',
-      ending: 'Here’s to all the adventures still to come. Your next chapter awaits!',
+      opening: 'Welcome, explorer. Follow the platforms, discover the world, and reach the portal.',
+      ending: 'You made it! Thanks for playing.',
     },
     physics: { speed: 270, jump: 590, gravity: 1500, health: 5 },
     sounds: { music: '', jump: '', hit: '', win: '', volume: 0.45 },
@@ -61,22 +62,59 @@ export function createTemplate(): Game {
   };
 }
 
-/** Upgrade untouched starter personalization when reopening an older draft. */
-export function upgradeStarter(game: Game): Game {
-  const recipient = game.recipient;
-  if (
-    !recipient ||
-    game.title !== `${recipient}’s little adventure` ||
-    game.story.ending !==
-      `Here’s to all the adventures still to come. Happy birthday, ${recipient}! ♡`
-  )
-    return game;
-  const next = structuredClone(game),
-    template = createTemplate();
-  next.title = template.title;
-  next.recipient = template.recipient;
-  next.story.ending = template.story.ending;
-  for (const character of next.characters)
-    if (character.role === 'hero' && character.name === recipient) character.name = 'Player';
-  return next;
+export const starters = [
+  {
+    id: 'adventure',
+    name: 'World explorer',
+    description: 'Three open worlds with platforms, rivals, and a story.',
+    theme: 'meadow',
+    tag: 'Adventure',
+  },
+  {
+    id: 'story',
+    name: 'Story journey',
+    description: 'A relaxed, combat-free experience built around your message.',
+    theme: 'sunset',
+    tag: 'Story',
+  },
+  {
+    id: 'arcade',
+    name: 'Arcade challenge',
+    description: 'Fast movement, tougher encounters, and a final guardian.',
+    theme: 'midnight',
+    tag: 'Arcade',
+  },
+] as const;
+export type StarterId = (typeof starters)[number]['id'];
+export function createStarter(id: StarterId): Game {
+  const game = createTemplate();
+  game.title = starters.find((s) => s.id === id)!.name;
+  if (id === 'story') {
+    game.characters = game.characters.filter((c) => c.role !== 'enemy');
+    game.physics = { speed: 220, jump: 650, gravity: 1200, health: 8, airJumps: 1 };
+    game.levels.forEach((l, i) => {
+      l.theme = 'sunset';
+      l.enemyCount = 0;
+      l.name = `Scene ${i + 1}`;
+    });
+  }
+  if (id === 'arcade') {
+    game.physics = { speed: 380, jump: 850, gravity: 1800, health: 5, airJumps: 1 };
+    game.levels.forEach((l) => {
+      l.theme = 'midnight';
+      l.enemyCount = 5;
+      l.requireDefeatAll = true;
+      l.powerup = 'mixed';
+    });
+    game.levels[2].boss = {
+      enabled: true,
+      characterId: 'enemy',
+      name: 'Guardian',
+      health: 150,
+      damage: 1,
+      enrageAt: 0.4,
+      armor: 0.6,
+    };
+  }
+  return game;
 }

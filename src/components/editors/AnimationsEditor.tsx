@@ -1,3 +1,4 @@
+import { MediaImage, MediaAudio } from '../../media';
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
@@ -107,7 +108,7 @@ export function AnimationsEditor({ game, change, notify, authed }: EditorProps) 
           ) : (
             a.frames.map((url, i) => (
               <div className="frame" key={`${url}-${i}`}>
-                <img src={url} alt={`Frame ${i + 1}`} />
+                <MediaImage src={url} alt={`Frame ${i + 1}`} />
                 <span>{i + 1}</span>
                 <button
                   className="icon-btn"

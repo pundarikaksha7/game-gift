@@ -78,6 +78,10 @@ export async function openDatabase(): Promise<DB> {
       ]);
       if (existing) continue;
       for (const statement of migration.statements) await q(statement);
+      // Supabase exposes public-schema tables through PostgREST. Deny direct client
+      // access; the table-owning server connection retains access through this API.
+      if (process.env.DATABASE_URL && 'postgresStatements' in migration)
+        for (const statement of migration.postgresStatements || []) await q(statement);
       if (migration.version === 2) {
         const published = await q(
           'SELECT id,published_game FROM projects WHERE published_game IS NOT NULL',

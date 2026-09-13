@@ -91,3 +91,18 @@ test('background uploads participate in asset authorization and movement options
   game.levels[0].background = 'https://untrusted.example/image.png';
   assert.equal(gameSchema.safeParse(game).success, false);
 });
+
+test('every reusable starter validates and maps movement into runtime coordinates', async () => {
+  const { starters, createStarter } = await import('../shared/template');
+  const { runtimeConfig, WORLD_UNIT } = await import('../shared/runtime');
+  for (const starter of starters) {
+    const game = gameSchema.parse(createStarter(starter.id));
+    const runtime = runtimeConfig(game);
+    assert.equal(runtime.player.moveSpeed * WORLD_UNIT, game.physics.speed);
+    assert.equal(runtime.levels.length, game.levels.length);
+    assert.ok(game.characters.every((c) => c.sprite === ''));
+  }
+  const story = createStarter('story');
+  assert.equal(story.characters.filter((c) => c.role === 'enemy').length, 0);
+  assert.ok(story.levels.every((l) => l.enemyCount === 0));
+});

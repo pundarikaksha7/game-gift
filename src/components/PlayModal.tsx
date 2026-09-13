@@ -28,14 +28,14 @@ export function PlayGame({ game, startLevel = 0 }: { game: Game; startLevel?: nu
             <div>
               <span className="eyebrow">
                 {stage === 'end'
-                  ? 'MADE WITH LOVE'
+                  ? 'EXPERIENCE COMPLETE'
                   : `CHAPTER ${String(level + 1).padStart(2, '0')}`}
               </span>
               <h2>
                 {stage === 'lose'
                   ? 'A little stumble. Try again?'
                   : stage === 'end'
-                    ? 'Your adventure, forever.'
+                    ? 'Thanks for playing.'
                     : current.name}
               </h2>
               <p>
@@ -70,13 +70,14 @@ export function PlayGame({ game, startLevel = 0 }: { game: Game; startLevel?: nu
         )}
       </div>
       <div className="play-controls">
-        <span>← → / A D to move · Space to jump · J / K to attack</span>
+        <span>← → / A D to move · Space to jump · J punch · K kick · P pause</span>
         <div>
           {[
             [ArrowLeft, 'ArrowLeft'],
             [ArrowRight, 'ArrowRight'],
             [ArrowUp, 'Space'],
             [Swords, 'KeyJ'],
+            [Swords, 'KeyK'],
           ].map(([Icon, code]) => {
             const I = Icon as typeof ArrowLeft;
             return (
@@ -84,6 +85,7 @@ export function PlayGame({ game, startLevel = 0 }: { game: Game; startLevel?: nu
                 key={String(code)}
                 aria-label={String(code)}
                 onPointerDown={(e) => {
+                  e.preventDefault();
                   e.currentTarget.setPointerCapture(e.pointerId);
                   controls.current.add(String(code));
                 }}

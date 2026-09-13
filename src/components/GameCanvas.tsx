@@ -1,9 +1,11 @@
+import { useRuntimeMedia } from '../media';
+import { AdventureRuntime } from './AdventureRuntime';
 import { useEffect, useRef } from 'react';
 import type { Game } from '../../shared/schema';
 import { drawWorld, drawCharacter } from '../engine/renderer';
 import { stepBody, overlaps, type Body } from '../engine/physics';
 import { GameAudio } from '../engine/audio';
-export function GameCanvas({
+function ClassicGameCanvas({
   game,
   levelIndex = 0,
   playing = false,
@@ -222,5 +224,14 @@ export function GameCanvas({
         }
       }}
     />
+  );
+}
+
+export function GameCanvas(props: Parameters<typeof ClassicGameCanvas>[0]) {
+  const game = useRuntimeMedia(props.game);
+  return props.game.engine === 'classic' ? (
+    <ClassicGameCanvas {...props} game={game} />
+  ) : (
+    <AdventureRuntime {...props} game={game} />
   );
 }

@@ -1,5 +1,5 @@
 {
-  "name": "gamegift-studio",
+  "name": "playcraft-studio",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -20,6 +20,9 @@
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource-variable/manrope": "^5.3.0",
+    "@sentry/node": "10.74.0",
+    "@sentry/react": "10.74.0",
+    "@supabase/supabase-js": "2.116.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
@@ -27,6 +30,7 @@
     "lucide-react": "^0.468.0",
     "multer": "^2.0.2",
     "pg": "^8.16.0",
+    "posthog-js": "1.430.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sharp": "^0.35.4",

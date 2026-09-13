@@ -8,7 +8,7 @@ services:
       PORT: 3001
       DATA_DIR: /app/.data
       APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
-      DATABASE_URL: postgresql://gamegift:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/gamegift
+      DATABASE_URL: postgresql://playcraft:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/playcraft
       TRUST_PROXY: 1
       REGISTRATION_CODE: ${REGISTRATION_CODE:?Set a random invitation code in .env}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -28,13 +28,13 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: gamegift
-      POSTGRES_DB: gamegift
+      POSTGRES_USER: playcraft
+      POSTGRES_DB: playcraft
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - database:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U gamegift -d gamegift]
+      test: [CMD-SHELL, pg_isready -U playcraft -d playcraft]
       interval: 5s
       timeout: 5s
       retries: 10

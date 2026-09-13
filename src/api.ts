@@ -1,25 +1,46 @@
+import { accessToken, supabase, authenticate } from './auth';
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+export class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message); }
+}
+let activeProject: string | null = null;
+export function setUploadProject(id: string | null) { activeProject = id; }
+export async function requestHeaders() {
+  const token = await accessToken();
+  return { 'X-Playcraft-Request': 'studio', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
 export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`/api${url}`, {
-    ...options,
-    headers: {
-      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      'X-Gamegift-Request': 'studio',
-      ...options.headers,
-    },
+  if (supabase && ['/auth/login', '/auth/register'].includes(url)) {
+    await authenticate(url.endsWith('register') ? 'register' : 'login', JSON.parse(String(options.body)));
+    return api('/auth/me');
+  }
+  if (supabase && url === '/auth/logout') {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    return { ok: true } as T;
+  }
+  if (supabase && url === '/auth/password') {
+    const { error } = await supabase.auth.updateUser({ password: JSON.parse(String(options.body)).password });
+    if (error) throw error;
+    await supabase.auth.signOut({ scope: 'others' });
+    return { ok: true } as T;
+  }
+  const res = await fetch(`${API_BASE_URL}/api${url}`, {
+    signal: AbortSignal.timeout(30000), credentials: supabase ? 'omit' : 'include', ...options,
+    headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...await requestHeaders(), ...options.headers },
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  let data: any;
+  try { data = await res.json(); } catch { throw new ApiError('The server is unavailable. Your draft is still here.', res.status); }
+  if (!res.ok) throw new ApiError(data.error || 'Request failed', res.status);
+  if (supabase && url === '/auth/account' && options.method === 'DELETE') await supabase.auth.signOut({ scope: 'local' });
   return data;
 }
 export async function uploadAsset(file: File, kind: 'image' | 'audio') {
   if (file.size > 10 * 1024 * 1024) throw new Error('Choose a file smaller than 10 MB');
   if (!file.type.startsWith(kind + '/')) throw new Error(`Choose an ${kind} file`);
-  const form = new FormData();
-  form.append('file', file);
-  const result = await api<{ url: string; mime: string }>('/assets', {
-    method: 'POST',
-    body: form,
-  });
+  if (supabase && !activeProject) throw new Error('Save your game before uploading media.');
+  const form = new FormData(); form.append('file', file);
+  const result = await api<{ url: string; mime: string }>('/assets', { method: 'POST', body: form, headers: activeProject ? { 'X-Project-Id': activeProject } : {} });
   if (!result.mime.startsWith(kind + '/')) throw new Error(`Choose an ${kind} file`);
   return result.url;
 }

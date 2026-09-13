@@ -1,10 +1,10 @@
-# Gamegift Studio
+# Playcraft Studio
 
-A personal game maker inspired by platformer. Create a little adventure with your own cast, chapters, messages, soundtrack, and movement.
+A multi-project builder for creating, playtesting, and publishing interactive adventures. Start with an exploration game, a story journey, or an arcade challenge; customize the cast, level layouts, physics, encounters, audio, and narrative. Projects use a declarative content schema and a reusable runtime.
 
-## Run locally
+## Development
 
-Requires **Node.js 24+** (the API uses `node:sqlite`). Your machine's default Node 16 is too old; select Node 24 with your version manager first.
+Use Node.js 24 LTS or newer (Node 22.18 also runs the test suite).
 
 ```sh
 npm ci
@@ -12,62 +12,32 @@ cp .env.example .env
 npm run dev
 ```
 
-Open **http://localhost:5173**. The API runs on port 3001. SQLite and uploaded media live in `.data/`. Environment files are loaded by the Node launch scripts. No API key or external database is needed locally.
+Open http://localhost:5173. The Express API runs on port 3001. Without cloud credentials, SQLite and uploads are stored in `.data/`. Guest drafts stay in the browser; accounts use explicit Save, revisions, and publishable snapshots.
 
-Explore as a guest; a valid guest draft is stored on that browser. Create an account to save projects and upload assets. Click **Save** explicitly to persist an account's changes to the database. **My games** reopens saved projects. Edits are not silently cloud-saved. The toolbar provides undo, redo, history, and game-data export.
+## Workspace
 
-## What works
+- Responsive editor and live preview, camera controls, placement grid, and chapter selection.
+- Three independent starter templates and multi-project management.
+- Custom character art, individual animation frames, combat attributes, and procedural fallbacks.
+- Up to 12 chapters with moving platforms, pits, optional crossings, power-ups, and configurable bosses.
+- Keyboard and touch playtesting, chapter progression, retry, and final messages.
+- Undo/redo, validated JSON import/export, the latest 100 saved revisions, and optimistic concurrency.
+- Owner-scoped accounts and uploads, HTTP-only sessions, CSRF checks, invitation-protected registration, rate limits, and published snapshots.
+- Optional private Supabase object storage and PostgreSQL persistence.
+- Optional reviewed AI proposals, enabled by server-side provider credentials.
 
-- Guided builder: game settings → characters → levels → story → sounds → animations → review and share. Back/Next navigation preserves your draft.
-- Movement presets, adjustable speed/jump/gravity/health, and optional double/triple jumps.
-- Chapter background PNG/JPEG/WebP uploads, plus meadow, sunset, and midnight starter atmospheres.
-- Optional Google OAuth sign-in with invitation-protected registration and a recovery password.
-
-- Character editor: custom names, hero/friend/enemy roles, uploaded art, scale and accent colors. Exactly one playable hero; enemy appearances cycle through enemy characters, and all friends appear near the goal.
-- Level editor: add/remove/reorder up to 12 chapters, choose atmosphere, set length and enemies, place platforms visually, edit coordinates and moving-platform behavior.
-- Story editor: opening, chapter introductions and conclusions, and a personalized ending.
-- Audio editor: background music and jump/hit/win sounds, volume, playback, uploads and reset. Procedural effects are provided when no clip is uploaded.
-- Animation editor: bounce/float presets, speed, squash/stretch, and a custom hero animation made from up to 24 uploaded frames. Frame order is upload order; delete and re-add to change it.
-- Shared canvas engine: fixed-step physics, collision, jumping, combat, enemy encounters, moving platforms, chapter progression, keyboard and touch controls.
-- Accounts, password hashing, HTTP-only sessions, owner-scoped authorization, append-only revisions, optimistic concurrency, and published snapshots.
-- Optional AI proposals: a server-side Responses API integration with an allowlist of editable paths, schema validation, review, stale-proposal checks and undo. It edits **game data**, not executable application code.
-
-## Code map
-
-| Folder                                 | Responsibility                                       |
-| -------------------------------------- | ---------------------------------------------------- |
-| `shared/schema.ts`                     | Versioned content contract and bounded AI changes    |
-| `shared/template.ts`                   | Starter adventure and chapter factory                |
-| `src/components/editors/`              | One component per content editor                     |
-| `src/components/GameCanvas.tsx`        | Simulation lifecycle and input integration           |
-| `src/engine/`                          | Rendering, physics, collision and audio              |
-| `src/App.tsx`                          | Studio shell, project state and workflows            |
-| `server/app.ts`                        | Authentication, projects, assets and publication API |
-| `server/db.ts`, `server/migrations.ts` | SQLite/PostgreSQL persistence and migrations         |
-| `server/ai.ts`                         | Constrained AI provider integration                  |
-| `tests/`                               | Schema, physics and HTTP integration tests           |
-
-## Deploy
-
-Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for exact GitHub Actions → Render → Supabase deployment steps, domain DNS, and Google sign-in setup. `render.yaml` provisions a native Node service with a persistent media disk. Local development needs no Docker.
-
-## Verify
+## Verification
 
 ```sh
 npm run check
 npm run format:check
-npx playwright install chromium
 npm run test:e2e
 ```
 
-The HTTP suite tests authorization, invalid input, concurrent writes, history, asset privacy, publication isolation, CSRF, and logout using a disposable SQLite database. Set `TEST_DATABASE_URL` to an isolated PostgreSQL test database to run the same tests against PostgreSQL; tests create and remove their own temporary schema. Never use a production database for tests.
+Browser tests cover desktop/mobile creation, editing, persistence, publish/play/unpublish, account management, template switching, viewport updates, and overflow. API tests cover account isolation, invalid data, media access, revisions, and concurrency. Set `TEST_DATABASE_URL` only to an isolated test PostgreSQL database; the suite creates its own temporary schema.
 
-## Scope and launch status
+## Deployment
 
-This is a working, production-oriented first release, **not a claim of a security-audited public SaaS**. It recreates the original's core platformer/combat idea in a modular engine; its bespoke boss fight, power-ups, cinematic events and specific three-stage layouts have not been ported. Levels currently have a continuous floor; this editor does not author ground holes or new gameplay scripts.
+See [deployment guide](docs/DEPLOYMENT.md). The intended topology is Vercel for the frontend, Render for the API, and Supabase for PostgreSQL plus a private media bucket. Vercel proxies `/api` to Render so cookies and media remain on the same browser origin. The Render service can also serve the complete app directly.
 
-Production registration requires a private invitation code. Account settings support password changes and permanent account deletion; operators can recover invited accounts using `npm run account:reset -- email@example.com`. Before opening registration to the general public, add verified email recovery and abuse/reporting workflows; run the staging checklist and a security/accessibility review. Horizontal scaling requires shared object storage and a distributed rate-limit store. Backups and restore drills are an operator responsibility. See the deployment guide for concrete boundaries.
-
-The AI integration requires your provider credentials and a compatible model, and has not been exercised against a paid live model in this workspace. A proposal passing validation is not a proof of level reachability or fun: playtest before publishing. Asset exports contain references, not bundled media; they are intended for backup/import on the same server and account.
-
-Projects are limited to 50 per account and the latest 100 revisions per game. Account deletion immediately revokes sessions and public links, then removes uploaded files through a retryable maintenance queue. My games includes game deletion and Account settings.
+Registration remains invitation protected. Billing, team roles, automated email recovery, and distributed rate limits are not implemented. Use one API instance until OAuth state and rate limits use a shared store. Playtest authored levels before publishing; schema validation does not establish reachability. JSON exports reference hosted assets rather than bundling them. Configure database/storage backups before a public launch.

@@ -1,3 +1,4 @@
+import { MechanicsEditor } from './MechanicsEditor';
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
@@ -5,7 +6,8 @@ import { newLevel } from '../../../shared/template';
 import { uploadAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
-export function SettingsEditor({ game, change }: EditorProps) {
+export function SettingsEditor(props: EditorProps) {
+  const { game, change } = props;
   return (
     <>
       <div className="section-top">
@@ -94,8 +96,8 @@ export function SettingsEditor({ game, change }: EditorProps) {
             >
               <input
                 type="number"
-                min={{ speed: 100, jump: 350, gravity: 800, health: 1 }[k]}
-                max={{ speed: 500, jump: 850, gravity: 2200, health: 10 }[k]}
+                min={{ speed: 100, jump: 200, gravity: 500, health: 1 }[k]}
+                max={{ speed: 500, jump: 1200, gravity: 3000, health: 10 }[k]}
                 value={game.physics[k]}
                 onChange={(e) =>
                   change((g) => {
@@ -110,6 +112,7 @@ export function SettingsEditor({ game, change }: EditorProps) {
           Changes are validated before saving. Playtest to check the difficulty feels right.
         </p>
       </div>
+      <MechanicsEditor {...props} />
     </>
   );
 }

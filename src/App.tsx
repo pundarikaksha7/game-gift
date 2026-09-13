@@ -37,7 +37,7 @@ import {
   type Project,
   type Proposal,
 } from '../shared/schema';
-import { createTemplate, upgradeStarter } from '../shared/template';
+import { createTemplate, createStarter, starters, type StarterId } from '../shared/template';
 import { api } from './api';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
@@ -63,8 +63,8 @@ type Tab = (typeof navigation)[number]['id'];
 type User = { id: string; name: string; email: string };
 function initial() {
   try {
-    const raw = localStorage.getItem('gamegift-guest');
-    return raw ? upgradeStarter(gameSchema.parse(JSON.parse(raw))) : createTemplate();
+    const raw = localStorage.getItem('playcraft-draft-v2');
+    return raw ? gameSchema.parse(JSON.parse(raw)) : createTemplate();
   } catch {
     return createTemplate();
   }
@@ -82,7 +82,7 @@ export default function App() {
     [busy, setBusy] = useState(false),
     [toast, setToast] = useState(''),
     [modal, setModal] = useState<
-      'play' | 'auth' | 'projects' | 'publish' | 'ai' | 'history' | 'account' | null
+      'templates' | 'play' | 'auth' | 'projects' | 'publish' | 'ai' | 'history' | 'account' | null
     >(null),
     [projects, setProjects] = useState<Project[]>([]),
     [versions, setVersions] = useState<{ revision: number; created_at: string }[]>([]),
@@ -96,6 +96,7 @@ export default function App() {
     [registrationCodeRequired, setRegistrationCodeRequired] = useState(false),
     [undo, setUndo] = useState<Game[]>([]),
     [redo, setRedo] = useState<Game[]>([]);
+  const [cloudUnavailable, setCloudUnavailable] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<(() => void) | null>(null);
   function switchSafely(action: () => void) {
     if (undo.length && dirty) setPendingSwitch(() => action);
@@ -104,9 +105,18 @@ export default function App() {
   const [publicGame, setPublicGame] = useState<Game | null>(null),
     [publicError, setPublicError] = useState('');
   const publicId = location.pathname.startsWith('/play/') ? location.pathname.split('/')[2] : null;
+  const draftEpoch = useRef(0);
+  const gameRef = useRef(game);
+  gameRef.current = game;
   const validRef = useRef(game);
   const validation = gameSchema.safeParse(game);
   if (validation.success) validRef.current = game;
+  const [previewGame, setPreviewGame] = useState(game);
+  useEffect(() => {
+    if (!validation.success) return;
+    const timer = setTimeout(() => setPreviewGame(game), 250);
+    return () => clearTimeout(timer);
+  }, [game]);
   const dirty = JSON.stringify(game) !== saved;
   const notify = (text: string) => setToast(text);
   useEffect(() => {
@@ -126,7 +136,7 @@ export default function App() {
       .then(async (d) => {
         setUser(d.user);
         try {
-          const id = localStorage.getItem(`gamegift-last-${d.user.id}`);
+          const id = localStorage.getItem(`playcraft-last-${d.user.id}`);
           if (id) {
             const p = await api<Project>(`/projects/${id}`);
             load(p);
@@ -142,7 +152,7 @@ export default function App() {
         setGoogleEnabled(d.googleEnabled);
         setRegistrationCodeRequired(d.registrationCodeRequired);
       })
-      .catch(() => {});
+      .catch(() => setCloudUnavailable(true));
   }, [publicId]);
   useEffect(() => {
     if (!toast) return;
@@ -153,7 +163,7 @@ export default function App() {
     if (publicId || project || user) return;
     if (gameSchema.safeParse(game).success)
       try {
-        localStorage.setItem('gamegift-guest', JSON.stringify(game));
+        localStorage.setItem('playcraft-draft-v2', JSON.stringify(game));
       } catch {
         notify('Browser storage is full. Export your game to keep a copy.');
       }
@@ -168,15 +178,18 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', listener);
   }, [user, dirty]);
   function change(fn: (g: Game) => void) {
-    const next = structuredClone(game);
+    const current = gameRef.current;
+    const next = structuredClone(current);
     fn(next);
-    setUndo((u) => [...u.slice(-39), game]);
+    setUndo((u) => [...u.slice(-39), current]);
+    gameRef.current = next;
     setRedo([]);
     setGame(next);
   }
   function load(p: Project) {
+    draftEpoch.current++;
     try {
-      if (user) localStorage.setItem(`gamegift-last-${user.id}`, p.id);
+      if (user) localStorage.setItem(`playcraft-last-${user.id}`, p.id);
     } catch {}
     setGame(p.game);
     setProject(p);
@@ -198,15 +211,17 @@ export default function App() {
       notify(parsed.error.issues.map((i) => i.message).join(' · '));
       return;
     }
+    const epoch = draftEpoch.current;
     setBusy(true);
     try {
       const p = await api<Project>(project ? `/projects/${project.id}` : '/projects', {
         method: project ? 'PUT' : 'POST',
         body: JSON.stringify({ game, revision: project?.revision }),
       });
+      if (epoch !== draftEpoch.current) return;
       setProject(p);
       try {
-        localStorage.setItem(`gamegift-last-${user.id}`, p.id);
+        localStorage.setItem(`playcraft-last-${user.id}`, p.id);
       } catch {}
       setSaved(JSON.stringify(game));
       notify('Your adventure is saved');
@@ -255,10 +270,24 @@ export default function App() {
       url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'my-adventure.gamegift.json';
+    link.download = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.playcraft.json`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify('Game data exported. Uploaded media remains on this server.');
+  }
+  function startProject(id: StarterId) {
+    switchSafely(() => {
+      draftEpoch.current++;
+      setGame(createStarter(id));
+      setProject(null);
+      setSaved('');
+      setUndo([]);
+      setRedo([]);
+      setLevel(0);
+      setCamera(0);
+      setTab('settings');
+      setModal(null);
+    });
   }
   const props = { game, change, notify, authed: !!user };
   if (publicId)
@@ -268,7 +297,7 @@ export default function App() {
           <span className="brand-mark">
             <Gamepad2 size={23} />
           </span>
-          gamegift<span className="brand-dot">✦</span>
+          playcraft<span className="brand-dot">studio</span>
         </a>
         {publicGame ? (
           <>
@@ -277,7 +306,7 @@ export default function App() {
             <PlayGame game={publicGame} />
             <p className="muted">
               A little world, made for {publicGame.recipient || 'you'} with <Heart size={12} />{' '}
-              Gamegift.
+              Playcraft.
             </p>
           </>
         ) : (
@@ -292,12 +321,12 @@ export default function App() {
           <span className="brand-mark">
             <Gamepad2 size={22} />
           </span>
-          gamegift<span className="brand-dot">✦</span>
+          playcraft<span className="brand-dot">studio</span>
         </a>
         <button className="workspace-picker" onClick={showProjects}>
-          <span className="workspace-icon">A</span>
+          <span className="workspace-icon">{user?.name[0].toUpperCase() || 'P'}</span>
           <span>
-            My creative space<small>Game maker studio</small>
+            Creator workspace<small>Experience builder</small>
           </span>
           <ChevronDown size={15} />
         </button>
@@ -307,6 +336,10 @@ export default function App() {
           My games
           <ChevronRight size={14} />
         </button>
+        <button className="nav-item" onClick={() => setModal('templates')}>
+          <Plus size={18} />
+          New experience
+        </button>
         <div className="nav-divider" />
         <span className="nav-label">BUILD YOUR GAME</span>
         <nav>
@@ -314,14 +347,13 @@ export default function App() {
             <button
               key={n.id}
               className={`nav-item ${tab === n.id ? 'active' : ''}`}
+              aria-current={tab === n.id ? 'page' : undefined}
               onClick={() => {
                 setTab(n.id);
                 setPlacing(false);
               }}
             >
-              <span className="step-number" aria-hidden="true">
-                {index + 1}
-              </span>
+              <n.icon size={18} aria-hidden="true" />
               {n.label}
               {n.id === 'characters' || n.id === 'levels' ? (
                 <span className="nav-count">{game[n.id].length}</span>
@@ -342,23 +374,23 @@ export default function App() {
             <Sparkles size={19} />
           </span>
           <strong>
-            A little help from AI <ArrowUpRight size={15} />
+            Creative assistant <ArrowUpRight size={15} />
           </strong>
           <p>
-            You bring the idea.
+            Describe a change.
             <br />
-            We’ll help bring it to life.
+            Review it before applying.
           </p>
           <span>
-            Meet your creative sidekick <ChevronRight size={13} />
+            Creative assistant <ChevronRight size={13} />
           </span>
         </button>
         <div className="sidebar-bottom">
           <span className="tiny-flower">✳</span>
           <p>
-            Small worlds.
+            Your ideas.
             <br />
-            Big feelings.
+            Playable.
           </p>
         </div>
         <button className="profile" onClick={() => (user ? showProjects() : setModal('auth'))}>
@@ -399,15 +431,24 @@ export default function App() {
           </div>
         </header>
         <main>
+          {cloudUnavailable && (
+            <div className="connection-notice" role="status">
+              <span>
+                Cloud services are unavailable. You can edit, playtest, and export your draft on
+                this device.
+              </span>
+              <button onClick={() => location.reload()}>Reconnect</button>
+            </div>
+          )}
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                <span /> YOUR NEXT GREAT GIFT
+                <span /> EXPERIENCE BUILDER
               </div>
               <h1>
-                A little world, made by you<span>.</span>
+                Your next experience starts here<span>.</span>
               </h1>
-              <p>Turn your favorite people and moments into a playable adventure.</p>
+              <p>Design, playtest, and publish interactive worlds from one workspace.</p>
             </div>
             <button
               className="help-link"
@@ -415,7 +456,7 @@ export default function App() {
                 setModal('play');
               }}
             >
-              Take it for a spin <ArrowUpRight size={16} />
+              Open playtest <ArrowUpRight size={16} />
             </button>
           </div>
           <div className="project-strip">
@@ -425,8 +466,8 @@ export default function App() {
             <div>
               <strong>{game.title}</strong>
               <span>
-                Side-scrolling adventure <span>·</span> Made for{' '}
-                {game.recipient || 'someone special'}
+                {game.levels.length} chapters <span>·</span> {game.characters.length} characters{' '}
+                <span>·</span> {project ? `Version ${project.revision}` : 'New project'}
               </span>
             </div>
             <div className="project-tools">
@@ -563,7 +604,7 @@ export default function App() {
                 </div>
                 <div className={`preview-canvas ${placing ? 'placing' : ''}`}>
                   <GameCanvas
-                    game={validRef.current}
+                    game={previewGame}
                     levelIndex={level}
                     camera={camera}
                     grid={grid}
@@ -571,7 +612,7 @@ export default function App() {
                       placing
                         ? (x, y) => {
                             change((g) => {
-                              const l = g.levels[level];
+                              const l = g.levels[level] || g.levels[0];
                               l.platforms.push({
                                 id: crypto.randomUUID(),
                                 x: Math.max(0, Math.min(l.width - 180, Math.round(x / 10) * 10)),
@@ -611,6 +652,17 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+                <div className="preview-assets" aria-label="Character asset preview">
+                  {game.characters.map((c) => (
+                    <button key={c.id} onClick={() => setTab('characters')}>
+                      <span className="asset-avatar" style={{ color: c.color }}>
+                        {c.sprite ? <img src={c.sprite} alt={c.name} /> : <Users size={26} />}
+                      </span>
+                      <span>{c.name}</span>
+                      <small>{c.role}</small>
+                    </button>
+                  ))}
+                </div>
                 <div className="preview-bottom">
                   <button
                     className="play-button"
@@ -620,21 +672,21 @@ export default function App() {
                     <Play size={16} fill="currentColor" />
                     Playtest your game
                   </button>
-                  <span>Go on. Make a little trouble.</span>
+                  <span>Keyboard and touch controls supported.</span>
                 </div>
-                {tab === 'levels' && (
+                {
                   <div className="world-scroll">
                     <Field label="Explore the world">
                       <input
                         type="range"
                         min={0}
-                        max={Math.max(0, game.levels[level].width - 960)}
+                        max={Math.max(0, (game.levels[level] || game.levels[0]).width - 960)}
                         value={camera}
                         onChange={(e) => setCamera(Number(e.target.value))}
                       />
                     </Field>
                   </div>
-                )}
+                }
               </div>
               <div className="chapter-switch">
                 <span>JUMP TO CHAPTER</span>
@@ -657,16 +709,16 @@ export default function App() {
               <div className="tip-card">
                 <span>✧</span>
                 <div>
-                  <h3>The best games feel personal.</h3>
+                  <h3>Build. Play. Refine.</h3>
                   <p>
-                    Add that friend who’s always late. Recreate your favorite place. Hide a message
-                    only they’ll understand.
+                    Start with a template, customize every chapter, and test the full journey before
+                    publishing.
                   </p>
                 </div>
               </div>
               <div className="safety-note">
                 <ShieldCheck size={15} />
-                <span>Your ideas are safe. Every saved version is kept.</span>
+                <span>Your latest 100 saved versions are available in history.</span>
               </div>
               {!validation.success && (
                 <div className="validation-error" role="alert">
@@ -683,14 +735,42 @@ export default function App() {
           </div>
           <footer className="studio-footer">
             <span>
-              <Heart size={12} /> A thoughtful gift. A playable memory.
+              <Heart size={12} /> Playcraft Studio
             </span>
-            <span>Built for a little imagination.</span>
+            <span>Create something worth playing.</span>
           </footer>
         </main>
       </div>
+      {modal === 'templates' && (
+        <Modal title="Create an experience" onClose={() => setModal(null)} wide>
+          <p className="modal-copy">
+            Choose a starting point. Every character, chapter, and rule is yours to change.
+          </p>
+          <div className="template-grid">
+            {starters.map((starter) => (
+              <button
+                className="template-card"
+                key={starter.id}
+                onClick={() => startProject(starter.id)}
+              >
+                <div className={`template-art ${starter.theme}`}>
+                  <span />
+                  <i />
+                  <Gamepad2 size={44} />
+                  <b>{starter.tag}</b>
+                </div>
+                <strong>{starter.name}</strong>
+                <p>{starter.description}</p>
+                <span>
+                  Use template <ArrowUpRight size={15} />
+                </span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
       {pendingSwitch && (
-        <Modal title="Keep this little world?" onClose={() => setPendingSwitch(null)}>
+        <Modal title="Save your changes?" onClose={() => setPendingSwitch(null)}>
           <p className="modal-copy">
             You have unsaved changes. Save them before opening another adventure.
           </p>
@@ -724,8 +804,11 @@ export default function App() {
         </div>
       )}
       {modal === 'play' && (
-        <Modal title="A little playtest" wide onClose={() => setModal(null)}>
-          <PlayGame game={validRef.current} startLevel={level} />
+        <Modal title="Playtest experience" wide onClose={() => setModal(null)}>
+          <PlayGame
+            game={validRef.current}
+            startLevel={Math.min(level, validRef.current.levels.length - 1)}
+          />
         </Modal>
       )}
       {modal === 'auth' && (
@@ -846,28 +929,15 @@ export default function App() {
         </Modal>
       )}
       {modal === 'projects' && (
-        <Modal title="Your little worlds" onClose={() => setModal(null)}>
+        <Modal title="Your projects" onClose={() => setModal(null)}>
           <p className="modal-copy">Save your current changes before switching projects.</p>
-          <button
-            className="primary full-width"
-            onClick={() =>
-              switchSafely(() => {
-                setGame(createTemplate());
-                setProject(null);
-                setSaved('');
-                setUndo([]);
-                setRedo([]);
-                setLevel(0);
-                setModal(null);
-              })
-            }
-          >
+          <button className="primary full-width" onClick={() => setModal('templates')}>
             <Plus size={16} />
-            Start a new adventure
+            New experience
           </button>
           <div className="projects-list">
             {projects.length === 0 ? (
-              <p className="empty-state">Your first adventure is waiting to be saved.</p>
+              <p className="empty-state">No saved projects yet. Save your draft to see it here.</p>
             ) : (
               projects.map((p) => (
                 <div key={p.id}>
@@ -1025,7 +1095,7 @@ export default function App() {
                   body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))),
                 });
                 try {
-                  localStorage.removeItem(`gamegift-last-${user.id}`);
+                  localStorage.removeItem(`playcraft-last-${user.id}`);
                 } catch {
                   /* Storage may be disabled. */
                 }
@@ -1063,7 +1133,7 @@ export default function App() {
         </Modal>
       )}
       {modal === 'publish' && project && (
-        <Modal title="Ready to make someone’s day?" onClose={() => setModal(null)}>
+        <Modal title="Publish your experience" onClose={() => setModal(null)}>
           <div className="publish-art">
             <Gamepad2 size={45} />
             <span>✦</span>
@@ -1143,7 +1213,7 @@ export default function App() {
         </Modal>
       )}
       {modal === 'history' && (
-        <Modal title="Every version, a little memory" onClose={() => setModal(null)}>
+        <Modal title="Version history" onClose={() => setModal(null)}>
           <p className="modal-copy">
             Restore a previous save into your draft. Save it to create a new version.
           </p>
@@ -1175,7 +1245,7 @@ export default function App() {
         </Modal>
       )}
       {modal === 'ai' && (
-        <Modal title="Meet your creative sidekick" onClose={() => setModal(null)}>
+        <Modal title="Creative assistant" onClose={() => setModal(null)}>
           <p className="modal-copy">
             Describe the feeling. Get a proposal. You decide what becomes part of your world.
           </p>
@@ -1191,13 +1261,13 @@ export default function App() {
               maxLength={2000}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Make the first chapter a dreamy sunset, give our hero a floaty jump, and write a warm birthday ending…"
+              placeholder="Make the first chapter a dreamy sunset, give our hero a floaty jump, and write a surprising final chapter…"
             />
           </Field>
           <div className="prompt-chips">
             {[
               'Make the game easier',
-              'Give the story a birthday theme',
+              'Give the story a space exploration theme',
               'Turn the first level into midnight',
             ].map((s) => (
               <button key={s} onClick={() => setPrompt(s)}>

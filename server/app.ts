@@ -1,3 +1,6 @@
+import { authenticateSupabase, supabaseAuthEnabled } from './supabase-auth';
+import { mountPayments, paymentWebhook, paymentsRequired, entitled } from './payments';
+import { mountPublic } from './public';
 import sharp from 'sharp';
 import { googleEnabled, googleFlow } from './google';
 import express from 'express';
@@ -7,12 +10,12 @@ import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import { randomUUID, randomBytes, scrypt, timingSafeEqual, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { mkdir, writeFile, unlink } from 'node:fs/promises';
+import { putAsset, readAsset, deleteAsset } from './storage';
 import path from 'node:path';
 import { z, ZodError } from 'zod';
 import type { DB } from './db';
 import { gameSchema, assetReferences, type Game } from '../shared/schema';
-import { createTemplate, upgradeStarter } from '../shared/template';
+import { createTemplate } from '../shared/template';
 import { propose } from './ai';
 import { validateEnvironment, trustedOrigin } from './config';
 const hashToken = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -23,10 +26,11 @@ async function passwordHash(password: string, salt = randomBytes(16).toString('h
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 const present = (p: any) => ({
   id: p.id,
-  game: upgradeStarter(JSON.parse(p.game)),
+  game: JSON.parse(p.game),
   revision: p.revision,
   updatedAt: p.updated_at,
   publishedId: p.published_id,
+  slug: p.slug,
 });
 export function createApp(db: DB) {
   validateEnvironment();
@@ -51,6 +55,18 @@ export function createApp(db: DB) {
         : false,
     }),
   );
+  app.use((req, res, next) => {
+    const origin = req.get('origin');
+    if (origin && trustedOrigin(origin)) {
+      res.set('Access-Control-Allow-Origin', origin).set('Access-Control-Allow-Credentials', 'true').vary('Origin');
+      res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Playcraft-Request, X-Project-Id');
+      res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    }
+    if (req.method === 'OPTIONS') { res.sendStatus(origin && trustedOrigin(origin) ? 204 : 403); return; }
+    next();
+  });
+  // Provider signatures cover exact bytes, before JSON parsing or browser CSRF middleware.
+  app.post('/api/webhooks/razorpay', express.raw({ type: 'application/json', limit: '256kb' }), paymentWebhook(db));
   app.use(express.json({ limit: '1mb' }), cookieParser());
   app.use(
     '/api',
@@ -61,19 +77,20 @@ export function createApp(db: DB) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin;
       if (origin && !trustedOrigin(origin)) return next(fail(403, 'Untrusted request origin'));
-      if (!req.headers['x-gamegift-request']) return next(fail(403, 'Missing request header'));
+      if (!supabaseAuthEnabled() && !req.headers['x-playcraft-request']) return next(fail(403, 'Missing request header'));
     }
     next();
   });
-  app.get('/api/health', async (_req, res) => {
+  app.get(['/health', '/api/health'], async (_req, res) => {
     await db.query('SELECT 1');
-    res.json({ ok: true });
+    res.json({ ok: true, status: 'ok' });
   });
   app.get('/api/config', (_req, res) =>
     res.json({
-      googleEnabled: googleEnabled(),
+      googleEnabled: !supabaseAuthEnabled() && googleEnabled(),
+      authProvider: supabaseAuthEnabled() ? 'supabase' : 'legacy',
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
-      registrationCodeRequired: !!process.env.REGISTRATION_CODE,
+      registrationCodeRequired: !supabaseAuthEnabled() && !!process.env.REGISTRATION_CODE,
     }),
   );
   const authLimit = rateLimit({
@@ -110,6 +127,10 @@ export function createApp(db: DB) {
     if (redirect) res.redirect(303, '/');
     else res.json({ user: { id: user.id, name: user.name, email: user.email } });
   }
+  app.use('/api/auth', (req, _res, next) => {
+    if (supabaseAuthEnabled() && !['/me', '/account'].includes(req.path)) return next(fail(404, 'Use Supabase Auth'));
+    next();
+  });
   const google = googleFlow();
   app.post('/api/auth/google/start', authLimit, async (req, res) => {
     if (!googleEnabled()) throw fail(503, 'Google sign-in is not configured');
@@ -210,6 +231,10 @@ export function createApp(db: DB) {
     res.clearCookie('session', { path: '/' }).json({ ok: true });
   });
   const auth: express.RequestHandler = async (req, res, next) => {
+    if (supabaseAuthEnabled()) {
+      res.locals.user = await authenticateSupabase(db, req.get('authorization'));
+      next(); return;
+    }
     const [user] = await db.query(
       'SELECT users.id, users.name, users.email FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.token=$1 AND sessions.expires>$2',
       [hashToken(req.cookies.session || ''), Date.now()],
@@ -218,6 +243,8 @@ export function createApp(db: DB) {
     res.locals.user = user;
     next();
   };
+  mountPayments(app, db, auth);
+  mountPublic(app, db, auth);
   app.get('/api/auth/me', auth, (_req, res) => res.json({ user: res.locals.user }));
   async function verifyPassword(userId: string, password: string, q = db.query) {
     const [user] = await q('SELECT password FROM users WHERE id=$1', [userId]);
@@ -241,11 +268,12 @@ export function createApp(db: DB) {
     await session(res.locals.user, res);
   });
   app.delete('/api/auth/account', authLimit, auth, async (req, res) => {
-    const { password } = z.object({ password: passwordInput }).parse(req.body);
+    const password = supabaseAuthEnabled() ? '' : z.object({ password: passwordInput }).parse(req.body).password;
     await db.transaction(async (q) => {
       const id = res.locals.user.id;
       await q('UPDATE users SET name=name WHERE id=$1', [id]);
-      await verifyPassword(id, password, q);
+      if (supabaseAuthEnabled()) await q('INSERT INTO deleted_accounts(id,created_at) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, new Date().toISOString()]);
+      else await verifyPassword(id, password, q);
       await q('INSERT INTO deleted_files(filename) SELECT filename FROM assets WHERE owner_id=$1', [
         id,
       ]);
@@ -257,29 +285,30 @@ export function createApp(db: DB) {
   });
 
   app.get('/api/play/:id', async (req, res) => {
-    const [p] = await db.query('SELECT published_game FROM projects WHERE published_id=$1', [
-      req.params.id,
+    const [p] = await db.query("SELECT published_game FROM projects WHERE (published_id=$1 OR slug=$2) AND publication_status='active'", [
+      req.params.id, req.params.id,
     ]);
     if (!p?.published_game) throw fail(404, 'This game is not published');
-    res.json({ game: upgradeStarter(JSON.parse(p.published_game)) });
+    res.json({ game: JSON.parse(p.published_game) });
   });
   const uploads = path.resolve(process.env.DATA_DIR || '.data', 'uploads');
   app.get('/api/assets/:id', async (req, res) => {
     const [asset] = await db.query('SELECT * FROM assets WHERE id=$1', [req.params.id]);
     if (!asset) throw fail(404, 'Asset not found');
     const [publicUse] = await db.query(
-      'SELECT projects.id FROM published_assets JOIN projects ON projects.id=published_assets.project_id WHERE published_assets.asset_id=$1 AND projects.published_id IS NOT NULL',
+      "SELECT projects.id FROM published_assets JOIN projects ON projects.id=published_assets.project_id WHERE published_assets.asset_id=$1 AND projects.published_id IS NOT NULL AND projects.publication_status='active'",
       [asset.id],
     );
-    const [owner] = await db.query('SELECT user_id FROM sessions WHERE token=$1 AND expires>$2', [
+    const [legacyOwner] = await db.query('SELECT user_id FROM sessions WHERE token=$1 AND expires>$2', [
       hashToken(req.cookies.session || ''),
       Date.now(),
     ]);
+    const owner = supabaseAuthEnabled() ? (req.get('authorization') ? { user_id: (await authenticateSupabase(db, req.get('authorization'))).id } : null) : legacyOwner;
     if (!publicUse && owner?.user_id !== asset.owner_id) throw fail(404, 'Asset not found');
     res
       .type(asset.mime)
       .set('Cache-Control', 'no-store')
-      .sendFile(path.join(uploads, asset.filename));
+      .send(await readAsset(asset.filename));
   });
   app.use('/api/projects', auth);
   async function owned(id: string, user: string, q = db.query) {
@@ -400,8 +429,12 @@ export function createApp(db: DB) {
         res.locals.user.id,
       ]);
       const p = await owned(req.params.id, res.locals.user.id, q);
+      if (p.publication_status === 'disabled') throw fail(403, 'This game has been disabled by moderation');
+      if (p.revision !== revision) throw fail(409, 'Save the latest version before publishing');
+      if (paymentsRequired() && !await entitled(q, p.id, res.locals.user.id)) throw fail(402, 'Payment required to publish this game');
       gameSchema.parse(JSON.parse(p.game));
       const publishedId = p.published_id || randomUUID();
+      const slug = p.slug || ((JSON.parse(p.game).title as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'game') + '-' + randomBytes(9).toString('base64url');
       const rows = await q(
         'UPDATE projects SET published_id=$1,published_game=game WHERE id=$2 AND owner_id=$3 AND revision=$4 RETURNING id',
         [publishedId, p.id, res.locals.user.id, revision],
@@ -417,9 +450,11 @@ export function createApp(db: DB) {
           p.id,
           url.split('/').at(-1),
         ]);
-      return publishedId;
+      await q('UPDATE projects SET slug=$1,published_at=$2 WHERE id=$3', [slug, new Date().toISOString(), p.id]);
+      await q("INSERT INTO email_outbox(id,user_id,kind,payload,created_at) VALUES ($1,$2,'published',$3,$4) ON CONFLICT DO NOTHING", [`published-${p.id}-${revision}`, res.locals.user.id, JSON.stringify({ slug }), new Date().toISOString()]);
+      return { publishedId, slug };
     });
-    res.json({ publishedId, url: `/play/${publishedId}` });
+    res.json({ ...publishedId, url: `/g/${publishedId.slug}` });
   });
   app.delete('/api/projects/:id/publish', async (req, res) => {
     await db.transaction(async (q) => {
@@ -441,6 +476,9 @@ export function createApp(db: DB) {
     rateLimit({ windowMs: 3600000, limit: 60 }),
     upload.single('file'),
     async (req, res) => {
+      const projectId = req.get('x-project-id');
+      if (projectId) await owned(projectId, res.locals.user.id);
+      if (production && !projectId) throw fail(400, 'Save the project before uploading');
       const f = req.file;
       if (!f) throw fail(400, 'Choose a file');
       const b = f.buffer;
@@ -475,8 +513,8 @@ export function createApp(db: DB) {
         }
       }
       const id = randomUUID();
-      await mkdir(uploads, { recursive: true });
-      await writeFile(path.join(uploads, id), payload, { flag: 'wx' });
+      const storagePath = process.env.SUPABASE_URL && projectId ? `users/${res.locals.user.id}/projects/${projectId}/${mime.startsWith('audio/') ? 'audio' : 'characters'}/${id}` : id;
+      await putAsset(storagePath, payload, mime);
       try {
         await db.transaction(async (q) => {
           // Lock the account row in PostgreSQL; SQLite transactions serialize writers.
@@ -487,16 +525,19 @@ export function createApp(db: DB) {
           );
           if (Number(total) + payload.length > 100 * 1024 * 1024)
             throw fail(413, 'Your 100 MB asset allowance is full');
-          await q('INSERT INTO assets(id,owner_id,mime,filename,size) VALUES ($1,$2,$3,$4,$5)', [
+          if (projectId) await owned(projectId, res.locals.user.id, q);
+          await q('INSERT INTO assets(id,owner_id,mime,filename,size,project_id,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)', [
             id,
             res.locals.user.id,
             mime,
-            id,
+            storagePath,
             payload.length,
+            projectId || null,
+            new Date().toISOString(),
           ]);
         });
       } catch (e) {
-        await unlink(path.join(uploads, id));
+        await deleteAsset(storagePath);
         throw e;
       }
       res.status(201).json({ url: `/api/assets/${id}`, mime });
@@ -510,7 +551,21 @@ export function createApp(db: DB) {
       const input = z
         .object({ game: gameSchema, prompt: z.string().min(4).max(2000) })
         .parse(req.body);
-      res.json(await propose(input.game, input.prompt));
+      const usageId = randomUUID();
+      await db.transaction(async q => {
+        await q('UPDATE users SET name=name WHERE id=$1', [res.locals.user.id]);
+        const [{ total }] = await q('SELECT COUNT(*) AS total FROM ai_usage WHERE user_id=$1 AND created_at>$2', [res.locals.user.id, new Date(Date.now() - 86400000).toISOString()]);
+        if (Number(total) >= Number(process.env.AI_DAILY_LIMIT || 20)) throw fail(429, 'Daily AI allowance reached');
+        await q("INSERT INTO ai_usage(id,user_id,operation,model,status,created_at) VALUES ($1,$2,'proposal',$3,'started',$4)", [usageId, res.locals.user.id, process.env.OPENAI_MODEL || 'unconfigured', new Date().toISOString()]);
+      });
+      try {
+        const proposal = await propose(input.game, input.prompt);
+        await db.query("UPDATE ai_usage SET status='completed' WHERE id=$1", [usageId]);
+        res.json(proposal);
+      } catch (error) {
+        await db.query("UPDATE ai_usage SET status='failed' WHERE id=$1", [usageId]);
+        throw error;
+      }
     },
   );
   app.use('/api', (_req, _res, next) => next(fail(404, 'Endpoint not found')));

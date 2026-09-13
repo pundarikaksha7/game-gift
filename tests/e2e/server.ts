@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { openDatabase } from '../../server/db';
 import { createApp } from '../../server/app';
 process.env.NODE_ENV = 'test';
-process.env.DATA_DIR = await mkdtemp(`${tmpdir()}/gamegift-browser-`);
+process.env.DATA_DIR = await mkdtemp(`${tmpdir()}/playcraft-browser-`);
 process.env.APP_ORIGIN = 'http://127.0.0.1:4173';
 process.env.REGISTRATION_CODE = 'browser-test-invitation-code-only';
 delete process.env.DATABASE_URL;

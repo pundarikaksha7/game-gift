@@ -1,3 +1,4 @@
+import { MediaImage, MediaAudio } from '../../media';
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
@@ -53,7 +54,7 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
           >
             <div className="character-art" style={{ background: char.color + '24' }}>
               {char.sprite ? (
-                <img src={char.sprite} alt={char.name} />
+                <MediaImage src={char.sprite} alt={char.name} />
               ) : (
                 <User size={70} color={char.color} />
               )}
@@ -85,6 +86,12 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
               onClick={() => {
                 change((g) => {
                   g.characters = g.characters.filter((x) => x.id !== c.id);
+                  g.levels.forEach((l) => {
+                    if (l.boss?.characterId === c.id) {
+                      l.boss.enabled = false;
+                      delete l.boss.characterId;
+                    }
+                  });
                 });
                 setSelected(0);
               }}
@@ -142,6 +149,57 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             />
           </Field>
         </div>
+        {c.role !== 'hero' && (
+          <div className="form-grid">
+            <Field label="Combat archetype">
+              <select
+                value={c.archetype || 'small'}
+                onChange={(e) => update({ archetype: e.target.value as Character['archetype'] })}
+              >
+                <option value="small">Small · agile / ranged helper</option>
+                <option value="medium">Medium · balanced</option>
+                <option value="large">Large · heavy / melee helper</option>
+              </select>
+            </Field>
+            {(c.role === 'enemy'
+              ? (['health', 'damage', 'moveSpeed', 'attackCooldown'] as const)
+              : (['damage', 'helperRange', 'attackCooldown'] as const)
+            ).map((k) => (
+              <Field
+                key={k}
+                label={
+                  {
+                    health: 'Enemy health',
+                    damage: 'Attack damage',
+                    moveSpeed: 'Movement speed',
+                    attackCooldown: 'Attack cooldown (seconds)',
+                    helperRange: 'Helper attack range',
+                  }[k]
+                }
+              >
+                <input
+                  type="number"
+                  step="any"
+                  min={k === 'attackCooldown' ? 0.1 : k === 'damage' ? 0.1 : 1}
+                  value={
+                    c[k] ??
+                    {
+                      health: 28,
+                      damage: c.role === 'friend' ? 6 : 0.35,
+                      moveSpeed: 120,
+                      attackCooldown: c.role === 'friend' ? 0.85 : 0.95,
+                      helperRange: 380,
+                    }[k]
+                  }
+                  onChange={(e) => update({ [k]: Number(e.target.value) })}
+                />
+              </Field>
+            ))}
+          </div>
+        )}
+        <button className="secondary" onClick={() => update({ sprite: '' })}>
+          Use built-in character
+        </button>
         <div className="upload-row">
           <div>
             <Image size={19} />
@@ -157,7 +215,12 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             onFile={async (f) => {
               setBusy(true);
               try {
-                update({ sprite: await uploadAsset(f, 'image') });
+                const id = c.id;
+                const sprite = await uploadAsset(f, 'image');
+                change((g) => {
+                  const target = g.characters.find((x) => x.id === id);
+                  if (target) target.sprite = sprite;
+                });
                 notify('Character uploaded');
               } catch (e) {
                 notify((e as Error).message);
@@ -166,6 +229,46 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
               }
             }}
           />
+        </div>
+        <div className="upload-row">
+          <div>
+            <strong>Character animation frames</strong>
+            <small>
+              Optional frames for this character; procedural movement, attack and hit effects remain
+              active.
+            </small>
+          </div>
+          <UploadButton
+            label="Add character frame"
+            disabled={!authed || (c.frames?.length || 0) >= 24}
+            accept="image/png,image/webp,image/jpeg"
+            onFile={async (f) => {
+              const id = c.id;
+              try {
+                const url = await uploadAsset(f, 'image');
+                change((g) => {
+                  const target = g.characters.find((x) => x.id === id);
+                  if (target) target.frames = [...(target.frames || []), url];
+                });
+              } catch (e) {
+                notify((e as Error).message);
+              }
+            }}
+          />
+        </div>
+        <div className="frames">
+          {c.frames?.map((url, i) => (
+            <div className="frame" key={`${url}-${i}`}>
+              <MediaImage src={url} alt={`${c.name} frame ${i + 1}`} />
+              <button
+                className="icon-btn"
+                aria-label={`Remove character frame ${i + 1}`}
+                onClick={() => update({ frames: c.frames?.filter((_, j) => j !== i) })}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
         </div>
         {!authed && <small className="muted">Sign in to upload and store your own assets.</small>}
       </div>

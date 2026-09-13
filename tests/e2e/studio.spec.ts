@@ -28,7 +28,7 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   const publicPage = await visitor.newPage();
   await publicPage.goto(`http://127.0.0.1:4173${publicUrl}`);
   await publicPage.getByRole('button', { name: 'Let’s go' }).click();
-  await expect(publicPage.locator('canvas')).toBeVisible();
+  await expect(publicPage.frameLocator('iframe').locator('canvas')).toBeVisible();
   await publicPage.keyboard.press('ArrowRight');
   await page.getByRole('button', { name: 'Unpublish game' }).click();
   await publicPage.reload();
@@ -64,4 +64,76 @@ test('guided builder preserves movement settings and walks through each step', a
   await expect(page.getByLabel('Extra jumps in the air')).toHaveValue('1');
   await page.reload();
   await expect(page.getByLabel('Game title')).toHaveValue('My new world');
+});
+
+test('templates create independent projects and viewport updates keep runtime alive', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New experience', exact: true }).click();
+  await page.getByRole('button', { name: /Story journey/ }).click();
+  await expect(page.getByLabel('Game title')).toHaveValue('Story journey');
+  await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
+  const runtime = page.frames().find((f) => f.url().endsWith('/engine/index.html'))!;
+  const marker = await runtime.evaluate(() => performance.timeOrigin);
+  await page.getByRole('button', { name: 'Toggle grid' }).click();
+  await expect.poll(() => runtime.evaluate(() => (window as any).gameConfig.grid)).toBe(true);
+  expect(await runtime.evaluate(() => performance.timeOrigin)).toBe(marker);
+  await page.getByLabel('Game title').fill('Independent world');
+  await page.getByRole('button', { name: 'New experience', exact: true }).click();
+  await page.getByRole('button', { name: /Arcade challenge/ }).click();
+  await page.getByRole('button', { name: 'Continue without saving' }).click();
+  await expect(page.getByLabel('Game title')).toHaveValue('Arcade challenge');
+  await page
+    .getByRole('button', { name: 'Undo', exact: true })
+    .isDisabled()
+    .then((v) => expect(v).toBe(true));
+  await page.getByRole('button', { name: 'Playtest your game' }).click();
+  await page.getByRole('button', { name: 'Let’s go' }).click();
+  const playable = page.locator('dialog').frameLocator('iframe');
+  await expect(playable.locator('canvas')).toBeVisible();
+  await expect(playable.locator('.hud-label')).toHaveText('Arcade challenge');
+  await page.screenshot({ path: 'test-results/playcraft-playtest.png' });
+  expect(errors).toEqual([]);
+});
+
+test('workspace fits the screen and retains a visible live preview', async ({ page }, testInfo) => {
+  await page.goto('/');
+  await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
+  await page.screenshot({
+    path: `test-results/playcraft-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
+  if (testInfo.project.name === 'desktop') {
+    const editor = await page.locator('.editor-panel').boundingBox();
+    const preview = await page.locator('.preview-column').boundingBox();
+    expect(preview!.x).toBeGreaterThan(editor!.x + editor!.width);
+  }
+});
+
+test('a creator-authored story can be completed using real game controls', async ({ page }) => {
+  const { createStarter } = await import('../../shared/template');
+  const game = createStarter('story');
+  game.levels = [{ ...game.levels[0], width: 1200, platforms: [] }];
+  game.physics.speed = 500;
+  await page.addInitScript(
+    (value) => localStorage.setItem('playcraft-draft-v2', JSON.stringify(value)),
+    game,
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Playtest your game' }).click();
+  await page.getByRole('button', { name: 'Let’s go' }).click();
+  const right = page.locator('dialog').getByRole('button', { name: 'ArrowRight', exact: true });
+  await right.dispatchEvent('pointerdown', { pointerId: 1 });
+  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible({
+    timeout: 10000,
+  });
+  await right.dispatchEvent('pointerup', { pointerId: 1 });
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByText(game.story.ending, { exact: true })).toBeVisible();
 });

@@ -7,5 +7,10 @@ export default defineConfig({
     strictPort: true,
     proxy: { '/api': 'http://127.0.0.1:3001', '/uploads': 'http://127.0.0.1:3001' },
   },
-  build: { sourcemap: false },
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: { manualChunks: { react: ['react', 'react-dom'], validation: ['zod'] } },
+    },
+  },
 });

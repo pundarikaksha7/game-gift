@@ -1,3 +1,4 @@
+import { EncounterEditor } from './EncounterEditor';
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
@@ -238,6 +239,7 @@ export function LevelsEditor({
                 <option value="none">Still</option>
                 <option value="horizontal">Horizontal</option>
                 <option value="vertical">Vertical</option>
+                <option value="both">Both axes</option>
               </select>
               <button
                 className="icon-btn"
@@ -254,6 +256,7 @@ export function LevelsEditor({
           ))}
         </div>
       </div>
+      <EncounterEditor game={game} change={change} notify={notify} authed={authed} level={level} />
     </>
   );
 }

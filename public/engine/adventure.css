@@ -1,0 +1,588 @@
+
+        :root {
+            --transition-fast: 150ms;
+            --transition-normal: 300ms;
+            --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+            --space-xs: 8px;
+            --space-sm: 16px;
+            --space-md: 24px;
+            --space-lg: 32px;
+            --space-xl: 48px;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            -ms-touch-action: none;
+            font-family: 'Inter', sans-serif;
+        }
+
+        #game-world {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #10151f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            /* Wide, Mario-style side-scroller viewport with proportional art. */
+            width: min(100vw, 177.777vh);
+            height: min(100vh, 56.25vw);
+            box-shadow: 0 0 42px rgba(0,0,0,.48);
+        }
+
+        /* Touch Controls */
+        .touch-controls {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .touch-controls > * {
+            pointer-events: auto;
+        }
+
+        .joystick-zone {
+            position: absolute;
+            bottom: 80px;
+            left: 32px;
+            width: 200px;
+            height: 200px;
+        }
+
+        .joystick-base {
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: 3px solid rgba(255,255,255,0.4);
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .joystick-knob {
+            position: absolute;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.6);
+            border: 2px solid rgba(255,255,255,0.8);
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            transition: none;
+        }
+
+        .jump-btn {
+            position: absolute;
+            bottom: 96px;
+            right: 40px;
+            width: 112px;
+            height: 112px;
+            border-radius: 50%;
+            background: rgba(255, 200, 60, 0.7);
+            border: 3px solid rgba(255, 220, 100, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 1px 2px 3px rgba(0,0,0,0.3);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .jump-btn:active {
+            background: rgba(255, 220, 100, 0.9);
+            transform: scale(0.92);
+        }
+
+        /* Combat buttons sit above jump on the right for easy thumb access. */
+        .attack-btn {
+            position: absolute;
+            right: 40px;
+            width: 112px;
+            height: 112px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 25px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 1px 2px 3px rgba(0,0,0,0.35);
+            user-select: none;
+            -webkit-user-select: none;
+            transition: transform 80ms ease, filter 80ms ease;
+        }
+
+        .attack-btn:active,
+        .attack-btn.pressed {
+            transform: scale(0.92);
+            filter: brightness(1.18);
+        }
+
+        .punch-btn {
+            bottom: 224px;
+            background: rgba(238, 92, 126, 0.82);
+            border: 3px solid rgba(255, 160, 180, 0.95);
+        }
+
+        .kick-btn {
+            bottom: 352px;
+            background: rgba(116, 104, 224, 0.84);
+            border: 3px solid rgba(174, 164, 255, 0.95);
+        }
+
+        /* HUD */
+        .hud {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-label {
+            font-family: 'Fredoka', sans-serif;
+            font-size: 28px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .level-name {
+            display: block;
+            margin-top: 2px;
+            font-size: 22px;
+            color: #ffe87c;
+            letter-spacing: 0.5px;
+        }
+
+        .health-row {
+            display: block;
+            margin-top: 6px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 30px;
+            letter-spacing: 3px;
+            line-height: 32px;
+            text-shadow: 1px 2px 3px rgba(0,0,0,0.55);
+        }
+
+        .heart-full { color: #ff4f78; }
+        .heart-empty { color: rgba(255,255,255,0.48); }
+
+        .enemy-count {
+            display: block;
+            margin-top: 2px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 18px;
+            color: #fff;
+            text-shadow: 1px 2px 3px rgba(0,0,0,0.5);
+        }
+
+        .combat-help,
+        .attack-state {
+            display: block;
+            margin-top: 4px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 18px;
+            color: #fff;
+            text-shadow: 1px 2px 3px rgba(0,0,0,0.5);
+        }
+
+        .attack-state {
+            color: #ffe87c;
+            min-height: 22px;
+        }
+
+        /* Edit mode info */
+        .edit-banner {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 22px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .level-transition-overlay,
+        .completion-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 35;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            background: rgba(18, 20, 48, 0.68);
+            pointer-events: auto;
+        }
+
+        .level-transition-overlay.is-hidden,
+        .completion-overlay.is-hidden {
+            display: none;
+        }
+
+        .stage-card {
+            width: min(600px, calc(100% - 48px));
+            padding: 40px 30px 34px;
+            border: 4px solid #ffe27a;
+            border-radius: 28px;
+            background: linear-gradient(160deg, #293e76, #20234f);
+            box-shadow: 0 18px 48px rgba(0,0,0,0.42);
+            text-align: center;
+            color: #fff;
+        }
+
+        .stage-kicker {
+            margin: 0 0 10px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 24px;
+            color: #a9efff;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .stage-title {
+            margin: 0;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 54px;
+            line-height: 1;
+            color: #ffe27a;
+            text-shadow: 3px 4px 0 #20234f;
+        }
+
+        .stage-copy {
+            margin: 18px 0 0;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 25px;
+            line-height: 1.25;
+            color: #f1f6ff;
+        }
+
+        .completion-overlay {
+            z-index: 45;
+            background: rgba(28, 12, 42, 0.78);
+        }
+
+        .completion-overlay .stage-card {
+            border-color: #ff9abb;
+            background: linear-gradient(160deg, #5a2f72, #2b214f);
+        }
+
+        .game-over-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            background: rgba(30, 18, 48, 0.72);
+            pointer-events: auto;
+        }
+
+        .game-over-overlay.is-hidden {
+            display: none;
+        }
+
+        .game-over-card {
+            width: min(560px, calc(100% - 48px));
+            padding: 42px 28px 34px;
+            border: 4px solid #ff8bb0;
+            border-radius: 28px;
+            background: linear-gradient(160deg, #40295f, #241d46);
+            box-shadow: 0 18px 48px rgba(0,0,0,0.42);
+            text-align: center;
+            color: #fff;
+        }
+
+        .game-over-title {
+            margin: 0;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 58px;
+            line-height: 1;
+            color: #ff9abb;
+            text-shadow: 3px 4px 0 #241d46;
+        }
+
+        .game-over-copy {
+            margin: 18px 0 28px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 25px;
+            line-height: 1.25;
+            color: #fff4fb;
+        }
+
+        .restart-btn {
+            min-width: 260px;
+            min-height: 96px;
+            padding: 16px 28px;
+            border: 4px solid #ffe28a;
+            border-radius: 18px;
+            background: #f39a3f;
+            color: #fff;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-shadow: 2px 2px 0 rgba(120, 55, 30, 0.35);
+            box-shadow: 0 7px 0 #b96132;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .restart-btn:active {
+            transform: translateY(5px);
+            box-shadow: 0 2px 0 #b96132;
+            filter: brightness(1.1);
+        }
+
+        .completion-overlay .stage-card { max-height: 86vh; overflow-y: auto; box-sizing: border-box; }
+        @media (max-height: 500px) { .award-art svg { height: 90px; } .completion-overlay .stage-card { padding: 16px; } .completion-overlay .stage-title { font-size: 30px; } .completion-overlay .stage-copy { font-size: 16px; } }
+        .powerup-notice { position: absolute; top: 24px; left: 50%; transform: translateX(-50%); max-width: 48vw; padding: 14px 20px; background: #17243bf2; border: 1px solid #91f3da; border-radius: 12px; color: #fff; font-weight: 600; text-align: center; z-index: 25; pointer-events:none; transition: opacity .25s; }
+        .powerup-status { color:#8ff4d2; font-size:13px; margin-top:8px; }
+        @media (max-width: 900px) { .powerup-notice { top:auto; bottom:12px; font-size:12px; max-width:65vw; padding:8px 12px; } }
+        .hud { background: linear-gradient(120deg, rgba(14,24,43,.88), rgba(14,24,43,.55)); padding: 16px 22px; border: 1px solid #ffffff30; border-radius: 16px; box-shadow: 0 8px 32px #0003; }
+        .hud-label { font-size: 23px; letter-spacing: .3px; }
+        .combat-help { font-size: 12px; opacity: .85; }
+        @media (hover: hover) and (pointer: fine) { .touch-controls { display: none; } }
+        @media (max-height: 500px) { .hud { padding: 8px 12px; top: 8px; left: 8px; } .hud-label { font-size: 18px; } .attack-btn,.jump-btn { width: 64px; height: 64px; right: 18px; font-size: 16px; } .jump-btn { bottom: 22px; } .punch-btn { bottom: 98px; } .kick-btn { bottom: 174px; } .joystick-zone { bottom: 12px; left: 12px; width: 140px; height: 140px; } .joystick-base { width: 110px; height: 110px; } }
+
+
+        /* ── Landscape phone game mode ─────────────────────────────────────── */
+        html, body {
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            background: #10151f;
+        }
+        #game-world { min-height: 100dvh; min-width: 100dvw; }
+        canvas { touch-action: none; }
+
+        .mobile-only { display: none; }
+        .rotate-phone-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: max(28px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(28px, env(safe-area-inset-left));
+            box-sizing: border-box;
+            background: radial-gradient(circle at 50% 35%, #283765 0, #15192f 52%, #0b0f19 100%);
+            color: #fff;
+            text-align: center;
+            font-family: 'Fredoka', sans-serif;
+        }
+        .rotate-phone-card { max-width: 390px; }
+        .rotate-phone-icon { font-size: 72px; line-height: 1; animation: phoneTilt 1.8s ease-in-out infinite; }
+        .rotate-phone-title { margin: 18px 0 6px; font-size: 34px; color: #ffe27a; }
+        .rotate-phone-copy { margin: 0; font-size: 18px; line-height: 1.35; color: #e9f2ff; }
+        @keyframes phoneTilt { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+
+        .fullscreen-btn {
+            position: absolute;
+            z-index: 32;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border: 1px solid rgba(255,255,255,.28);
+            border-radius: 12px;
+            background: rgba(20,36,61,.88);
+            color: #fff;
+            font-size: 20px;
+            box-shadow: 0 5px 18px rgba(0,0,0,.25);
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        @media (pointer: coarse), (hover: none) {
+            .touch-controls { display: block !important; }
+        }
+
+        @media (pointer: coarse) and (orientation: portrait),
+               (hover: none) and (orientation: portrait) {
+            .rotate-phone-overlay { display: flex; }
+        }
+
+        @media (pointer: coarse) and (orientation: landscape),
+               (hover: none) and (orientation: landscape) {
+            body.mobile-landscape { background: #080d16; }
+            body.mobile-landscape #game-world {
+                width: 100dvw;
+                height: 100dvh;
+                min-height: 100dvh;
+                align-items: center;
+                justify-content: center;
+            }
+            body.mobile-landscape canvas {
+                width: 100dvw;
+                height: 100dvh;
+                max-width: 177.777dvh;
+                max-height: 56.25dvw;
+                box-shadow: none;
+            }
+
+            body.mobile-landscape .touch-controls {
+                inset: 0;
+                width: 100dvw;
+                height: 100dvh;
+                z-index: 22;
+            }
+
+            /* Left thumb: wide horizontal movement pad. */
+            body.mobile-landscape .joystick-zone {
+                left: max(10px, env(safe-area-inset-left));
+                bottom: max(8px, env(safe-area-inset-bottom));
+                width: min(31vw, 190px);
+                height: min(43vh, 170px);
+            }
+            body.mobile-landscape .joystick-base {
+                width: min(25vw, 142px);
+                height: min(25vw, 142px);
+                max-width: min(35vh, 142px);
+                max-height: min(35vh, 142px);
+                border-width: 2px;
+                background: rgba(255,255,255,.13);
+                border-color: rgba(255,255,255,.32);
+                box-shadow: inset 0 0 20px rgba(255,255,255,.04), 0 5px 20px rgba(0,0,0,.22);
+            }
+            body.mobile-landscape .joystick-knob {
+                width: 44%;
+                height: 44%;
+                border-width: 2px;
+                background: rgba(255,255,255,.58);
+                box-shadow: 0 4px 14px rgba(0,0,0,.22);
+            }
+
+            /* Right thumb: arcade diamond — jump is largest/lowest button. */
+            body.mobile-landscape .jump-btn,
+            body.mobile-landscape .attack-btn {
+                right: max(12px, env(safe-area-inset-right));
+                width: clamp(58px, 10.5vw, 78px);
+                height: clamp(58px, 10.5vw, 78px);
+                min-width: 0;
+                min-height: 0;
+                border-width: 2px;
+                font-size: clamp(12px, 2.1vw, 16px);
+                line-height: 1;
+                box-shadow: 0 5px 18px rgba(0,0,0,.28), inset 0 0 15px rgba(255,255,255,.08);
+                -webkit-tap-highlight-color: transparent;
+                touch-action: none;
+            }
+            body.mobile-landscape .jump-btn {
+                right: max(18px, calc(env(safe-area-inset-right) + 8px));
+                bottom: max(10px, env(safe-area-inset-bottom));
+                width: clamp(66px, 12vw, 88px);
+                height: clamp(66px, 12vw, 88px);
+                background: rgba(247,174,45,.88);
+            }
+            body.mobile-landscape .punch-btn {
+                right: max(92px, calc(env(safe-area-inset-right) + 92px));
+                bottom: max(42px, calc(env(safe-area-inset-bottom) + 42px));
+                background: rgba(238,92,126,.86);
+            }
+            body.mobile-landscape .kick-btn {
+                right: max(20px, calc(env(safe-area-inset-right) + 12px));
+                bottom: max(98px, calc(env(safe-area-inset-bottom) + 98px));
+                background: rgba(116,104,224,.88);
+            }
+
+            /* HUD is information-dense but gets out of the play field. */
+            body.mobile-landscape .hud {
+                top: max(6px, env(safe-area-inset-top));
+                left: max(8px, env(safe-area-inset-left));
+                max-width: min(48vw, 330px);
+                padding: 7px 10px;
+                border-radius: 10px;
+                background: linear-gradient(120deg, rgba(14,24,43,.82), rgba(14,24,43,.46));
+                box-shadow: 0 5px 18px rgba(0,0,0,.2);
+                backdrop-filter: blur(3px);
+            }
+            body.mobile-landscape .hud-label { font-size: clamp(14px, 2.3vw, 19px); }
+            body.mobile-landscape .level-name { margin-top: 0; font-size: clamp(11px, 1.8vw, 15px); }
+            body.mobile-landscape .health-row { margin-top: 2px; font-size: clamp(16px, 2.6vw, 21px); line-height: 20px; letter-spacing: 1px; }
+            body.mobile-landscape .enemy-count,
+            body.mobile-landscape .attack-state { font-size: clamp(10px, 1.6vw, 13px); margin-top: 1px; min-height: 0; }
+            body.mobile-landscape .combat-help { display: none; }
+            body.mobile-landscape .powerup-status { font-size: 10px; margin-top: 2px; }
+            body.mobile-landscape .powerup-notice {
+                top: max(6px, env(safe-area-inset-top));
+                bottom: auto;
+                max-width: 36vw;
+                padding: 7px 10px;
+                font-size: 10px;
+                border-radius: 9px;
+            }
+
+            body.mobile-landscape .mobile-pause {
+                top: max(6px, env(safe-area-inset-top)) !important;
+                right: max(56px, calc(env(safe-area-inset-right) + 56px)) !important;
+                width: 42px;
+                height: 42px;
+                padding: 0 !important;
+                border-radius: 12px !important;
+                font-size: 0 !important;
+            }
+            body.mobile-landscape .mobile-pause::after { content: 'Ⅱ'; font-size: 18px; font-weight: 700; }
+            body.mobile-landscape .fullscreen-btn {
+                display: flex;
+                top: max(6px, env(safe-area-inset-top));
+                right: max(8px, env(safe-area-inset-right));
+            }
+
+            body.mobile-landscape .stage-card,
+            body.mobile-landscape .game-over-card {
+                width: min(68vw, 520px);
+                max-height: 82dvh;
+                padding: 18px 22px;
+                border-width: 3px;
+                border-radius: 20px;
+                overflow-y: auto;
+            }
+            body.mobile-landscape .stage-title,
+            body.mobile-landscape .game-over-title { font-size: clamp(28px, 6vw, 46px); }
+            body.mobile-landscape .stage-kicker { font-size: clamp(13px, 2.2vw, 18px); }
+            body.mobile-landscape .stage-copy,
+            body.mobile-landscape .game-over-copy { margin-top: 9px; font-size: clamp(13px, 2.2vw, 18px); }
+            body.mobile-landscape .restart-btn { min-width: 190px; min-height: 56px; padding: 10px 18px; font-size: 20px; }
+        }
+
+    
+html,body,#game-world {margin:0;width:100%;height:100%;min-height:0;overflow:hidden} canvas {width:100%;height:100%;object-fit:contain;box-shadow:none} .rotate-phone-overlay,.edit-banner {display:none!important} .hud {transform:scale(.68);transform-origin:top left;max-width:460px} .mobile-pause {font-size:12px!important;padding:7px!important} .preview .hud,.preview .mobile-pause,.preview .fullscreen-btn {display:none} .preview canvas {cursor:crosshair}
+.preview .powerup-notice,.preview .powerup-status {display:none!important}
+.powerup-notice:empty {display:none}
+.touch-controls{display:none!important}
+.hud{max-width:420px;pointer-events:none}
+@media(max-width:600px){.hud{transform:scale(.5);left:8px;top:8px}.combat-help{display:none}.mobile-pause{top:8px!important;right:8px!important;font-size:10px!important}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
