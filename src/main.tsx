@@ -38,7 +38,7 @@ async function boot() {
       if (response.ok) {
         const config = await response.json();
         if (config.authProvider === 'supabase')
-          configureSupabase(config.supabaseUrl, config.supabaseAnonKey);
+          configureSupabase(config.supabaseUrl, config.supabaseAnonKey, config.authRedirectUrl);
       }
     } catch {
       // Studio retains its offline guest-draft behavior when the API is unavailable.

@@ -30,13 +30,14 @@ Without Supabase storage, use a paid Render service with a persistent disk mount
 
 ## Supabase Auth
 
-1. In **Authentication > Providers > Email**, enable email/password signup and require email confirmation. Disable anonymous sign-ins and social providers so Supabase is the only identity provider.
-2. In **Authentication > URL Configuration**, set Site URL to `https://game-gift.shop`. Add exact redirect URLs `https://game-gift.shop/my-games` and `http://localhost:5173/my-games` (development only).
-3. Configure custom SMTP before launch and enable CAPTCHA/bot protection for public signup.
-4. Put `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` on Render. Never put the service-role key on Vercel or in a `VITE_` variable.
-5. Keep `AUTH_PROVIDER=supabase`. Production validation rejects legacy auth, and legacy login/registration endpoints return 404 in this mode.
+1. In **Authentication > Providers > Email**, enable email/password signup and require email confirmation. Disable anonymous sign-ins.
+2. In **Authentication > URL Configuration**, set Site URL to `https://game-gift.shop`. Add exact redirect URLs `https://game-gift.shop/auth/callback` and `http://localhost:5173/auth/callback` (development only). In the confirmation email template, use `{{ .RedirectTo }}` rather than `{{ .SiteURL }}` so the email honors the callback selected by the app.
+3. In **Authentication > Providers > Google**, enable Google and add the client ID and secret from Google Cloud. In Google Cloud, use the Supabase callback shown on that provider page (normally `https://<project-ref>.supabase.co/auth/v1/callback`) as the authorized redirect URI; do not use the Gamegift callback there.
+4. Configure custom SMTP before launch and enable CAPTCHA/bot protection for public signup.
+5. Put `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` on Render. Never put the service-role key on Vercel or in a `VITE_` variable.
+6. Keep `AUTH_PROVIDER=supabase`. Production validation rejects legacy auth, and legacy login/registration endpoints return 404 in this mode.
 
-The studio obtains public Supabase configuration from `/api/config`, so Vercel needs no duplicate Supabase variables. Confirmation links return to `/my-games`; the SPA loads the studio, Supabase consumes the URL session, and API requests carry the access token.
+The studio obtains public Supabase configuration from `/api/config`, so Vercel needs no duplicate Supabase variables. Confirmation and Google OAuth links return to `/auth/callback`; the SPA consumes the Supabase response, moves the signed-in user to `/my-games`, and sends the access token with API requests.
 
 ## Custom domain: game-gift.shop
 

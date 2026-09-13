@@ -1,6 +1,7 @@
 # game-gift implementation checklist
 
 ## Architecture inspection
+
 - [x] Read application, schemas, database/migrations, auth, storage, AI, tests and deployment files.
 - [x] Preserve pre-existing uncommitted changes, React/Vite, both engines, SQL adapter, revisions, ownership and immutable public snapshot boundary.
 - [x] Decision: legacy sessions remain development-only; production uses Supabase Auth with server-validated bearer tokens. Existing accounts are not linked by email automatically.

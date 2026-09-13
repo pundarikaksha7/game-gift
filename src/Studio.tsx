@@ -39,7 +39,7 @@ import {
 } from '../shared/schema';
 import { createTemplate, createStarter, starters, type StarterId } from '../shared/template';
 import { api, setUploadProject } from './api';
-import { supabase } from './auth';
+import { authenticateWithGoogle, completeAuthRedirect, supabase } from './auth';
 import { hasLocalAssets, persistLocalAssets, stripLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
@@ -133,7 +133,13 @@ export default function App() {
       setModal('auth');
       history.replaceState(null, '', location.pathname);
     }
-    api('/auth/me')
+    completeAuthRedirect()
+      .catch((error) => {
+        setAuthError(error.message);
+        setModal('auth');
+        return false;
+      })
+      .then(() => api('/auth/me'))
       .then(async (d) => {
         setUser(d.user);
         try {
@@ -831,12 +837,6 @@ export default function App() {
           <p className="modal-copy">
             Save your worlds, upload your own art, and share a game made just for them.
           </p>
-          {googleEnabled && (
-            <p className="modal-copy">
-              For a new Google account, choose a recovery password below. You can use it for account
-              settings and password sign-in.
-            </p>
-          )}
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -863,20 +863,23 @@ export default function App() {
                 type="button"
                 className="secondary full-width"
                 disabled={busy}
-                onClick={async (e) => {
-                  const data = new FormData(e.currentTarget.form!);
+                onClick={async (event) => {
                   setBusy(true);
                   setAuthError('');
                   try {
-                    const result = await api('/auth/google/start', {
-                      method: 'POST',
-                      body: JSON.stringify(
-                        authMode === 'register' ? { password: data.get('password') } : {},
-                      ),
-                    });
-                    location.assign(result.url);
-                  } catch (err) {
-                    setAuthError((err as Error).message);
+                    if (supabase) await authenticateWithGoogle();
+                    else {
+                      const form = new FormData(event.currentTarget.form!);
+                      const result = await api('/auth/google/start', {
+                        method: 'POST',
+                        body: JSON.stringify(
+                          authMode === 'register' ? { password: form.get('password') } : {},
+                        ),
+                      });
+                      location.assign(result.url);
+                    }
+                  } catch (error) {
+                    setAuthError((error as Error).message);
                     setBusy(false);
                   }
                 }}

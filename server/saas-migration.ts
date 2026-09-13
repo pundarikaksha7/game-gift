@@ -1,9 +1,18 @@
 /** Additive migration; users and projects remain the profile/snapshot source of truth. */
-const tables = ['products', 'orders', 'entitlements', 'payment_webhook_events', 'reports', 'ai_usage', 'deleted_accounts', 'email_outbox'];
+const tables = [
+  'products',
+  'orders',
+  'entitlements',
+  'payment_webhook_events',
+  'reports',
+  'ai_usage',
+  'deleted_accounts',
+  'email_outbox',
+];
 export const saasMigration = {
   version: 6,
   statements: [
-    'ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT \'legacy\'',
+    "ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT 'legacy'",
     'ALTER TABLE projects ADD COLUMN slug TEXT',
     'CREATE UNIQUE INDEX projects_slug ON projects(slug)',
     'ALTER TABLE projects ADD COLUMN published_at TEXT',

@@ -14,7 +14,12 @@ function localPath(id: string) {
 }
 async function storageRequest(id: string, method: string, payload?: Buffer, mime?: string) {
   const config = remote()!;
-  if (!/^(?:users\/[a-f0-9-]{36}\/projects\/[a-f0-9-]{36}\/(?:characters|audio|animations)\/)?[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid storage key');
+  if (
+    !/^(?:users\/[a-f0-9-]{36}\/projects\/[a-f0-9-]{36}\/(?:characters|audio|animations)\/)?[a-f0-9-]{36}$/.test(
+      id,
+    )
+  )
+    throw new Error('Invalid storage key');
   const endpoint = `${config.url}/storage/v1/object/${method === 'GET' ? 'authenticated/' : ''}${encodeURIComponent(config.bucket)}/${id}`;
   const response = await fetch(endpoint, {
     method,
