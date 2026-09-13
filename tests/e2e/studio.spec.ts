@@ -1,11 +1,20 @@
 import { test, expect } from '@playwright/test';
+
+test('landing page enters the live studio', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /Give them a world/ })).toBeVisible();
+  await page.getByRole('link', { name: /Make your first game/ }).click();
+  await expect(page).toHaveURL(/\/studio$/);
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+});
+
 test('create, edit, save, reopen, publish, play, unpublish and delete account', async ({
   page,
   browser,
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByLabel('Your name').fill('Browser Creator');
   await page.getByLabel('Email address').fill(`browser-${Date.now()}@example.com`);
@@ -48,7 +57,7 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
 });
 
 test('guided builder preserves movement settings and walks through each step', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/studio');
   await expect(page.getByText('STEP 1 OF 7')).toBeVisible();
   await page.getByLabel('Game title').fill('My new world');
   await page.getByRole('button', { name: 'Fast', exact: true }).click();
@@ -70,7 +79,7 @@ test('templates create independent projects and viewport updates keep runtime al
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'New experience', exact: true }).click();
   await page.getByRole('button', { name: /Story journey/ }).click();
   await expect(page.getByLabel('Game title')).toHaveValue('Story journey');
@@ -99,7 +108,7 @@ test('templates create independent projects and viewport updates keep runtime al
 });
 
 test('workspace fits the screen and retains a visible live preview', async ({ page }, testInfo) => {
-  await page.goto('/');
+  await page.goto('/studio');
   await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
   await page.screenshot({
     path: `test-results/game-gift-${testInfo.project.name}.png`,
@@ -124,7 +133,7 @@ test('a creator-authored story can be completed using real game controls', async
     (value) => localStorage.setItem('game-gift-draft-v2', JSON.stringify(value)),
     game,
   );
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'Playtest your game' }).click();
   await page.getByRole('button', { name: 'Let’s go' }).click();
   const right = page.locator('dialog').getByRole('button', { name: 'ArrowRight', exact: true });

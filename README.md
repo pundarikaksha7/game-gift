@@ -22,7 +22,7 @@ Open http://localhost:5173. The Express API runs on port 3001. Without cloud cre
 - Up to 12 chapters with moving platforms, pits, optional crossings, power-ups, and configurable bosses.
 - Keyboard and touch playtesting, chapter progression, retry, and final messages.
 - Undo/redo, validated JSON import/export, the latest 100 saved revisions, and optimistic concurrency.
-- Owner-scoped accounts and uploads, HTTP-only sessions, CSRF checks, open account registration, rate limits, and published snapshots.
+- Supabase-only production authentication, verified bearer sessions, owner-scoped uploads, rate limits, and published snapshots.
 - Optional private Supabase object storage and PostgreSQL persistence.
 - Optional reviewed AI proposals, enabled by server-side provider credentials.
 

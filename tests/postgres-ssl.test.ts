@@ -30,3 +30,19 @@ test('loopback Postgres stays plaintext unless sslmode requests verification', (
     false,
   );
 });
+
+test('TLS CA loading survives a stale Render secret-file path and supports inline PEM', () => {
+  const bundled = readFileSync(defaultDatabaseCaPath, 'utf8');
+  assert.deepEqual(
+    postgresSslConfig('postgresql://user:pass@db.example.com/postgres', {
+      DATABASE_SSL_CA: '/etc/secrets/missing-prod-ca.crt',
+    }),
+    { rejectUnauthorized: true, ca: bundled },
+  );
+  assert.deepEqual(
+    postgresSslConfig('postgresql://user:pass@db.example.com/postgres', {
+      DATABASE_SSL_CA_PEM: 'line-one\\nline-two',
+    }),
+    { rejectUnauthorized: true, ca: 'line-one\nline-two' },
+  );
+});

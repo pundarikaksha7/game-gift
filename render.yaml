@@ -17,14 +17,8 @@ services:
       - key: TRUST_PROXY
         value: '1'
       - key: APP_ORIGIN
-        sync: false
+        value: https://game-gift.shop
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_SSL_CA
-        value: /etc/secrets/prod-ca-2021.crt
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: SUPABASE_URL
         sync: false

@@ -13,6 +13,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
+COPY --from=build /app/certs ./certs
 RUN mkdir -p /app/.data/uploads && chown -R node:node /app/.data
 USER node
 EXPOSE 3001

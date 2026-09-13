@@ -2,8 +2,6 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/manrope';
 import { Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
-import './styles.css';
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false };
   static getDerivedStateFromError() {
@@ -29,8 +27,31 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
     );
   }
 }
-createRoot(document.getElementById('root')!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>,
-);
+async function boot() {
+  const landing = location.pathname === '/';
+  if (!landing) {
+    const { configureSupabase } = await import('./auth');
+    try {
+      const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+      const response = await fetch(`${apiBase}/api/config`);
+      if (response.ok) {
+        const config = await response.json();
+        if (config.authProvider === 'supabase')
+          configureSupabase(config.supabaseUrl, config.supabaseAnonKey);
+      }
+    } catch {
+      // Studio retains its offline guest-draft behavior when the API is unavailable.
+    }
+  }
+  const [{ default: App }] = await Promise.all([
+    landing ? import('./Landing') : import('./Studio'),
+    landing ? import('./landing.css') : import('./studio.css'),
+  ]);
+  createRoot(document.getElementById('root')!).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>,
+  );
+}
+
+void boot();

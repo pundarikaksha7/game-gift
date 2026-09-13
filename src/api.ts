@@ -33,8 +33,10 @@ export async function api<T = any>(url: string, options: RequestInit = {}): Prom
     return { ok: true } as T;
   }
   if (supabase && url === '/auth/password') {
+    const input = JSON.parse(String(options.body));
     const { error } = await supabase.auth.updateUser({
-      password: JSON.parse(String(options.body)).password,
+      password: input.password,
+      current_password: input.currentPassword,
     });
     if (error) throw error;
     await supabase.auth.signOut({ scope: 'others' });

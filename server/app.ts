@@ -103,6 +103,9 @@ export function createApp(db: DB) {
     res.json({
       googleEnabled: !supabaseAuthEnabled() && googleEnabled(),
       authProvider: supabaseAuthEnabled() ? 'supabase' : 'legacy',
+      supabaseUrl: supabaseAuthEnabled() ? process.env.SUPABASE_URL : undefined,
+      // Supabase publishable/anon keys are designed for public clients; service-role stays server-only.
+      supabaseAnonKey: supabaseAuthEnabled() ? process.env.SUPABASE_ANON_KEY : undefined,
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
     }),
   );

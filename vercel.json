@@ -10,6 +10,14 @@
     {
       "source": "/play/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/studio",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/my-games",
+      "destination": "/index.html"
     }
   ],
   "headers": [
