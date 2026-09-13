@@ -11,7 +11,7 @@ import { maintain } from '../server/maintenance';
 import { readdir } from 'node:fs/promises';
 import { createTemplate } from '../shared/template';
 test('account isolation, revisions, uploads, publication and session lifecycle', async () => {
-  const directory = await mkdtemp(`${tmpdir()}/playcraft-test-`);
+  const directory = await mkdtemp(`${tmpdir()}/game-gift-test-`);
   process.env.DATA_DIR = directory;
   const postgres = process.env.TEST_DATABASE_URL
     ? new Pool({ connectionString: process.env.TEST_DATABASE_URL })
@@ -35,7 +35,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
       method,
       headers: {
         'Content-Type': 'application/json',
-        'X-Playcraft-Request': 'test',
+        'X-game-gift-Request': 'test',
         Cookie: cookie,
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -138,7 +138,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     );
     const bad = await fetch(base + '/assets', {
       method: 'POST',
-      headers: { Cookie: alice, 'X-Playcraft-Request': 'test' },
+      headers: { Cookie: alice, 'X-game-gift-Request': 'test' },
       body: form,
     });
     assert.equal(bad.status, 400);
@@ -159,7 +159,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     );
     const upload = await fetch(base + '/assets', {
       method: 'POST',
-      headers: { Cookie: alice, 'X-Playcraft-Request': 'test' },
+      headers: { Cookie: alice, 'X-game-gift-Request': 'test' },
       body: png,
     });
     assert.equal(upload.status, 201);
@@ -198,7 +198,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
       headers: {
         'Content-Type': 'application/json',
         Cookie: alice,
-        'X-Playcraft-Request': 'test',
+        'X-game-gift-Request': 'test',
         Origin: 'https://evil.example',
       },
       body: JSON.stringify({ game }),

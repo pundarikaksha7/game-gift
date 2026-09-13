@@ -20,7 +20,7 @@ export async function razorpay(path: string, body?: unknown) {
   return response.json() as Promise<any>;
 }
 export async function product(q: Query) {
-  await q('INSERT INTO products(id,code,name,price_amount,currency,active,created_at) VALUES ($1,$2,$3,$4,$5,1,$6) ON CONFLICT(code) DO NOTHING', ['single-game-publish', 'SINGLE_GAME_PUBLISH', 'Publish one Gamegift', Number(process.env.PUBLISH_PRICE_AMOUNT || 29900), 'INR', new Date().toISOString()]);
+  await q('INSERT INTO products(id,code,name,price_amount,currency,active,created_at) VALUES ($1,$2,$3,$4,$5,1,$6) ON CONFLICT(code) DO NOTHING', ['single-game-publish', 'SINGLE_GAME_PUBLISH', 'Publish one game-gift', Number(process.env.PUBLISH_PRICE_AMOUNT || 29900), 'INR', new Date().toISOString()]);
   const [p] = await q("SELECT * FROM products WHERE code='SINGLE_GAME_PUBLISH' AND active=1");
   if (!p) throw fail(503, 'Publishing is currently unavailable');
   return p;
@@ -98,7 +98,7 @@ export function mountPayments(app: express.Express, db: DB, auth: express.Reques
         await q("INSERT INTO orders(id,user_id,project_id,product_id,amount,currency,provider,provider_order_id,status,created_at) VALUES ($1,$2,$3,$4,$5,$6,'razorpay',$7,'created',$8)", [id, userId, projectId, p.id, p.price_amount, p.currency, remote.id, new Date().toISOString()]);
         order = { provider_order_id: remote.id, amount: p.price_amount, currency: p.currency };
       }
-      return { key: process.env.RAZORPAY_KEY_ID, order_id: order.provider_order_id, amount: order.amount, currency: order.currency, name: 'Gamegift', description: p.name };
+      return { key: process.env.RAZORPAY_KEY_ID, order_id: order.provider_order_id, amount: order.amount, currency: order.currency, name: 'game-gift', description: p.name };
     });
     res.json(checkout);
   });

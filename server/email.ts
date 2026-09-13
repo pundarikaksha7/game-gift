@@ -8,12 +8,12 @@ export async function deliverEmails(db: DB) {
     const payload = JSON.parse(message.payload);
     const origin = process.env.APP_URL || process.env.APP_ORIGIN;
     const content = message.kind === 'welcome'
-      ? ['Welcome to Gamegift', `Make someone the main character. Create your first game at ${origin}/create`]
+      ? ['Welcome to game-gift', `Make someone the main character. Create your first game at ${origin}/create`]
       : message.kind === 'payment'
-        ? ['Gamegift payment confirmed', `Your payment of ${Number(payload.amount) / 100} ${payload.currency} is confirmed. Your game is ready to publish at ${origin}/my-games`]
+        ? ['game-gift payment confirmed', `Your payment of ${Number(payload.amount) / 100} ${payload.currency} is confirmed. Your game is ready to publish at ${origin}/my-games`]
         : message.kind === 'published'
-          ? ['Your Gamegift is ready to share', `Your game is published: ${origin}/g/${payload.slug}`]
-          : ['Gamegift account notification', 'Your account settings have changed.'];
+          ? ['Your game-gift is ready to share', `Your game is published: ${origin}/g/${payload.slug}`]
+          : ['game-gift account notification', 'Your account settings have changed.'];
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': message.id },
       body: JSON.stringify({ from: process.env.EMAIL_FROM, to: message.email, subject: content[0], text: content[1] }), signal: AbortSignal.timeout(10000),

@@ -59,7 +59,7 @@ export function createApp(db: DB) {
     const origin = req.get('origin');
     if (origin && trustedOrigin(origin)) {
       res.set('Access-Control-Allow-Origin', origin).set('Access-Control-Allow-Credentials', 'true').vary('Origin');
-      res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Playcraft-Request, X-Project-Id');
+      res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-game-gift-Request, X-Project-Id');
       res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     }
     if (req.method === 'OPTIONS') { res.sendStatus(origin && trustedOrigin(origin) ? 204 : 403); return; }
@@ -77,7 +77,7 @@ export function createApp(db: DB) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin;
       if (origin && !trustedOrigin(origin)) return next(fail(403, 'Untrusted request origin'));
-      if (!supabaseAuthEnabled() && !req.headers['x-playcraft-request']) return next(fail(403, 'Missing request header'));
+      if (!supabaseAuthEnabled() && !req.headers['x-game-gift-request']) return next(fail(403, 'Missing request header'));
     }
     next();
   });

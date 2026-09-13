@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: playcraft-studio
+    name: game-gift-studio
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build
@@ -29,4 +29,4 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
-        value: playcraft-media
+        value: game-gift-media

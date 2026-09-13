@@ -364,7 +364,7 @@
                 player.vy = 0;
                 pendingAttack = null;
                 gameOver = true;
-                parent.postMessage({type:'playcraft:end', result:'lose'}, location.origin);
+                parent.postMessage({type:'game-gift:end', result:'lose'}, location.origin);
             }
         }
 
@@ -919,7 +919,7 @@
             if (levelComplete || levelTransition || allLevelsComplete || gameOver) return;
             levelComplete = true;
             playSound('win');
-            parent.postMessage({type:'playcraft:end', result:'win'}, location.origin);
+            parent.postMessage({type:'game-gift:end', result:'win'}, location.origin);
             paused = true;
 
         }
@@ -2156,8 +2156,8 @@
         let virtualKeys = [];
         window.addEventListener('message', event => {
           if (event.source !== parent || event.origin !== location.origin) return;
-          if (event.data?.type === 'playcraft:viewport' && mode === 'preview') { cfg.camera = event.data.camera; cfg.grid = !!event.data.grid; }
-          if (event.data?.type === 'playcraft:keys' && Array.isArray(event.data.keys)) {
+          if (event.data?.type === 'game-gift:viewport' && mode === 'preview') { cfg.camera = event.data.camera; cfg.grid = !!event.data.grid; }
+          if (event.data?.type === 'game-gift:keys' && Array.isArray(event.data.keys)) {
             const next = event.data.keys;
             if (next.includes('KeyJ') && !keys.KeyJ) pendingAttack = 'punch';
             if (next.includes('KeyK') && !keys.KeyK) pendingAttack = 'kick';
@@ -2171,7 +2171,7 @@
         if (mode === 'preview') { player.x = cfg.camera + 220; companions.forEach((h,i) => { h.x=cfg.camera+360+i*120; h.y=player.y; }); }
         canvas.addEventListener('click', event => {
           const r=canvas.getBoundingClientRect();
-          parent.postMessage({type:'playcraft:point',x:(event.clientX-r.left)/r.width*viewportWidth()+cameraX,y:(event.clientY-r.top)/r.height*viewportHeight()}, location.origin);
+          parent.postMessage({type:'game-gift:point',x:(event.clientX-r.left)/r.width*viewportWidth()+cameraX,y:(event.clientY-r.top)/r.height*viewportHeight()}, location.origin);
         });
 
         lastTime = performance.now();
@@ -2180,10 +2180,10 @@
 
 let started = false;
 window.addEventListener('message', event => {
-  if (event.source !== parent || event.origin !== location.origin || event.data?.type !== 'playcraft:init' || started) return;
+  if (event.source !== parent || event.origin !== location.origin || event.data?.type !== 'game-gift:init' || started) return;
   started = true;
   window.gameConfig = event.data.config;
   document.body.classList.toggle('preview', event.data.mode === 'preview');
   run(event.data.mode);
 });
-parent.postMessage({type:'playcraft:ready'}, location.origin);
+parent.postMessage({type:'game-gift:ready'}, location.origin);

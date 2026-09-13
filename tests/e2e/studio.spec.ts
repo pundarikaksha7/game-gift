@@ -95,7 +95,7 @@ test('templates create independent projects and viewport updates keep runtime al
   const playable = page.locator('dialog').frameLocator('iframe');
   await expect(playable.locator('canvas')).toBeVisible();
   await expect(playable.locator('.hud-label')).toHaveText('Arcade challenge');
-  await page.screenshot({ path: 'test-results/playcraft-playtest.png' });
+  await page.screenshot({ path: 'test-results/game-gift-playtest.png' });
   expect(errors).toEqual([]);
 });
 
@@ -103,7 +103,7 @@ test('workspace fits the screen and retains a visible live preview', async ({ pa
   await page.goto('/');
   await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
   await page.screenshot({
-    path: `test-results/playcraft-${testInfo.project.name}.png`,
+    path: `test-results/game-gift-${testInfo.project.name}.png`,
     fullPage: true,
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
@@ -122,7 +122,7 @@ test('a creator-authored story can be completed using real game controls', async
   game.levels = [{ ...game.levels[0], width: 1200, platforms: [] }];
   game.physics.speed = 500;
   await page.addInitScript(
-    (value) => localStorage.setItem('playcraft-draft-v2', JSON.stringify(value)),
+    (value) => localStorage.setItem('game-gift-draft-v2', JSON.stringify(value)),
     game,
   );
   await page.goto('/');

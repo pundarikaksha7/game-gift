@@ -63,7 +63,7 @@ type Tab = (typeof navigation)[number]['id'];
 type User = { id: string; name: string; email: string };
 function initial() {
   try {
-    const raw = localStorage.getItem('playcraft-draft-v2');
+    const raw = localStorage.getItem('game-gift-draft-v2');
     return raw ? gameSchema.parse(JSON.parse(raw)) : createTemplate();
   } catch {
     return createTemplate();
@@ -136,7 +136,7 @@ export default function App() {
       .then(async (d) => {
         setUser(d.user);
         try {
-          const id = localStorage.getItem(`playcraft-last-${d.user.id}`);
+          const id = localStorage.getItem(`game-gift-last-${d.user.id}`);
           if (id) {
             const p = await api<Project>(`/projects/${id}`);
             load(p);
@@ -163,7 +163,7 @@ export default function App() {
     if (publicId || project || user) return;
     if (gameSchema.safeParse(game).success)
       try {
-        localStorage.setItem('playcraft-draft-v2', JSON.stringify(game));
+        localStorage.setItem('game-gift-draft-v2', JSON.stringify(game));
       } catch {
         notify('Browser storage is full. Export your game to keep a copy.');
       }
@@ -189,7 +189,7 @@ export default function App() {
   function load(p: Project) {
     draftEpoch.current++;
     try {
-      if (user) localStorage.setItem(`playcraft-last-${user.id}`, p.id);
+      if (user) localStorage.setItem(`game-gift-last-${user.id}`, p.id);
     } catch {}
     setGame(p.game);
     setProject(p);
@@ -221,7 +221,7 @@ export default function App() {
       if (epoch !== draftEpoch.current) return;
       setProject(p);
       try {
-        localStorage.setItem(`playcraft-last-${user.id}`, p.id);
+        localStorage.setItem(`game-gift-last-${user.id}`, p.id);
       } catch {}
       setSaved(JSON.stringify(game));
       notify('Your adventure is saved');
@@ -270,7 +270,7 @@ export default function App() {
       url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.playcraft.json`;
+    link.download = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.game-gift.json`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify('Game data exported. Uploaded media remains on this server.');
@@ -297,7 +297,7 @@ export default function App() {
           <span className="brand-mark">
             <Gamepad2 size={23} />
           </span>
-          playcraft<span className="brand-dot">studio</span>
+          game-gift<span className="brand-dot">studio</span>
         </a>
         {publicGame ? (
           <>
@@ -306,7 +306,7 @@ export default function App() {
             <PlayGame game={publicGame} />
             <p className="muted">
               A little world, made for {publicGame.recipient || 'you'} with <Heart size={12} />{' '}
-              Playcraft.
+              game-gift.
             </p>
           </>
         ) : (
@@ -321,7 +321,7 @@ export default function App() {
           <span className="brand-mark">
             <Gamepad2 size={22} />
           </span>
-          playcraft<span className="brand-dot">studio</span>
+          game-gift<span className="brand-dot">studio</span>
         </a>
         <button className="workspace-picker" onClick={showProjects}>
           <span className="workspace-icon">{user?.name[0].toUpperCase() || 'P'}</span>
@@ -735,7 +735,7 @@ export default function App() {
           </div>
           <footer className="studio-footer">
             <span>
-              <Heart size={12} /> Playcraft Studio
+              <Heart size={12} /> game-gift Studio
             </span>
             <span>Create something worth playing.</span>
           </footer>
@@ -1095,7 +1095,7 @@ export default function App() {
                   body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))),
                 });
                 try {
-                  localStorage.removeItem(`playcraft-last-${user.id}`);
+                  localStorage.removeItem(`game-gift-last-${user.id}`);
                 } catch {
                   /* Storage may be disabled. */
                 }

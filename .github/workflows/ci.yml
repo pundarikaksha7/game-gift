@@ -1,4 +1,4 @@
-name: Playcraft checks
+name: game-gift checks
 on: [push, pull_request]
 jobs:
   check:
@@ -7,12 +7,12 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: playcraft_test
+          POSTGRES_USER: game-gift_test
           POSTGRES_PASSWORD: test-only-password
-          POSTGRES_DB: playcraft_test
+          POSTGRES_DB: game-gift_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U playcraft_test"
+          --health-cmd "pg_isready -U game-gift_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
       - run: npm run format:check
       - run: npm test
         env:
-          TEST_DATABASE_URL: postgresql://playcraft_test:test-only-password@localhost:5432/playcraft_test
+          TEST_DATABASE_URL: postgresql://game-gift_test:test-only-password@localhost:5432/game-gift_test
 
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

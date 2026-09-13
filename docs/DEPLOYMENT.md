@@ -1,14 +1,14 @@
-# Deploy Playcraft
+# Deploy game-gift
 
 ## Architecture
 
 - **Vercel:** Vite frontend and static game runtime, with `/api/:path*` rewritten to the Render HTTPS origin.
 - **Render:** Node 24 LTS Express API. Build with `npm ci --include=dev && npm run build`, start with `npm start`, and health check `/api/health`.
-- **Supabase:** PostgreSQL through a server-only connection string, and the private `playcraft-media` storage bucket. The application manages its own accounts and sessions; do not expose its tables through public API policies.
+- **Supabase:** PostgreSQL through a server-only connection string, and the private `game-gift-media` storage bucket. The application manages its own accounts and sessions; do not expose its tables through public API policies.
 
 ## Required configuration
 
-Create a Supabase project and a **private** `playcraft-media` bucket, allowing JPEG, PNG, WebP, and the audio MIME types accepted by the API. Use a 10 MB object limit. Set the following only on Render:
+Create a Supabase project and a **private** `game-gift-media` bucket, allowing JPEG, PNG, WebP, and the audio MIME types accepted by the API. Use a 10 MB object limit. Set the following only on Render:
 
 | Variable                  | Value                                                     |
 | ------------------------- | --------------------------------------------------------- |
@@ -20,7 +20,7 @@ Create a Supabase project and a **private** `playcraft-media` bucket, allowing J
 | REGISTRATION_CODE         | Random secret of at least 32 characters                   |
 | SUPABASE_URL              | Exact project HTTPS origin                                |
 | SUPABASE_SERVICE_ROLE_KEY | Server-only service role credential                       |
-| SUPABASE_STORAGE_BUCKET   | playcraft-media                                           |
+| SUPABASE_STORAGE_BUCKET   | game-gift-media                                           |
 
 The storage key never reaches the browser. The API checks asset ownership or active publication before returning private media. Account deletion queues media removal for retry. When switching from local storage to Supabase, migrate all existing objects before setting the storage variables; the application does not copy them automatically.
 

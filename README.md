@@ -1,4 +1,4 @@
-# Playcraft Studio
+# game-gift Studio
 
 A multi-project builder for creating, playtesting, and publishing interactive adventures. Start with an exploration game, a story journey, or an arcade challenge; customize the cast, level layouts, physics, encounters, audio, and narrative. Projects use a declarative content schema and a reusable runtime.
 

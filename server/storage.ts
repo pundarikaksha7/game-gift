@@ -6,7 +6,7 @@ function remote() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
-  return { url, key, bucket: process.env.SUPABASE_STORAGE_BUCKET || 'playcraft-media' };
+  return { url, key, bucket: process.env.SUPABASE_STORAGE_BUCKET || 'game-gift-media' };
 }
 function localPath(id: string) {
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid asset identifier');

@@ -7,7 +7,7 @@ let activeProject: string | null = null;
 export function setUploadProject(id: string | null) { activeProject = id; }
 export async function requestHeaders() {
   const token = await accessToken();
-  return { 'X-Playcraft-Request': 'studio', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  return { 'X-game-gift-Request': 'studio', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
   if (supabase && ['/auth/login', '/auth/register'].includes(url)) {

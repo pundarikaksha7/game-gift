@@ -1,4 +1,4 @@
-# Gamegift implementation checklist
+# game-gift implementation checklist
 
 ## Architecture inspection
 - [x] Read application, schemas, database/migrations, auth, storage, AI, tests and deployment files.

@@ -31,10 +31,10 @@ export function AdventureRuntime({
     const receive = (event: MessageEvent) => {
       if (event.source !== frame.contentWindow || event.origin !== location.origin || !event.data)
         return;
-      if (event.data.type === 'playcraft:ready') {
+      if (event.data.type === 'game-gift:ready') {
         frame.contentWindow?.postMessage(
           {
-            type: 'playcraft:init',
+            type: 'game-gift:init',
             config: {
               ...runtimeConfig(
                 game,
@@ -50,13 +50,13 @@ export function AdventureRuntime({
         if (playing) frame.focus();
       }
       if (
-        event.data.type === 'playcraft:end' &&
+        event.data.type === 'game-gift:end' &&
         playing &&
         ['win', 'lose'].includes(event.data.result)
       )
         callbacks.current.onEnd?.(event.data.result);
       if (
-        event.data.type === 'playcraft:point' &&
+        event.data.type === 'game-gift:point' &&
         !playing &&
         Number.isFinite(event.data.x) &&
         Number.isFinite(event.data.y)
@@ -69,7 +69,7 @@ export function AdventureRuntime({
       interval = setInterval(
         () =>
           frame.contentWindow?.postMessage(
-            { type: 'playcraft:keys', keys: [...controls.current] },
+            { type: 'game-gift:keys', keys: [...controls.current] },
             location.origin,
           ),
         16,
@@ -82,7 +82,7 @@ export function AdventureRuntime({
   }, [game, levelIndex, playing, controls]);
   useEffect(() => {
     ref.current?.contentWindow?.postMessage(
-      { type: 'playcraft:viewport', camera: camera / WORLD_UNIT, grid },
+      { type: 'game-gift:viewport', camera: camera / WORLD_UNIT, grid },
       location.origin,
     );
   }, [camera, grid]);

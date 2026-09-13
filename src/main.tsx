@@ -17,7 +17,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
         <button onClick={() => location.reload()}>Reload studio</button>
         <button
           onClick={() => {
-            localStorage.removeItem('playcraft-draft-v2');
+            localStorage.removeItem('game-gift-draft-v2');
             location.reload();
           }}
         >
