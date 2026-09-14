@@ -1,4 +1,5 @@
 import type { Game, Level } from './schema';
+import { defaultAvatar } from './avatar';
 export function newLevel(index: number): Level {
   return {
     id: crypto.randomUUID(),
@@ -33,6 +34,7 @@ export function createTemplate(): Game {
         sprite: '',
         color: '#a7b78f',
         scale: 1,
+        avatar: structuredClone(defaultAvatar),
       },
       {
         id: 'friend',

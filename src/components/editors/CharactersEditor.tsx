@@ -6,6 +6,8 @@ import { newLevel } from '../../../shared/template';
 import { attachAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
+import { AvatarRenderer } from '../../avatar/components/AvatarRenderer';
+import { AvatarCreator } from '../../avatar/components/AvatarCreator';
 export function CharactersEditor({ game, change, notify, authed }: EditorProps) {
   const [selected, setSelected] = useState(0),
     [busy, setBusy] = useState(false);
@@ -55,6 +57,8 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             <div className="character-art" style={{ background: char.color + '24' }}>
               {char.sprite ? (
                 <MediaImage src={char.sprite} alt={char.name} />
+              ) : char.avatar ? (
+                <AvatarRenderer config={char.avatar} label={char.name} />
               ) : (
                 <User size={70} color={char.color} />
               )}
@@ -100,6 +104,11 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             </button>
           )}
         </div>
+        <AvatarCreator
+          value={c.avatar}
+          onChange={(avatar) => update({ avatar, sprite: '' })}
+          onSave={() => notify('Character ready — save the adventure to keep it')}
+        />
         <div className="form-grid">
           <Field label="Character name">
             <input
@@ -197,8 +206,8 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             ))}
           </div>
         )}
-        <button className="secondary" onClick={() => update({ sprite: '' })}>
-          Use built-in character
+        <button className="secondary" onClick={() => update({ sprite: '', avatar: c.avatar })}>
+          Use custom character
         </button>
         <div className="upload-row">
           <div>

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { avatarConfigSchema } from './avatar';
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const text = z.string().max(2000);
@@ -24,6 +25,7 @@ export const characterSchema = z
     attackCooldown: z.number().min(0.1).max(10).optional(),
     helperRange: z.number().min(30).max(1000).optional(),
     frames: z.array(assetUrl).max(24).optional(),
+    avatar: avatarConfigSchema.optional(),
   })
   .strict();
 export const platformSchema = z

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Game } from '../../shared/schema';
 import { runtimeConfig, WORLD_UNIT } from '../../shared/runtime';
+import { composeAvatar } from '../avatar/compose';
 export function AdventureRuntime({
   game,
   levelIndex = 0,
@@ -28,19 +29,30 @@ export function AdventureRuntime({
   useEffect(() => {
     const frame = ref.current!;
     let interval: ReturnType<typeof setInterval> | undefined;
-    const receive = (event: MessageEvent) => {
+    const receive = async (event: MessageEvent) => {
       if (event.source !== frame.contentWindow || event.origin !== location.origin || !event.data)
         return;
       if (event.data.type === 'game-gift:ready') {
+        const config = runtimeConfig(
+          game,
+          Math.min(levelIndex, game.levels.length - 1),
+          viewport.current.camera,
+        );
+        const hero = game.characters.find((character) => character.role === 'hero');
+        if (hero?.avatar && !hero.sprite) {
+          try {
+            const texture = await composeAvatar(hero.avatar);
+            config.assets.player_character = texture;
+            config.assets[hero.id] = texture;
+          } catch {
+            // The game retains its existing built-in fallback if composition fails.
+          }
+        }
         frame.contentWindow?.postMessage(
           {
             type: 'game-gift:init',
             config: {
-              ...runtimeConfig(
-                game,
-                Math.min(levelIndex, game.levels.length - 1),
-                viewport.current.camera,
-              ),
+              ...config,
               grid: viewport.current.grid,
             },
             mode: playing ? 'play' : 'preview',

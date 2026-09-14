@@ -63,6 +63,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
       invincibilityDuration: mechanics.invincibility,
       airJumps: game.physics.airJumps || 0,
       scale: hero.scale,
+      avatar: hero.avatar,
     },
     physics: { gravity: game.physics.gravity / WORLD_UNIT },
     level: { groundY: 1080 },
