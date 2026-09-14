@@ -247,7 +247,10 @@ export function createApp(db: DB) {
   };
   mountPayments(app, db, auth);
   mountPublic(app, db, auth);
-  app.get('/api/auth/me', auth, (_req, res) => res.json({ user: res.locals.user }));
+  app.get('/api/auth/me', auth, (_req, res) => {
+    const { id, name, email } = res.locals.user;
+    res.json({ user: { id, name, email } });
+  });
   async function verifyPassword(userId: string, password: string, q = db.query) {
     const [user] = await q('SELECT password FROM users WHERE id=$1', [userId]);
     if (!user) throw fail(401, 'Sign in again');
@@ -278,8 +281,8 @@ export function createApp(db: DB) {
       await q('UPDATE users SET name=name WHERE id=$1', [id]);
       if (supabaseAuthEnabled())
         await q(
-          'INSERT INTO deleted_accounts(id,created_at) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-          [id, new Date().toISOString()],
+          'INSERT INTO deleted_accounts(id,auth_subject,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
+          [id, res.locals.user.authSubject, new Date().toISOString()],
         );
       else await verifyPassword(id, password, q);
       await q('INSERT INTO deleted_files(filename) SELECT filename FROM assets WHERE owner_id=$1', [

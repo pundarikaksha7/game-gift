@@ -47,4 +47,14 @@ export const migrations = [
     ],
   },
   saasMigration,
+  {
+    version: 7,
+    statements: [
+      'ALTER TABLE users ADD COLUMN auth_subject TEXT',
+      "UPDATE users SET auth_subject=id WHERE auth_provider='supabase'",
+      'CREATE UNIQUE INDEX users_auth_subject ON users(auth_subject)',
+      'ALTER TABLE deleted_accounts ADD COLUMN auth_subject TEXT',
+      'CREATE UNIQUE INDEX deleted_accounts_auth_subject ON deleted_accounts(auth_subject)',
+    ],
+  },
 ];

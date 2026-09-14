@@ -25,21 +25,52 @@ export async function supabaseIdentity(authorization: string | undefined) {
 export async function authenticateSupabase(db: DB, authorization: string | undefined) {
   const user = await supabaseIdentity(authorization);
   return db.transaction(async (q) => {
-    if ((await q('SELECT id FROM deleted_accounts WHERE id=$1', [user.id])).length) throw denied();
-    // Never auto-link an existing legacy account by email.
-    await q(
-      "INSERT INTO users(id,email,password,name,auth_provider) VALUES ($1,$2,'!supabase',$3,'supabase') ON CONFLICT(id) DO NOTHING",
-      [user.id, user.email, user.name],
+    if (
+      (
+        await q('SELECT id FROM deleted_accounts WHERE id=$1 OR auth_subject=$2', [
+          user.id,
+          user.id,
+        ])
+      ).length
+    )
+      throw denied();
+    let [profile] = await q(
+      'SELECT id,email,name,auth_provider,auth_subject FROM users WHERE auth_subject=$1',
+      [user.id],
     );
-    const [profile] = await q('SELECT id,email,name,auth_provider FROM users WHERE id=$1', [
-      user.id,
-    ]);
-    if (profile.auth_provider !== 'supabase') throw denied();
+    if (profile)
+      return {
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        authSubject: profile.auth_subject,
+      };
+    // A verified Google email can claim its matching legacy profile without changing the
+    // application user ID, which keeps all project, asset, and purchase foreign keys intact.
+    await q(
+      `INSERT INTO users(id,email,password,name,auth_provider,auth_subject)
+       VALUES ($1,$2,'!supabase',$3,'supabase',$4)
+       ON CONFLICT(email) DO UPDATE SET
+         password=CASE WHEN users.auth_provider='legacy' THEN '!supabase' ELSE users.password END,
+         auth_provider=CASE WHEN users.auth_provider='legacy' THEN 'supabase' ELSE users.auth_provider END,
+         auth_subject=CASE WHEN users.auth_provider='legacy' THEN EXCLUDED.auth_subject ELSE users.auth_subject END`,
+      [user.id, user.email, user.name, user.id],
+    );
+    [profile] = await q(
+      'SELECT id,email,name,auth_provider,auth_subject FROM users WHERE email=$1',
+      [user.email],
+    );
+    if (profile?.auth_provider !== 'supabase' || profile.auth_subject !== user.id) throw denied();
     await q(
       "INSERT INTO email_outbox(id,user_id,kind,payload,created_at) VALUES ($1,$2,'welcome','{}',$3) ON CONFLICT DO NOTHING",
-      [`welcome-${user.id}`, user.id, new Date().toISOString()],
+      [`welcome-${profile.id}`, profile.id, new Date().toISOString()],
     );
-    return { id: profile.id, email: user.email, name: profile.name };
+    return {
+      id: profile.id,
+      email: profile.email,
+      name: profile.name,
+      authSubject: profile.auth_subject,
+    };
   });
 }
 export async function removeSupabaseAccount(id: string) {
