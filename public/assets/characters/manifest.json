@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "source": "source/characters.webp",
+  "characters": [
+    {
+      "id": "character-01",
+      "file": "sprites/character-01.webp"
+    },
+    {
+      "id": "character-02",
+      "file": "sprites/character-02.webp"
+    },
+    {
+      "id": "character-03",
+      "file": "sprites/character-03.webp"
+    },
+    {
+      "id": "character-04",
+      "file": "sprites/character-04.webp"
+    },
+    {
+      "id": "character-05",
+      "file": "sprites/character-05.webp"
+    },
+    {
+      "id": "character-06",
+      "file": "sprites/character-06.webp"
+    },
+    {
+      "id": "character-07",
+      "file": "sprites/character-07.webp"
+    },
+    {
+      "id": "character-08",
+      "file": "sprites/character-08.webp"
+    },
+    {
+      "id": "character-09",
+      "file": "sprites/character-09.webp"
+    },
+    {
+      "id": "character-10",
+      "file": "sprites/character-10.webp"
+    },
+    {
+      "id": "character-11",
+      "file": "sprites/character-11.webp"
+    },
+    {
+      "id": "character-12",
+      "file": "sprites/character-12.webp"
+    },
+    {
+      "id": "character-13",
+      "file": "sprites/character-13.webp"
+    },
+    {
+      "id": "character-14",
+      "file": "sprites/character-14.webp"
+    },
+    {
+      "id": "character-15",
+      "file": "sprites/character-15.webp"
+    },
+    {
+      "id": "character-16",
+      "file": "sprites/character-16.webp"
+    },
+    {
+      "id": "character-17",
+      "file": "sprites/character-17.webp"
+    },
+    {
+      "id": "character-18",
+      "file": "sprites/character-18.webp"
+    },
+    {
+      "id": "character-19",
+      "file": "sprites/character-19.webp"
+    },
+    {
+      "id": "character-20",
+      "file": "sprites/character-20.webp"
+    },
+    {
+      "id": "character-21",
+      "file": "sprites/character-21.webp"
+    },
+    {
+      "id": "character-22",
+      "file": "sprites/character-22.webp"
+    },
+    {
+      "id": "character-23",
+      "file": "sprites/character-23.webp"
+    },
+    {
+      "id": "character-24",
+      "file": "sprites/character-24.webp"
+    },
+    {
+      "id": "character-25",
+      "file": "sprites/character-25.webp"
+    },
+    {
+      "id": "character-26",
+      "file": "sprites/character-26.webp"
+    },
+    {
+      "id": "character-27",
+      "file": "sprites/character-27.webp"
+    },
+    {
+      "id": "character-28",
+      "file": "sprites/character-28.webp"
+    },
+    {
+      "id": "character-29",
+      "file": "sprites/character-29.webp"
+    },
+    {
+      "id": "character-30",
+      "file": "sprites/character-30.webp"
+    },
+    {
+      "id": "character-31",
+      "file": "sprites/character-31.webp"
+    },
+    {
+      "id": "character-32",
+      "file": "sprites/character-32.webp"
+    },
+    {
+      "id": "character-33",
+      "file": "sprites/character-33.webp"
+    },
+    {
+      "id": "character-34",
+      "file": "sprites/character-34.webp"
+    },
+    {
+      "id": "character-35",
+      "file": "sprites/character-35.webp"
+    },
+    {
+      "id": "character-36",
+      "file": "sprites/character-36.webp"
+    },
+    {
+      "id": "character-37",
+      "file": "sprites/character-37.webp"
+    },
+    {
+      "id": "character-38",
+      "file": "sprites/character-38.webp"
+    },
+    {
+      "id": "character-39",
+      "file": "sprites/character-39.webp"
+    }
+  ]
+}

@@ -4,9 +4,11 @@ import {
   avatarCacheKey,
   avatarConfigSchema,
   avatarPresets,
+  CHARACTER_COUNT,
   defaultAvatar,
   randomizeAvatar,
-  resolveAvatarLayers,
+  resolveAvatarAsset,
+  resolveAvatarFrames,
   safeAvatar,
 } from '../shared/avatar';
 import { createTemplate } from '../shared/template';
@@ -22,36 +24,29 @@ test('default avatar is valid, serializable and included in new games', () => {
   assert.ok(gameSchema.safeParse(createTemplate()).success);
 });
 
-test('invalid component IDs and arbitrary paths fail closed', () => {
+test('invalid appearance IDs and arbitrary values fail closed', () => {
   assert.equal(
-    avatarConfigSchema.safeParse({ ...defaultAvatar, hair: '../../secret' }).success,
+    avatarConfigSchema.safeParse({ ...defaultAvatar, appearance: '../../secret' }).success,
     false,
   );
-  assert.deepEqual(safeAvatar({ ...defaultAvatar, top: 'unknown' }), defaultAvatar);
-  assert.ok(
-    resolveAvatarLayers({ ...defaultAvatar, shoes: '../../secret' }).every((layer) =>
-      layer.src.startsWith('/avatars/'),
-    ),
-  );
+  assert.deepEqual(safeAvatar({ ...defaultAvatar, outfit: 'unknown' }), defaultAvatar);
+  assert.match(resolveAvatarAsset(defaultAvatar), /^\/assets\/characters\/sprites\/character-\d{2}\.webp$/);
 });
 
 test('random avatar generation always produces valid library combinations', () => {
   for (let i = 0; i < 100; i++) {
     const avatar = randomizeAvatar(() => (i * 0.61803398875) % 1);
     assert.ok(avatarConfigSchema.safeParse(avatar).success);
-    assert.ok(resolveAvatarLayers(avatar).length >= 19);
+    assert.deepEqual(resolveAvatarFrames(avatar, 'run'), [resolveAvatarAsset(avatar)]);
   }
 });
 
 test('presets are varied, valid and use stable cache keys', () => {
-  assert.equal(avatarPresets.length, 16);
-  assert.equal(new Set(avatarPresets.map((preset) => preset.preset)).size, 16);
+  assert.equal(avatarPresets.length, CHARACTER_COUNT);
+  assert.equal(new Set(avatarPresets.map((preset) => preset.appearance)).size, CHARACTER_COUNT);
   for (const preset of avatarPresets) assert.ok(avatarConfigSchema.safeParse(preset).success);
   assert.equal(avatarCacheKey(defaultAvatar), avatarCacheKey(structuredClone(defaultAvatar)));
-  assert.notEqual(
-    avatarCacheKey(defaultAvatar),
-    avatarCacheKey({ ...defaultAvatar, hair: 'crop' }),
-  );
+  assert.notEqual(avatarCacheKey(defaultAvatar), avatarCacheKey(avatarPresets[0]));
 });
 
 test('old projects without avatar configuration remain valid', () => {

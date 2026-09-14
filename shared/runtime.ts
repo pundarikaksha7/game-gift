@@ -1,4 +1,5 @@
 import { mechanicsSchema, type Game } from './schema';
+import { resolveAvatarAsset, resolveAvatarFrames, roleSprite } from './avatar';
 export const WORLD_UNIT = 460 / 1080;
 export const defaultBoss = {
   enabled: false,
@@ -13,8 +14,12 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
   const mechanics = mechanicsSchema.parse(game.mechanics || {});
   const enemies = game.characters.filter((c) => c.role === 'enemy');
   const hero = game.characters.find((c) => c.role === 'hero')!;
-  const assets: Record<string, string> = { player_character: hero.sprite };
-  game.characters.forEach((c) => (assets[c.id] = c.sprite));
+  const heroArt = hero.avatar ? resolveAvatarAsset(hero.avatar) : hero.sprite;
+  const assets: Record<string, string> = { player_character: heroArt };
+  game.characters.forEach((c, index) => {
+    assets[c.id] = c.avatar ? resolveAvatarAsset(c.avatar) : c.sprite ||
+      (c.role === 'hero' ? heroArt : roleSprite(c.role, index));
+  });
   game.levels.forEach((l) => (assets[l.id] = l.background || ''));
   const enemyTypes = Object.fromEntries(
     enemies.map((c) => {
@@ -70,7 +75,14 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
     combat: mechanics,
     hazards: { fallDamage: mechanics.fallDamage },
     animation: game.animation,
-    characters: game.characters,
+    characters: game.characters.map((character) => ({
+      ...character,
+      sheetFrames: character.avatar ? {
+        idle: resolveAvatarFrames(character.avatar, 'idle'),
+        run: resolveAvatarFrames(character.avatar, 'run'),
+        jump: resolveAvatarFrames(character.avatar, 'jump'),
+      } : undefined,
+    })),
     helpers: game.characters
       .filter((c) => c.role === 'friend')
       .map((c) => ({

@@ -16,7 +16,7 @@
     "format:check": "prettier --check src shared server tests docs README.md package.json tsconfig.json vite.config.ts index.html playwright.config.ts",
     "account:reset": "node --env-file-if-exists=.env --import tsx server/reset-password.ts",
     "test:e2e": "playwright test",
-    "avatars:import": "tsx scripts/import-avatar-assets.ts"
+    "characters:import": "python3 scripts/import-character-library.py"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

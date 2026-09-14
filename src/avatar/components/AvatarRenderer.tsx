@@ -6,10 +6,12 @@ export const AvatarRenderer = memo(function AvatarRenderer({
   config,
   className = '',
   label = 'Custom character',
+  motion: _motion,
 }: {
   config?: AvatarConfig;
   className?: string;
   label?: string;
+  motion?: 'idle' | 'run' | 'jump';
 }) {
   const valid = useMemo(() => safeAvatar(config), [config]);
   const key = avatarCacheKey(valid);

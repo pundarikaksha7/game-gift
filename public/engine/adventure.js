@@ -464,14 +464,19 @@
         };
 
         const frameCache = new Map();
-        for (const c of cfg.characters) for (const url of (c.frames?.length ? c.frames : c.role === 'hero' ? cfg.animation.frames : [])) {
+        for (const c of cfg.characters) for (const url of [
+          ...(c.frames?.length ? c.frames : c.role === 'hero' ? cfg.animation.frames : []),
+          ...Object.values(c.sheetFrames || {}).flat()
+        ]) {
           if (!frameCache.has(url)) {const image=new Image();image.src=url;frameCache.set(url,image);}
         }
-        function animatedArt(id, fallback) {
+        function animatedArt(id, fallback, motion = 'idle') {
           const c=cfg.characters.find(c=>c.id===id);
-          const frames=c?.frames?.length ? c.frames : c?.role==='hero' ? cfg.animation.frames : [];
+          const authored = c?.sheetFrames?.[motion] || c?.sheetFrames?.idle || [];
+          const frames=authored.length ? authored : c?.frames?.length ? c.frames : c?.role==='hero' ? cfg.animation.frames : [];
           if (!frames.length) return fallback;
-          const image=frameCache.get(frames[Math.floor(worldTime*cfg.animation.fps)%frames.length]);
+          const fps = motion === 'run' ? Math.max(8, cfg.animation.fps) : motion === 'jump' ? 7 : 4;
+          const image=frameCache.get(frames[Math.floor(worldTime*fps)%frames.length]);
           return image?.complete && image.naturalWidth ? {image,ready:true}:fallback;
         }
         // Sound is optional and starts after the first input, satisfying browser
@@ -1247,7 +1252,9 @@
                 const spec = enemyTypes[enemy.type];
                 const sx = enemy.x - cameraX;
                 const sy = enemy.y + Math.sin(enemy.animTime * 8) * (enemy.defeatTimer > 0 ? 0 : 1);
-                const state = animatedArt(enemy.type, enemyImageStates[enemy.type]);
+                const running = enemy.defeatTimer <= 0 && enemy.onGround && Math.abs(enemy.vx) > 5;
+                const jumping = enemy.defeatTimer <= 0 && !enemy.onGround;
+                const state = animatedArt(enemy.type, enemyImageStates[enemy.type], jumping ? 'jump' : running ? 'run' : 'idle');
                 const image = state && state.image;
                 const defeated = enemy.defeatTimer > 0;
                 ctx.save();
@@ -1260,8 +1267,6 @@
                     ctx.globalAlpha = Math.max(0, enemy.defeatTimer / 0.42);
                 }
                 if (enemy.flashTimer > 0) ctx.globalAlpha *= 0.68;
-                const running = enemy.defeatTimer <= 0 && enemy.onGround && Math.abs(enemy.vx) > 5;
-                const jumping = enemy.defeatTimer <= 0 && !enemy.onGround;
                 const runPhase = Math.sin(enemy.animTime * 14 * cfg.animation.speed);
                 const motionBob = jumping ? -4 : running ? -Math.abs(runPhase) * 3 : Math.sin(enemy.animTime * 3) * 1.5;
                 const motionTilt = defeated ? -.55 * Math.min(1, (.42 - enemy.defeatTimer) / .42) : enemy.boss && enemy.phase.endsWith('windup') ? -.13 : enemy.boss && enemy.phase === 'slam' ? .24 : jumping ? (enemy.vx >= 0 ? 0.06 : -0.06) : running ? runPhase * 0.035 : 0;
@@ -1425,7 +1430,7 @@
                 const sx = ally.x - cameraX, sy = ally.y + 10;
                 const color = ally.size === 'big' ? '#a598ff' : '#56e5d3';
                 const stride = Math.sin(worldTime * 13) * Math.min(6, Math.abs(player.vx) / 50);
-                const art = animatedArt(ally.id, helperImages[ally.id]);
+                const art = animatedArt(ally.id, helperImages[ally.id], Math.abs(player.vx) > 5 ? 'run' : 'idle');
                 if (art.ready) {
                     const h = (ally.size === 'big' ? 90 : 82) * ally.scale, w = h * art.image.naturalWidth / art.image.naturalHeight;
                     ctx.save(); ctx.translate(sx + 27, sy + 102);
@@ -1621,7 +1626,8 @@
         }
 
         function drawPlayer() {
-            const heroArt = animatedArt(cfg.characters.find(c=>c.role==='hero').id, {image:playerImage,ready:playerImageReady});
+            const motion = !player.onGround && !player.attack ? 'jump' : player.animState === 'moving' && Math.abs(player.vx) > 5 ? 'run' : 'idle';
+            const heroArt = animatedArt(cfg.characters.find(c=>c.role==='hero').id, {image:playerImage,ready:playerImageReady}, motion);
             const heroImage=heroArt.image;
             const px = player.x - cameraX;
             ctx.font = '700 16px Inter'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe6a3'; ctx.fillText(cfg.characters.find(c=>c.role==='hero').name, px + player.w / 2, player.y - 12);

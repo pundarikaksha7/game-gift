@@ -1,17 +1,15 @@
-import { MediaImage, MediaAudio } from '../../media';
+import { MediaImage } from '../../media';
 import { useState } from 'react';
-import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
+import { Plus, Trash2, User, Check } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
 import { newLevel } from '../../../shared/template';
-import { attachAsset } from '../../api';
-import { Field, UploadButton } from '../UI';
+import { Field } from '../UI';
 import type { EditorProps } from './types';
 import { AvatarRenderer } from '../../avatar/components/AvatarRenderer';
 import { AvatarCreator } from '../../avatar/components/AvatarCreator';
 import { defaultAvatar } from '../../../shared/avatar';
-export function CharactersEditor({ game, change, notify, authed }: EditorProps) {
-  const [selected, setSelected] = useState(0),
-    [busy, setBusy] = useState(false);
+export function CharactersEditor({ game, change, notify }: EditorProps) {
+  const [selected, setSelected] = useState(0);
   const c = game.characters[Math.min(selected, game.characters.length - 1)];
   function update(partial: Partial<Character>) {
     change((g) =>
@@ -211,84 +209,7 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
             ))}
           </div>
         )}
-        <button className="secondary" onClick={() => update({ sprite: '', avatar: c.avatar })}>
-          Use custom character
-        </button>
-        <div className="upload-row">
-          <div>
-            <Image size={19} />
-            <div>
-              <strong>Your art, your character</strong>
-              <small>Transparent PNG or WebP works best. Up to 10 MB.</small>
-            </div>
-          </div>
-          <UploadButton
-            label={busy ? 'Uploading…' : 'Upload character'}
-            disabled={busy}
-            accept="image/png,image/jpeg,image/webp"
-            onFile={async (f) => {
-              setBusy(true);
-              try {
-                const id = c.id;
-                const sprite = await attachAsset(f, 'image');
-                change((g) => {
-                  const target = g.characters.find((x) => x.id === id);
-                  if (target) target.sprite = sprite;
-                });
-                notify('Character uploaded');
-              } catch (e) {
-                notify((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-        </div>
-        <div className="upload-row">
-          <div>
-            <strong>Character animation frames</strong>
-            <small>
-              Optional frames for this character; procedural movement, attack and hit effects remain
-              active.
-            </small>
-          </div>
-          <UploadButton
-            label="Add character frame"
-            disabled={(c.frames?.length || 0) >= 24}
-            accept="image/png,image/webp,image/jpeg"
-            onFile={async (f) => {
-              const id = c.id;
-              try {
-                const url = await attachAsset(f, 'image');
-                change((g) => {
-                  const target = g.characters.find((x) => x.id === id);
-                  if (target) target.frames = [...(target.frames || []), url];
-                });
-              } catch (e) {
-                notify((e as Error).message);
-              }
-            }}
-          />
-        </div>
-        <div className="frames">
-          {c.frames?.map((url, i) => (
-            <div className="frame" key={`${url}-${i}`}>
-              <MediaImage src={url} alt={`${c.name} frame ${i + 1}`} />
-              <button
-                className="icon-btn"
-                aria-label={`Remove character frame ${i + 1}`}
-                onClick={() => update({ frames: c.frames?.filter((_, j) => j !== i) })}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-        {!authed && (
-          <small className="muted">
-            Sign in and save to keep this art in your Gamegift account.
-          </small>
-        )}
+        <small className="muted">All character art and movement comes from the built-in sprite collection.</small>
       </div>
     </>
   );

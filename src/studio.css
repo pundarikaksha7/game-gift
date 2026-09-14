@@ -2801,6 +2801,36 @@ main {
   transform-origin: center;
   margin: -55px -30px;
 }
+.avatar-stage-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 200px;
+}
+.avatar-motion-picker {
+  z-index: 2;
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  margin-top: -58px;
+  border: 1px solid #dfdced;
+  border-radius: 10px;
+  background: #ffffffeb;
+  box-shadow: 0 8px 20px #3d37531a;
+}
+.avatar-motion-picker button {
+  min-height: 32px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #79758d;
+  font-size: 10px;
+}
+.avatar-motion-picker button.active {
+  color: #fff;
+  background: #6c65df;
+}
 .avatar-creator-stage h3 {
   margin-top: 8px;
   font-size: 17px;
@@ -2875,7 +2905,10 @@ main {
   display: block;
   overflow: hidden;
   border-radius: 8px;
-  background: #f1f0f7;
+  background:
+    linear-gradient(45deg, #ecebf2 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(-45deg, #ecebf2 25%, transparent 25%) 0 6px / 12px 12px,
+    #f8f8fb;
 }
 .avatar-option-thumb i {
   position: absolute;
@@ -2941,6 +2974,9 @@ main {
     transform: scale(0.55);
     margin: -75px -55px;
   }
+  .avatar-stage-preview { min-width: 150px; }
+  .avatar-motion-picker { margin-top: -70px; }
+  .avatar-motion-picker button span { display: none; }
   .avatar-option-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

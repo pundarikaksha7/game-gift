@@ -12,3 +12,8 @@ backups/
 
 certs/*
 !certs/prod-ca-2021.crt
+
+.venv/
+asset_library/
+
+certs/
