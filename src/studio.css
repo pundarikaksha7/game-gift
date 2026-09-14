@@ -2771,9 +2771,9 @@ main {
   }
 }
 .character-art > .avatar-renderer {
-  transform: scale(0.34);
-  transform-origin: bottom center;
-  margin: -230px -85px 0;
+  width: 100%;
+  height: 100%;
+  flex-basis: 100%;
 }
 .avatar-creator {
   margin: 0 0 22px;
@@ -2974,9 +2974,15 @@ main {
     transform: scale(0.55);
     margin: -75px -55px;
   }
-  .avatar-stage-preview { min-width: 150px; }
-  .avatar-motion-picker { margin-top: -70px; }
-  .avatar-motion-picker button span { display: none; }
+  .avatar-stage-preview {
+    min-width: 150px;
+  }
+  .avatar-motion-picker {
+    margin-top: -70px;
+  }
+  .avatar-motion-picker button span {
+    display: none;
+  }
   .avatar-option-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

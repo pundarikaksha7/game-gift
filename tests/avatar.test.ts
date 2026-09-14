@@ -30,7 +30,10 @@ test('invalid appearance IDs and arbitrary values fail closed', () => {
     false,
   );
   assert.deepEqual(safeAvatar({ ...defaultAvatar, outfit: 'unknown' }), defaultAvatar);
-  assert.match(resolveAvatarAsset(defaultAvatar), /^\/assets\/characters\/sprites\/character-\d{2}\.webp$/);
+  assert.match(
+    resolveAvatarAsset(defaultAvatar),
+    /^\/assets\/characters\/sprites\/character-\d{2}\.webp$/,
+  );
 });
 
 test('random avatar generation always produces valid library combinations', () => {

@@ -7,20 +7,28 @@ const characterIds = Array.from(
   (_, index) => `character-${String(index + 1).padStart(2, '0')}`,
 ) as [string, ...string[]];
 
-const avatarV3 = z.object({
-  version: z.literal(AVATAR_VERSION),
-  source: z.literal('character-library'),
-  appearance: z.enum(characterIds),
-}).strict();
-const oldAvatar = z.object({
-  version: z.union([z.literal(1), z.literal(2)]),
-  appearance: z.string().optional(),
-}).passthrough();
+const avatarV3 = z
+  .object({
+    version: z.literal(AVATAR_VERSION),
+    source: z.literal('character-library'),
+    appearance: z.enum(characterIds),
+  })
+  .strict();
+const oldAvatar = z
+  .object({
+    version: z.union([z.literal(1), z.literal(2)]),
+    appearance: z.string().optional(),
+  })
+  .passthrough();
 export type AvatarConfig = z.infer<typeof avatarV3>;
 
 export function avatarForIndex(index: number): AvatarConfig {
   const safeIndex = Math.max(0, Math.min(CHARACTER_COUNT - 1, Math.floor(index)));
-  return { version: AVATAR_VERSION, source: 'character-library', appearance: characterIds[safeIndex] };
+  return {
+    version: AVATAR_VERSION,
+    source: 'character-library',
+    appearance: characterIds[safeIndex],
+  };
 }
 export const defaultAvatar = avatarForIndex(8);
 export const avatarPresets = characterIds.map((_, index) => avatarForIndex(index));
@@ -29,10 +37,12 @@ function migrateOldAvatar(value: z.infer<typeof oldAvatar>): AvatarConfig {
   const match = value.appearance?.match(/(\d+)$/);
   return avatarForIndex(match ? Number(match[1]) - 1 : 8);
 }
-export const avatarConfigSchema = z.union([avatarV3, oldAvatar]).transform((value) =>
-  value.version === AVATAR_VERSION ? value : migrateOldAvatar(value),
-);
-export function parseAvatar(value: unknown): AvatarConfig { return avatarConfigSchema.parse(value); }
+export const avatarConfigSchema = z
+  .union([avatarV3, oldAvatar])
+  .transform((value) => (value.version === AVATAR_VERSION ? value : migrateOldAvatar(value)));
+export function parseAvatar(value: unknown): AvatarConfig {
+  return avatarConfigSchema.parse(value);
+}
 export function safeAvatar(value: unknown): AvatarConfig {
   const parsed = avatarConfigSchema.safeParse(value);
   return parsed.success ? parsed.data : structuredClone(defaultAvatar);

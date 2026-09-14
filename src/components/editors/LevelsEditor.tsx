@@ -1,7 +1,6 @@
 import { EncounterEditor } from './EncounterEditor';
 import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
-import type { Game, Character } from '../../../shared/schema';
 import { newLevel } from '../../../shared/template';
 import { attachAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
@@ -145,11 +144,12 @@ export function LevelsEditor({
             <input
               type="number"
               min={0}
-              max={30}
+              max={200}
               value={l.enemyCount}
               onChange={(e) =>
                 change((g) => {
                   g.levels[level].enemyCount = Number(e.target.value);
+                  g.levels[level].difficulty = 'custom';
                 })
               }
             />

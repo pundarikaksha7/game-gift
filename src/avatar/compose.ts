@@ -1,4 +1,10 @@
-import { resolveAvatarAsset, resolveAvatarFrames, safeAvatar, type AvatarConfig, type AvatarMotion } from '../../shared/avatar';
+import {
+  resolveAvatarAsset,
+  resolveAvatarFrames,
+  safeAvatar,
+  type AvatarConfig,
+  type AvatarMotion,
+} from '../../shared/avatar';
 
 const loaded = new Map<string, Promise<string>>();
 function preload(src: string): Promise<string> {
@@ -26,8 +32,12 @@ export function avatarAnimation(raw: AvatarConfig, motion: AvatarMotion): string
 
 export function preloadAvatar(raw: AvatarConfig) {
   const config = safeAvatar(raw);
-  return Promise.allSettled([
-    resolveAvatarAsset(config), ...resolveAvatarFrames(config, 'idle'),
-    ...resolveAvatarFrames(config, 'run'), ...resolveAvatarFrames(config, 'jump'),
-  ].map(preload));
+  return Promise.allSettled(
+    [
+      resolveAvatarAsset(config),
+      ...resolveAvatarFrames(config, 'idle'),
+      ...resolveAvatarFrames(config, 'run'),
+      ...resolveAvatarFrames(config, 'jump'),
+    ].map(preload),
+  );
 }

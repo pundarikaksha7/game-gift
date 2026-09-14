@@ -1,5 +1,41 @@
 import type { Game, Level } from './schema';
 import { avatarPresets, defaultAvatar } from './avatar';
+
+export type DifficultyMode = 'easy' | 'difficult' | 'hard';
+export const difficultyPresets = {
+  easy: { enemyCount: 3, enemyIq: 'low', pitCount: 1, boss: false },
+  difficult: { enemyCount: 7, enemyIq: 'high', pitCount: 3, boss: false },
+  hard: { enemyCount: 12, enemyIq: 'high', pitCount: 5, boss: true },
+} as const satisfies Record<
+  DifficultyMode,
+  { enemyCount: number; enemyIq: 'low' | 'high'; pitCount: number; boss: boolean }
+>;
+
+export function applyDifficultyPreset(level: Level, mode: DifficultyMode, enemyId?: string) {
+  const preset = difficultyPresets[mode];
+  level.difficulty = mode;
+  level.enemyCount = preset.enemyCount;
+  level.enemyIq = preset.enemyIq;
+  level.requireDefeatAll = mode !== 'easy';
+  level.powerup = mode === 'hard' ? 'mixed' : mode === 'difficult' ? 'boost' : 'companion';
+  level.holes = Array.from({ length: preset.pitCount }, (_, index) => ({
+    x: Math.round(520 + ((level.width - 1040) * (index + 1)) / (preset.pitCount + 1)),
+    width: mode === 'easy' ? 90 : mode === 'difficult' ? 125 : 155,
+  }));
+  level.boss = {
+    ...{
+      enabled: false,
+      name: 'Guardian',
+      health: 240,
+      damage: 1,
+      enrageAt: 0.5,
+      armor: 0.45,
+    },
+    ...level.boss,
+    enabled: preset.boss && !!enemyId,
+    characterId: enemyId || level.boss?.characterId,
+  };
+}
 export function newLevel(index: number): Level {
   return {
     id: crypto.randomUUID(),
@@ -7,6 +43,8 @@ export function newLevel(index: number): Level {
     theme: index % 3 === 0 ? 'meadow' : index % 3 === 1 ? 'sunset' : 'midnight',
     width: 2800,
     enemyCount: 3,
+    enemyIq: 'low',
+    difficulty: 'easy',
     platforms: [
       { id: 'p1', x: 360, y: 355, width: 190, motion: 'none' },
       { id: 'p2', x: 680, y: 285, width: 180, motion: 'vertical' },

@@ -1,4 +1,9 @@
 import { defaultBoss } from '../../../shared/runtime';
+import {
+  applyDifficultyPreset,
+  difficultyPresets,
+  type DifficultyMode,
+} from '../../../shared/template';
 import { Field } from '../UI';
 import type { EditorProps } from './types';
 export function EncounterEditor({ game, change, level }: EditorProps & { level: number }) {
@@ -8,7 +13,44 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
   return (
     <div className="form-card">
       <h3>Encounters, rewards & hazards</h3>
+      <Field
+        label="Challenge mode"
+        hint="Choose a starting point, then fine-tune any setting below."
+      >
+        <div className="preset-buttons">
+          {(Object.keys(difficultyPresets) as DifficultyMode[]).map((mode) => (
+            <button
+              type="button"
+              key={mode}
+              className={l.difficulty === mode ? 'primary' : 'secondary'}
+              onClick={() =>
+                change((g) => applyDifficultyPreset(g.levels[level], mode, enemies[0]?.id))
+              }
+            >
+              {mode[0].toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+          {l.difficulty === 'custom' && <span className="muted">Custom</span>}
+        </div>
+      </Field>
       <div className="form-grid">
+        <Field
+          label="Enemy pit awareness"
+          hint="Low-IQ enemies can run into pits; high-IQ enemies stop or jump."
+        >
+          <select
+            value={l.enemyIq || 'low'}
+            onChange={(e) =>
+              change((g) => {
+                g.levels[level].enemyIq = e.target.value as 'low' | 'high';
+                g.levels[level].difficulty = 'custom';
+              })
+            }
+          >
+            <option value="low">Low · may fall into pits</option>
+            <option value="high">High · avoids pits</option>
+          </select>
+        </Field>
         <Field label="Exit rule">
           <select
             value={l.requireDefeatAll === false ? 'reach' : 'clear'}
@@ -28,6 +70,7 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
             onChange={(e) =>
               change((g) => {
                 g.levels[level].powerup = e.target.value as typeof l.powerup;
+                g.levels[level].difficulty = 'custom';
               })
             }
           >
@@ -133,6 +176,7 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
                 ...(l.holes || []),
                 { x: Math.min(l.width - 400, 600 + (l.holes?.length || 0) * 300), width: 120 },
               ];
+              g.levels[level].difficulty = 'custom';
             })
           }
         >
@@ -160,6 +204,7 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
                 onChange={(e) =>
                   change((g) => {
                     g.levels[level].holes![i][k] = Number(e.target.value);
+                    g.levels[level].difficulty = 'custom';
                   })
                 }
               />
@@ -170,6 +215,7 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
             onClick={() =>
               change((g) => {
                 g.levels[level].holes!.splice(i, 1);
+                g.levels[level].difficulty = 'custom';
               })
             }
           >

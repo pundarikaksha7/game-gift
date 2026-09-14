@@ -17,8 +17,9 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
   const heroArt = hero.avatar ? resolveAvatarAsset(hero.avatar) : hero.sprite;
   const assets: Record<string, string> = { player_character: heroArt };
   game.characters.forEach((c, index) => {
-    assets[c.id] = c.avatar ? resolveAvatarAsset(c.avatar) : c.sprite ||
-      (c.role === 'hero' ? heroArt : roleSprite(c.role, index));
+    assets[c.id] = c.avatar
+      ? resolveAvatarAsset(c.avatar)
+      : c.sprite || (c.role === 'hero' ? heroArt : roleSprite(c.role, index));
   });
   game.levels.forEach((l) => (assets[l.id] = l.background || ''));
   const enemyTypes = Object.fromEntries(
@@ -77,11 +78,13 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
     animation: game.animation,
     characters: game.characters.map((character) => ({
       ...character,
-      sheetFrames: character.avatar ? {
-        idle: resolveAvatarFrames(character.avatar, 'idle'),
-        run: resolveAvatarFrames(character.avatar, 'run'),
-        jump: resolveAvatarFrames(character.avatar, 'jump'),
-      } : undefined,
+      sheetFrames: character.avatar
+        ? {
+            idle: resolveAvatarFrames(character.avatar, 'idle'),
+            run: resolveAvatarFrames(character.avatar, 'run'),
+            jump: resolveAvatarFrames(character.avatar, 'jump'),
+          }
+        : undefined,
     })),
     helpers: game.characters
       .filter((c) => c.role === 'friend')
@@ -104,6 +107,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
         l.theme === 'midnight' ? '#35374e' : l.theme === 'sunset' ? '#8c8589' : '#618b7a',
       boss: { ...defaultBoss, ...l.boss, enabled: !!l.boss?.enabled && enemies.length > 0 },
       requireDefeatAll: l.requireDefeatAll ?? false,
+      enemyIq: l.enemyIq || 'low',
       powerup: l.powerup || 'none',
       holes: (l.holes || []).map((h) => ({ x: h.x / WORLD_UNIT, w: h.width / WORLD_UNIT })),
       platforms: l.platforms.map((p) => ({

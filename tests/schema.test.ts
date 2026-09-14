@@ -9,6 +9,16 @@ test('template validates and supports variable chapter counts', () => {
   game.levels = game.levels.slice(0, 1);
   assert.ok(gameSchema.safeParse(game).success);
 });
+test('difficulty presets configure enemy count, pit awareness, hazards and bosses', async () => {
+  const { applyDifficultyPreset } = await import('../shared/template');
+  const game = createTemplate();
+  applyDifficultyPreset(game.levels[0], 'hard', 'enemy');
+  assert.equal(game.levels[0].enemyCount, 12);
+  assert.equal(game.levels[0].enemyIq, 'high');
+  assert.equal(game.levels[0].holes?.length, 5);
+  assert.equal(game.levels[0].boss?.enabled, true);
+  assert.ok(gameSchema.safeParse(game).success);
+});
 test('rejects executable assets, unbounded physics and duplicate heroes', () => {
   for (const mutate of [
     (g: any) => (g.characters[0].sprite = 'javascript:alert(1)'),

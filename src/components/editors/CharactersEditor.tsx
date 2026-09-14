@@ -1,16 +1,20 @@
 import { MediaImage } from '../../media';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, User, Check } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
-import { newLevel } from '../../../shared/template';
 import { Field } from '../UI';
 import type { EditorProps } from './types';
 import { AvatarRenderer } from '../../avatar/components/AvatarRenderer';
 import { AvatarCreator } from '../../avatar/components/AvatarCreator';
 import { defaultAvatar } from '../../../shared/avatar';
 export function CharactersEditor({ game, change, notify }: EditorProps) {
-  const [selected, setSelected] = useState(0);
-  const c = game.characters[Math.min(selected, game.characters.length - 1)];
+  const [selectedId, setSelectedId] = useState(game.characters[0].id);
+  const c = game.characters.find((character) => character.id === selectedId) || game.characters[0];
+  useEffect(() => {
+    if (!game.characters.some((character) => character.id === selectedId)) {
+      setSelectedId(game.characters[0].id);
+    }
+  }, [game.characters, selectedId]);
   function update(partial: Partial<Character>) {
     change((g) =>
       Object.assign(
@@ -30,10 +34,11 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
           className="secondary"
           disabled={game.characters.length >= 12}
           onClick={() => {
+            const id = crypto.randomUUID();
             change((g) =>
               g.characters.push({
-                id: crypto.randomUUID(),
-                name: 'New friend',
+                id,
+                name: `New friend ${g.characters.length}`,
                 role: 'friend',
                 sprite: '',
                 color: '#bbadcf',
@@ -41,7 +46,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
                 avatar: structuredClone(defaultAvatar),
               }),
             );
-            setSelected(game.characters.length);
+            setSelectedId(id);
           }}
         >
           <Plus size={16} /> Add character
@@ -52,7 +57,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
           <button
             key={char.id}
             className={`character-card ${c.id === char.id ? 'selected' : ''}`}
-            onClick={() => setSelected(i)}
+            onClick={() => setSelectedId(char.id)}
           >
             <div className="character-art" style={{ background: char.color + '24' }}>
               {char.sprite ? (
@@ -97,7 +102,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
                     }
                   });
                 });
-                setSelected(0);
+                setSelectedId(game.characters[0].id);
               }}
             >
               <Trash2 size={16} />
@@ -209,7 +214,9 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
             ))}
           </div>
         )}
-        <small className="muted">All character art and movement comes from the built-in sprite collection.</small>
+        <small className="muted">
+          All character art and movement comes from the built-in sprite collection.
+        </small>
       </div>
     </>
   );
