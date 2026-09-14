@@ -2693,62 +2693,108 @@ main {
   color: #545d78;
 }
 
-/* Avatar creator: fixed source coordinates keep Kenney's modular parts aligned. */
+/* Avatar creator uses one composed image; individual source layers never enter the DOM. */
 .avatar-renderer {
   position: relative;
   width: 260px;
   height: 350px;
   flex: 0 0 auto;
   overflow: hidden;
+  isolation: isolate;
 }
-.avatar-renderer > img {
-  position: absolute;
-  max-width: none;
-  height: auto;
-  pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-.avatar-renderer.loading > img {
-  opacity: 0;
-}
-.avatar-renderer.loaded > img {
-  opacity: 1;
-}
-.avatar-loading {
+.avatar-composite {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  color: #8a86aa;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  animation: avatar-arrive 0.24s ease both;
+}
+.avatar-loader,
+.avatar-error {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  color: #66647e;
+  background: linear-gradient(110deg, #f6f4fb 25%, #fff 42%, #f6f4fb 60%);
+  background-size: 240% 100%;
+  animation: avatar-shimmer 1.35s linear infinite;
+}
+.avatar-loader strong {
   font-size: 11px;
 }
-.avatar-renderer.loaded .avatar-loading {
-  display: none;
+.avatar-loader small {
+  color: #9996aa;
+  font-size: 9px;
+}
+.avatar-loader-orbit {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #dedaf4;
+  border-top-color: #6d65df;
+  border-radius: 50%;
+  animation: avatar-spin 0.75s linear infinite;
+}
+.avatar-error {
+  font-size: 10px;
+  color: #9c6262;
+  background: #fff4f4;
+}
+@keyframes avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes avatar-shimmer {
+  to {
+    background-position: -240% 0;
+  }
+}
+@keyframes avatar-arrive {
+  from {
+    opacity: 0.25;
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-loader,
+  .avatar-loader-orbit,
+  .avatar-composite,
+  .avatar-option-thumb i {
+    animation: none !important;
+  }
 }
 .character-art > .avatar-renderer {
   transform: scale(0.34);
   transform-origin: bottom center;
   margin: -230px -85px 0;
 }
-.character-art > .avatar-renderer > img {
-  width: auto;
-  object-fit: initial;
-  filter: none;
-}
 .avatar-creator {
-  margin: 0 0 20px;
-  padding: 14px;
-  border: 1px solid #e2e3f3;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #fbfaff, #fff8f5);
+  margin: 0 0 22px;
+  padding: 16px;
+  border: 1px solid #dedfec;
+  border-radius: 14px;
+  background: #fbfbfe;
+  box-shadow: 0 8px 30px #34365a0a;
 }
 .avatar-creator-stage {
-  min-height: 270px;
+  min-height: 250px;
   display: grid;
   grid-template-columns: minmax(120px, 1fr) 200px;
   align-items: center;
   overflow: hidden;
-  padding: 4px 8px 0;
+  padding: 0 12px;
+  border: 1px solid #e7e6f0;
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 76% 65%, #ebe8fa 0 24%, transparent 25%),
+    linear-gradient(145deg, #fff, #f7f5fb);
 }
 .avatar-creator-stage .avatar-renderer {
   transform: scale(0.68);
@@ -2774,7 +2820,7 @@ main {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 6px 1px 10px;
+  padding: 14px 1px 11px;
   scrollbar-width: thin;
 }
 .avatar-category-tabs button {
@@ -2795,24 +2841,25 @@ main {
 .avatar-option-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  max-height: 282px;
+  gap: 10px;
+  max-height: 326px;
   overflow-y: auto;
   padding: 2px;
 }
 .avatar-option-grid > button {
-  min-height: 116px;
+  min-height: 142px;
   overflow: hidden;
   border: 1px solid #e3e4ef;
-  border-radius: 9px;
+  border-radius: 11px;
   background: #fff;
   color: #747a90;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 7px 4px;
-  font-size: 9px;
+  padding: 8px 6px 9px;
+  font-size: 10px;
+  font-weight: 650;
   text-transform: capitalize;
 }
 .avatar-option-grid > button.selected {
@@ -2821,11 +2868,49 @@ main {
   background: #f8f7ff;
   color: #5d57c6;
 }
-.avatar-option-grid .avatar-renderer {
-  transform: scale(0.2);
-  transform-origin: top left;
-  margin-right: -208px;
-  margin-bottom: -280px;
+.avatar-option-thumb {
+  position: relative;
+  width: 78px;
+  height: 105px;
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f1f0f7;
+}
+.avatar-option-thumb i {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, #efedf5 20%, #faf9fc 38%, #efedf5 56%);
+  background-size: 220% 100%;
+  animation: avatar-shimmer 1.25s linear infinite;
+}
+.avatar-option-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.avatar-option-thumb.loaded img {
+  opacity: 1;
+}
+.avatar-option-thumb.loaded i {
+  display: none;
+}
+.avatar-option-grid > button:hover .avatar-option-thumb {
+  transform: translateY(-1px);
+}
+.avatar-option-grid > button:focus-visible {
+  outline: 3px solid #746ee536;
+  outline-offset: 2px;
+}
+.avatar-option-grid > button:active {
+  transform: scale(0.98);
+}
+.avatar-option-grid > button .avatar-option-thumb {
+  transition: transform 0.16s ease;
 }
 .avatar-option-grid > button span {
   margin-top: 3px;

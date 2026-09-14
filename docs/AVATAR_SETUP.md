@@ -21,7 +21,7 @@ No new environment variables required.
 
 ## REQUIRED VERCEL ACTIONS
 
-No configuration changes required. Deploy the repository normally; Vite includes `public/avatars/` as static assets.
+No configuration changes required. Deploy the repository normally; Vite includes `public/avatars/` as static assets and Vercel serves them through its edge CDN. `vercel.json` applies long shared-cache headers to avatar images and a shorter revalidation window to the manifest.
 
 ## REQUIRED RENDER ACTIONS
 
@@ -50,4 +50,4 @@ Only the Kenney Modular Characters CC0 pack is used. Exact source paths and norm
 
 ## Architecture and limitations
 
-The editor renders trusted manifest layers for instant feedback. Before the game starts, `composeAvatar()` combines those layers once into a cached 260×350 PNG data URL; the canvas engine then draws that single texture. V1 uses the game's existing procedural bob, tilt, squash, and attack effects rather than skeletal limb animation. The selected Kenney pack has no meaningful accessory layer, so the UI intentionally does not expose an empty Accessories category.
+The picker uses precomposed WebP thumbnails, so opening a category does not create dozens of layered avatar renderers. The live editor loads trusted manifest layers once and `composeAvatar()` caches a single 260×350 PNG data URL; the canvas engine draws that same single texture. V1 uses the game's existing procedural bob, tilt, squash, and attack effects rather than skeletal limb animation. The selected Kenney pack has no meaningful accessory layer, so the UI intentionally does not expose an empty Accessories category.

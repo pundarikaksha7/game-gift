@@ -26,6 +26,16 @@ const groups: { id: 'presets' | EditableCategory; label: string }[] = [
 const friendly = (id: string) =>
   id.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+function OptionThumbnail({ src, alt }: { src: string; alt: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <span className={`avatar-option-thumb ${loaded ? 'loaded' : ''}`}>
+      <i />
+      <img src={src} alt={alt} loading="lazy" decoding="async" onLoad={() => setLoaded(true)} />
+    </span>
+  );
+}
+
 export function AvatarCreator({
   value,
   onChange,
@@ -33,7 +43,7 @@ export function AvatarCreator({
 }: {
   value?: AvatarConfig;
   onChange: (config: AvatarConfig) => void;
-  onSave: () => void;
+  onSave: (config: AvatarConfig) => void;
 }) {
   const [category, setCategory] = useState<(typeof groups)[number]['id']>('presets');
   const config = useMemo(() => safeAvatar(value), [value]);
@@ -81,7 +91,14 @@ export function AvatarCreator({
               key={category === 'presets' ? (option as AvatarConfig).preset : String(option)}
               onClick={() => onChange(next)}
             >
-              <AvatarRenderer config={next} label="" />
+              <OptionThumbnail
+                src={
+                  category === 'presets'
+                    ? `/avatars/thumbnails/presets/${(option as AvatarConfig).preset}.webp`
+                    : `/avatars/thumbnails/${category}/${String(option)}.webp`
+                }
+                alt=""
+              />
               <span>
                 {category === 'presets'
                   ? `Look ${String(index + 1).padStart(2, '0')}`
@@ -102,7 +119,7 @@ export function AvatarCreator({
         >
           <RotateCcw size={15} /> Reset
         </button>
-        <button type="button" className="primary" onClick={onSave}>
+        <button type="button" className="primary" onClick={() => onSave(config)}>
           Save character
         </button>
       </div>

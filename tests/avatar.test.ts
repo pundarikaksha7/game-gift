@@ -18,6 +18,7 @@ test('default avatar is valid, serializable and included in new games', () => {
     defaultAvatar,
   );
   assert.deepEqual(createTemplate().characters[0].avatar, defaultAvatar);
+  assert.ok(createTemplate().characters.every((character) => character.avatar));
   assert.ok(gameSchema.safeParse(createTemplate()).success);
 });
 

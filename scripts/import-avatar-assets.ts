@@ -1,6 +1,13 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { avatarCatalog, avatarPresets } from '../shared/avatar';
+import sharp from 'sharp';
+import {
+  avatarCatalog,
+  avatarPresets,
+  defaultAvatar,
+  resolveAvatarLayers,
+  type AvatarConfig,
+} from '../shared/avatar';
 
 const source = resolve(process.argv[2] || 'assets-source/kenney/modular-characters/PNG');
 const output = resolve(process.argv[3] || 'public/avatars');
@@ -53,7 +60,26 @@ const eyes = {
   'bright-green': 'eyeGreen_large.png',
   'soft-pine': 'eyePine_small.png',
 };
-for (const [id, file] of Object.entries(eyes)) copy(`Face/Eyes/${file}`, `eyes/${id}.png`);
+for (const [id, file] of Object.entries(eyes)) {
+  const iris = await sharp(join(source, `Face/Eyes/${file}`))
+    .resize(7, 7)
+    .png()
+    .toBuffer();
+  const eye = await sharp({
+    create: { width: 22, height: 16, channels: 4, background: '#00000000' },
+  })
+    .composite([
+      {
+        input: Buffer.from(
+          '<svg width="22" height="16"><ellipse cx="11" cy="8" rx="9.5" ry="6.5" fill="white" stroke="#493b3a" stroke-width="1.5"/></svg>',
+        ),
+      },
+      { input: iris, left: 8, top: 5 },
+    ])
+    .png()
+    .toBuffer();
+  writeFileSync(join(output, `eyes/${id}.png`), eye);
+}
 const mouths = {
   glad: 'mouth_glad.png',
   happy: 'mouth_happy.png',
@@ -125,6 +151,48 @@ const manifest = {
 };
 writeFileSync(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 writeFileSync(join(output, 'presets/presets.json'), JSON.stringify(avatarPresets, null, 2) + '\n');
+
+async function thumbnail(config: AvatarConfig, target: string) {
+  mkdirSync(dirname(join(output, target)), { recursive: true });
+  const layers = await Promise.all(
+    resolveAvatarLayers(config).map(async (layer) => {
+      let image = sharp(join(output, layer.src.replace('/avatars/', '')));
+      if (layer.width) image = image.resize({ width: layer.width });
+      if (layer.flipX) image = image.flop();
+      return { input: await image.png().toBuffer(), left: layer.x, top: layer.y };
+    }),
+  );
+  const full = await sharp({
+    create: { width: 800, height: 800, channels: 4, background: '#00000000' },
+  })
+    .composite(layers)
+    .png()
+    .toBuffer();
+  await sharp(full)
+    .extract({ left: 0, top: 0, width: 260, height: 350 })
+    .resize({ width: 104, height: 140, fit: 'contain' })
+    .webp({ quality: 82, effort: 5 })
+    .toFile(join(output, target));
+}
+
+for (const [index, preset] of avatarPresets.entries())
+  await thumbnail(preset, `thumbnails/presets/preset-${String(index + 1).padStart(2, '0')}.webp`);
+for (const category of [
+  'skinTone',
+  'hair',
+  'hairColor',
+  'eyes',
+  'mouth',
+  'top',
+  'bottom',
+  'shoes',
+] as const)
+  for (const id of avatarCatalog[category])
+    await thumbnail(
+      { ...defaultAvatar, [category]: id, preset: undefined },
+      `thumbnails/${category}/${id}.webp`,
+    );
+
 const license = resolve(source, '../../license.txt');
 if (existsSync(license)) writeFileSync(join(output, 'KENNEY-CC0.txt'), readFileSync(license));
 console.log(

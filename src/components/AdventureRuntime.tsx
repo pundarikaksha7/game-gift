@@ -38,15 +38,19 @@ export function AdventureRuntime({
           Math.min(levelIndex, game.levels.length - 1),
           viewport.current.camera,
         );
-        const hero = game.characters.find((character) => character.role === 'hero');
-        if (hero?.avatar && !hero.sprite) {
-          try {
-            const texture = await composeAvatar(hero.avatar);
-            config.assets.player_character = texture;
-            config.assets[hero.id] = texture;
-          } catch {
-            // The game retains its existing built-in fallback if composition fails.
-          }
+        const composed = await Promise.allSettled(
+          game.characters
+            .filter((character) => character.avatar && !character.sprite)
+            .map(async (character) => ({
+              character,
+              texture: await composeAvatar(character.avatar!),
+            })),
+        );
+        for (const result of composed) {
+          if (result.status !== 'fulfilled') continue;
+          const { character, texture } = result.value;
+          config.assets[character.id] = texture;
+          if (character.role === 'hero') config.assets.player_character = texture;
         }
         frame.contentWindow?.postMessage(
           {

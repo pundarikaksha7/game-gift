@@ -8,6 +8,7 @@ import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 import { AvatarRenderer } from '../../avatar/components/AvatarRenderer';
 import { AvatarCreator } from '../../avatar/components/AvatarCreator';
+import { defaultAvatar } from '../../../shared/avatar';
 export function CharactersEditor({ game, change, notify, authed }: EditorProps) {
   const [selected, setSelected] = useState(0),
     [busy, setBusy] = useState(false);
@@ -39,6 +40,7 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
                 sprite: '',
                 color: '#bbadcf',
                 scale: 1,
+                avatar: structuredClone(defaultAvatar),
               }),
             );
             setSelected(game.characters.length);
@@ -107,7 +109,10 @@ export function CharactersEditor({ game, change, notify, authed }: EditorProps) 
         <AvatarCreator
           value={c.avatar}
           onChange={(avatar) => update({ avatar, sprite: '' })}
-          onSave={() => notify('Character ready — save the adventure to keep it')}
+          onSave={(avatar) => {
+            update({ avatar, sprite: '' });
+            notify(`${c.name}'s character is ready — save the adventure to keep it`);
+          }}
         />
         <div className="form-grid">
           <Field label="Character name">

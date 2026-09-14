@@ -632,7 +632,13 @@ export function createApp(db: DB) {
       setHeaders(res, file) {
         res.setHeader(
           'Cache-Control',
-          file.endsWith('.html') ? 'no-cache' : 'public, max-age=3600',
+          file.endsWith('.html')
+            ? 'no-cache'
+            : file.includes(`${path.sep}avatars${path.sep}`)
+              ? file.endsWith('manifest.json')
+                ? 'public, max-age=300, stale-while-revalidate=86400'
+                : 'public, max-age=86400, stale-while-revalidate=604800'
+              : 'public, max-age=3600',
         );
       },
     }),
