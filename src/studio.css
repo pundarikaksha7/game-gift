@@ -1283,6 +1283,15 @@ input[type='color'] {
 .full-width {
   width: 100%;
 }
+.google-sign-in {
+  min-height: 46px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.google-icon {
+  width: 19px;
+  height: 19px;
+}
 .text-button {
   display: flex;
   background: transparent;

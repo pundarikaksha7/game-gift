@@ -4,7 +4,7 @@
 
 - **Vercel:** Vite frontend and static game runtime, with `/api/:path*` rewritten to the Render HTTPS origin.
 - **Render:** Node 24 LTS Express API. Build with `npm ci --include=dev && npm run build`, start with `npm start`, and health check `/api/health`.
-- **Supabase:** Email/password authentication, PostgreSQL through a server-only connection string, and the private `game-gift-media` storage bucket. The browser uses only the public anon/publishable key; the API verifies each bearer token with Supabase and owns all application data access.
+- **Supabase:** Google authentication, PostgreSQL through a server-only connection string, and the private `game-gift-media` storage bucket. The browser uses only the public anon/publishable key; the API verifies each bearer token with Supabase and owns all application data access.
 
 ## Required configuration
 
@@ -30,7 +30,7 @@ Without Supabase storage, use a paid Render service with a persistent disk mount
 
 ## Supabase Auth
 
-1. In **Authentication > Providers > Email**, enable email/password signup and require email confirmation. Disable anonymous sign-ins.
+1. In **Authentication > Providers > Email**, disable new email/password signups. Disable anonymous sign-ins as well; the creator UI intentionally offers Google only.
 2. In **Authentication > URL Configuration**, set Site URL to `https://game-gift.shop`. Add exact redirect URLs `https://game-gift.shop/auth/callback` and `http://localhost:5173/auth/callback` (development only). In the confirmation email template, use `{{ .RedirectTo }}` rather than `{{ .SiteURL }}` so the email honors the callback selected by the app.
 3. In **Authentication > Providers > Google**, enable Google and add the client ID and secret from Google Cloud. In Google Cloud, use the Supabase callback shown on that provider page (normally `https://<project-ref>.supabase.co/auth/v1/callback`) as the authorized redirect URI; do not use the Gamegift callback there.
 4. Configure custom SMTP before launch and enable CAPTCHA/bot protection for public signup.

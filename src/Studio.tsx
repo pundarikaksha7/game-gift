@@ -63,6 +63,28 @@ const navigation = [
 ] as const;
 type Tab = (typeof navigation)[number]['id'];
 type User = { id: string; name: string; email: string };
+function GoogleIcon() {
+  return (
+    <svg className="google-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M21.6 12.23c0-.71-.06-1.4-.19-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.32 2.98-7.41Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.7 0 4.98-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.39 13.86A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.86V7.52H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.48l3.35-2.62Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 6.01c1.47 0 2.79.5 3.82 1.5l2.88-2.88A9.65 9.65 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01Z"
+      />
+    </svg>
+  );
+}
 function initial() {
   try {
     const raw = localStorage.getItem('game-gift-draft-v2');
@@ -88,7 +110,6 @@ export default function App() {
     >(null),
     [projects, setProjects] = useState<Project[]>([]),
     [versions, setVersions] = useState<{ revision: number; created_at: string }[]>([]),
-    [authMode, setAuthMode] = useState<'register' | 'login'>('register'),
     [authError, setAuthError] = useState(''),
     [proposal, setProposal] = useState<Proposal | null>(null),
     [proposalBase, setProposalBase] = useState(''),
@@ -830,101 +851,46 @@ export default function App() {
         </Modal>
       )}
       {modal === 'auth' && (
-        <Modal
-          title={authMode === 'register' ? 'Your creative space awaits' : 'Welcome back'}
-          onClose={() => setModal(null)}
-        >
+        <Modal title="Sign in to Gamegift" onClose={() => setModal(null)}>
           <p className="modal-copy">
-            Save your worlds, upload your own art, and share a game made just for them.
+            Continue with Google to save your worlds, upload your own art, and share a game made
+            just for them.
           </p>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
+          <button
+            type="button"
+            className="secondary full-width google-sign-in"
+            disabled={busy || !googleEnabled}
+            onClick={async () => {
               setAuthError('');
               setBusy(true);
-              const data = Object.fromEntries(new FormData(e.currentTarget));
               try {
-                const result = await api(`/auth/${authMode}`, {
-                  method: 'POST',
-                  body: JSON.stringify(data),
-                });
-                setUser(result.user);
-                setModal(null);
-                notify('Signed in. Save your adventure whenever you’re ready.');
-              } catch (e) {
-                setAuthError((e as Error).message);
-              } finally {
+                if (supabase) await authenticateWithGoogle();
+                else {
+                  const result = await api('/auth/google/start', {
+                    method: 'POST',
+                    body: JSON.stringify({}),
+                  });
+                  location.assign(result.url);
+                }
+              } catch (error) {
+                setAuthError((error as Error).message);
                 setBusy(false);
               }
             }}
           >
-            {googleEnabled && (
-              <button
-                type="button"
-                className="secondary full-width"
-                disabled={busy}
-                onClick={async (event) => {
-                  setBusy(true);
-                  setAuthError('');
-                  try {
-                    if (supabase) await authenticateWithGoogle();
-                    else {
-                      const form = new FormData(event.currentTarget.form!);
-                      const result = await api('/auth/google/start', {
-                        method: 'POST',
-                        body: JSON.stringify(
-                          authMode === 'register' ? { password: form.get('password') } : {},
-                        ),
-                      });
-                      location.assign(result.url);
-                    }
-                  } catch (error) {
-                    setAuthError((error as Error).message);
-                    setBusy(false);
-                  }
-                }}
-              >
-                Continue with Google
-              </button>
-            )}
-            {authMode === 'register' && (
-              <Field label="Your name">
-                <input name="name" required maxLength={60} autoComplete="name" />
-              </Field>
-            )}
-            <Field label="Email address">
-              <input name="email" type="email" required autoComplete="email" />
-            </Field>
-            <Field label="Password" hint="At least 10 characters.">
-              <input
-                name="password"
-                type="password"
-                minLength={10}
-                maxLength={128}
-                required
-                autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
-              />
-            </Field>
-            {authError && (
-              <p className="error" role="alert">
-                {authError}
-              </p>
-            )}
-            <button className="primary full-width" disabled={busy}>
-              {busy ? 'One moment…' : authMode === 'register' ? 'Create your account' : 'Sign in'}
-            </button>
-          </form>
-          <button
-            className="text-button"
-            onClick={() => {
-              setAuthMode(authMode === 'register' ? 'login' : 'register');
-              setAuthError('');
-            }}
-          >
-            {authMode === 'register'
-              ? 'Already have an account? Sign in'
-              : 'New here? Create an account'}
+            <GoogleIcon />
+            {busy ? 'Opening Google…' : 'Continue with Google'}
           </button>
+          {!googleEnabled && (
+            <p className="error" role="alert">
+              Google sign-in is temporarily unavailable. Your draft is still saved on this device.
+            </p>
+          )}
+          {authError && (
+            <p className="error" role="alert">
+              {authError}
+            </p>
+          )}
         </Modal>
       )}
       {modal === 'projects' && (
@@ -1030,52 +996,52 @@ export default function App() {
       )}
       {modal === 'account' && user && (
         <Modal title="Account settings" onClose={() => setModal(null)}>
-          <p className="modal-copy">
-            {user.email}. Changing your password signs out your other sessions.
-          </p>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const form = e.currentTarget;
-              setBusy(true);
-              try {
-                await api('/auth/password', {
-                  method: 'POST',
-                  body: JSON.stringify(Object.fromEntries(new FormData(form))),
-                });
-                form.reset();
-                notify('Password changed. Other sessions have been signed out.');
-              } catch (error) {
-                notify((error as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <Field label="Current password">
-              <input
-                type="password"
-                name="currentPassword"
-                autoComplete="current-password"
-                minLength={10}
-                maxLength={128}
-                required
-              />
-            </Field>
-            <Field label="New password">
-              <input
-                type="password"
-                name="password"
-                autoComplete="new-password"
-                minLength={10}
-                maxLength={128}
-                required
-              />
-            </Field>
-            <button className="primary" disabled={busy}>
-              Change password
-            </button>
-          </form>
+          <p className="modal-copy">Signed in as {user.email}.</p>
+          {!supabase && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                setBusy(true);
+                try {
+                  await api('/auth/password', {
+                    method: 'POST',
+                    body: JSON.stringify(Object.fromEntries(new FormData(form))),
+                  });
+                  form.reset();
+                  notify('Password changed. Other sessions have been signed out.');
+                } catch (error) {
+                  notify((error as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Field label="Current password">
+                <input
+                  type="password"
+                  name="currentPassword"
+                  autoComplete="current-password"
+                  minLength={10}
+                  maxLength={128}
+                  required
+                />
+              </Field>
+              <Field label="New password">
+                <input
+                  type="password"
+                  name="password"
+                  autoComplete="new-password"
+                  minLength={10}
+                  maxLength={128}
+                  required
+                />
+              </Field>
+              <button className="primary" disabled={busy}>
+                Change password
+              </button>
+            </form>
+          )}
           <hr />
           <form
             onSubmit={async (e) => {
