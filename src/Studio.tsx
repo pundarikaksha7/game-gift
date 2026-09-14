@@ -128,6 +128,7 @@ export default function App() {
     [publicError, setPublicError] = useState('');
   const publicId = location.pathname.startsWith('/play/') ? location.pathname.split('/')[2] : null;
   const draftEpoch = useRef(0);
+  const hydratedUser = useRef<string | null>(null);
   const gameRef = useRef(game);
   gameRef.current = game;
   const validRef = useRef(game);
@@ -148,6 +149,43 @@ export default function App() {
         .catch((e) => setPublicError(e.message));
       return;
     }
+    let active = true;
+    let authSubscription: { unsubscribe: () => void } | undefined;
+    async function syncSignedInUser() {
+      try {
+        const d = await api('/auth/me');
+        if (!active) return;
+        setUser(d.user);
+        if (hydratedUser.current === d.user.id) return;
+        hydratedUser.current = d.user.id;
+        try {
+          const id = localStorage.getItem(`game-gift-last-${d.user.id}`);
+          if (id) {
+            const p = await api<Project>(`/projects/${id}`);
+            if (active) load(p);
+          }
+        } catch {
+          /* A removed project or unavailable storage leaves the guest template available. */
+        }
+      } catch {
+        if (active) {
+          hydratedUser.current = null;
+          setUser(null);
+        }
+      }
+    }
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          hydratedUser.current = null;
+          setUser(null);
+          return;
+        }
+        // Defer API work until after Supabase releases its internal auth callback lock.
+        setTimeout(() => void syncSignedInUser(), 0);
+      });
+      authSubscription = data.subscription;
+    }
     const oauthError = new URLSearchParams(location.search).get('authError');
     if (oauthError) {
       setAuthError(oauthError);
@@ -160,26 +198,17 @@ export default function App() {
         setModal('auth');
         return false;
       })
-      .then(() => api('/auth/me'))
-      .then(async (d) => {
-        setUser(d.user);
-        try {
-          const id = localStorage.getItem(`game-gift-last-${d.user.id}`);
-          if (id) {
-            const p = await api<Project>(`/projects/${id}`);
-            load(p);
-          }
-        } catch {
-          /* A removed project or unavailable storage leaves the guest template available. */
-        }
-      })
-      .catch(() => {});
+      .then(() => syncSignedInUser());
     api('/config')
       .then((d) => {
         setAiEnabled(d.aiEnabled);
         setGoogleEnabled(d.googleEnabled);
       })
       .catch(() => setCloudUnavailable(true));
+    return () => {
+      active = false;
+      authSubscription?.unsubscribe();
+    };
   }, [publicId]);
   useEffect(() => {
     setUploadProject(project?.id ?? null);

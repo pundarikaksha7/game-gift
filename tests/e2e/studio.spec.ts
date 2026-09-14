@@ -16,10 +16,19 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/studio');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await page.getByLabel('Your name').fill('Browser Creator');
-  await page.getByLabel('Email address').fill(`browser-${Date.now()}@example.com`);
-  await page.getByLabel('Password', { exact: false }).fill('browser-long-password');
-  await page.getByRole('button', { name: 'Create your account' }).click();
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+  await expect(page.locator('.google-icon')).toBeVisible();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  const registration = await page.request.post('/api/auth/register', {
+    headers: { 'X-Game-Gift-Request': 'studio' },
+    data: {
+      name: 'Browser Creator',
+      email: `browser-${Date.now()}@example.com`,
+      password: 'browser-long-password',
+    },
+  });
+  expect(registration.ok()).toBe(true);
+  await page.reload();
   await expect(page.locator('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Game settings', exact: true }).click();
   await page.getByLabel('Game title').fill('A browser-tested adventure');
