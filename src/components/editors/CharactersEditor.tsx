@@ -138,8 +138,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
                       if (x.role === 'hero') x.role = 'friend';
                     });
                   g.characters.find((x) => x.id === c.id)!.role = role;
-                  if (role !== 'friend' && g.story.narratorId === c.id)
-                    delete g.story.narratorId;
+                  if (role !== 'friend' && g.story.narratorId === c.id) delete g.story.narratorId;
                 })
               }
               disabled={c.role === 'hero'}

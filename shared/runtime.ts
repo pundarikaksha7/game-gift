@@ -113,9 +113,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
         ...defaultBoss,
         ...l.boss,
         name:
-          enemies.find((enemy) => enemy.id === l.boss?.characterId)?.name ||
-          enemies[0]?.name ||
-          '',
+          enemies.find((enemy) => enemy.id === l.boss?.characterId)?.name || enemies[0]?.name || '',
         enabled: !!l.boss?.enabled && enemies.length > 0,
       },
       requireDefeatAll: l.requireDefeatAll ?? false,
