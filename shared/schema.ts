@@ -7,7 +7,11 @@ export const assetUrl = z
   .string()
   .max(256)
   .refine(
-    (v) => v === '' || /^\/api\/assets\/[a-f0-9-]{36}$/.test(v) || /^blob:/i.test(v),
+    (v) =>
+      v === '' ||
+      /^\/api\/assets\/[a-f0-9-]{36}$/.test(v) ||
+      /^\/assets\/sounds\/[a-zA-Z0-9_./-]+\.mp3$/.test(v) ||
+      /^blob:/i.test(v),
     'Use an uploaded asset',
   );
 export const characterSchema = z
@@ -73,6 +77,7 @@ export const levelSchema = z
     crossingPlatforms: z.boolean().optional(),
     requireDefeatAll: z.boolean().optional(),
     powerup: z.enum(['none', 'companion', 'beam', 'boost', 'mixed']).optional(),
+    powerupArt: assetUrl.optional(),
   })
   .strict();
 export const animationSchema = z
@@ -124,7 +129,7 @@ export const gameSchema = z
     recipient: z.string().max(60),
     characters: z.array(characterSchema).min(1).max(12),
     levels: z.array(levelSchema).min(1).max(12),
-    story: z.object({ opening: text, ending: text }).strict(),
+    story: z.object({ opening: text, ending: text, narratorId: id.optional() }).strict(),
     physics: z
       .object({
         speed: z.number().min(100).max(500),
@@ -140,6 +145,10 @@ export const gameSchema = z
         jump: assetUrl,
         hit: assetUrl,
         win: assetUrl,
+        punch: assetUrl.optional(),
+        kick: assetUrl.optional(),
+        heroAttack: assetUrl.optional(),
+        villainAttack: assetUrl.optional(),
         volume: z.number().min(0).max(1),
       })
       .strict(),
@@ -149,6 +158,15 @@ export const gameSchema = z
   .superRefine((g, ctx) => {
     if (g.characters.filter((c) => c.role === 'hero').length !== 1)
       ctx.addIssue({ code: 'custom', path: ['characters'], message: 'Choose exactly one hero' });
+    if (
+      g.story.narratorId &&
+      !g.characters.some((c) => c.id === g.story.narratorId && c.role === 'friend')
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['story', 'narratorId'],
+        message: 'The narrator must be a companion character',
+      });
     for (const [key, items] of [
       ['characters', g.characters],
       ['levels', g.levels],
@@ -240,9 +258,12 @@ export function assetReferences(game: Game): { url: string; kind: 'image' | 'aud
       [c.sprite, ...(c.frames || [])].map((url) => ({ url, kind: 'image' as const })),
     ),
     ...game.levels.map((l) => ({ url: l.background || '', kind: 'image' as const })),
+    ...game.levels.map((l) => ({ url: l.powerupArt || '', kind: 'image' as const })),
     ...game.animation.frames.map((url) => ({ url, kind: 'image' as const })),
-    ...(['music', 'jump', 'hit', 'win'] as const).map((k) => ({
-      url: game.sounds[k],
+    ...(
+      ['music', 'jump', 'hit', 'win', 'punch', 'kick', 'heroAttack', 'villainAttack'] as const
+    ).map((k) => ({
+      url: game.sounds[k] || '',
       kind: 'audio' as const,
     })),
   ].filter((a) => a.url);

@@ -5,8 +5,10 @@ import {
   type DifficultyMode,
 } from '../../../shared/template';
 import { Field } from '../UI';
+import { UploadButton } from '../UI';
+import { attachAsset } from '../../api';
 import type { EditorProps } from './types';
-export function EncounterEditor({ game, change, level }: EditorProps & { level: number }) {
+export function EncounterEditor({ game, change, level, notify }: EditorProps & { level: number }) {
   const l = game.levels[level],
     boss = { ...defaultBoss, ...l.boss };
   const enemies = game.characters.filter((c) => c.role === 'enemy');
@@ -33,10 +35,62 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
           {l.difficulty === 'custom' && <span className="muted">Custom</span>}
         </div>
       </Field>
+      <Field
+        label="Number of villains"
+        hint="Choose exactly how many villains appear in this chapter (0–200)."
+      >
+        <div className="number-stepper">
+          <button
+            type="button"
+            className="secondary"
+            aria-label="Remove one villain"
+            disabled={l.enemyCount <= 0}
+            onClick={() =>
+              change((g) => {
+                g.levels[level].enemyCount = Math.max(0, l.enemyCount - 1);
+                g.levels[level].difficulty = 'custom';
+              })
+            }
+          >
+            −
+          </button>
+          <input
+            type="number"
+            min={0}
+            max={200}
+            inputMode="numeric"
+            value={l.enemyCount}
+            aria-label="Number of villains"
+            onChange={(e) =>
+              change((g) => {
+                g.levels[level].enemyCount = Math.max(0, Math.min(200, Number(e.target.value)));
+                g.levels[level].difficulty = 'custom';
+              })
+            }
+          />
+          <button
+            type="button"
+            className="secondary"
+            aria-label="Add one villain"
+            disabled={l.enemyCount >= 200 || !enemies.length}
+            onClick={() =>
+              change((g) => {
+                g.levels[level].enemyCount = Math.min(200, l.enemyCount + 1);
+                g.levels[level].difficulty = 'custom';
+              })
+            }
+          >
+            +
+          </button>
+        </div>
+        {!enemies.length && (
+          <p className="muted">Add a villain character before placing villains.</p>
+        )}
+      </Field>
       <div className="form-grid">
         <Field
-          label="Enemy pit awareness"
-          hint="Low-IQ enemies can run into pits; high-IQ enemies stop or jump."
+          label="Villain intelligence"
+          hint="All villains chase and attack the hero. Smart villains also navigate platforms and avoid pits."
         >
           <select
             value={l.enemyIq || 'low'}
@@ -47,8 +101,8 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
               })
             }
           >
-            <option value="low">Low · may fall into pits</option>
-            <option value="high">High · avoids pits</option>
+            <option value="low">Standard · direct chase</option>
+            <option value="high">Smart · navigates obstacles</option>
           </select>
         </Field>
         <Field label="Exit rule">
@@ -87,6 +141,38 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
             ))}
           </select>
         </Field>
+        <Field
+          label="Custom power-up art"
+          hint="Upload the artwork shown for every power-up drop in this chapter."
+        >
+          <div className="inline-actions">
+            <UploadButton
+              label={l.powerupArt ? 'Replace artwork' : 'Upload artwork'}
+              accept="image/png,image/jpeg,image/webp"
+              onFile={async (file) => {
+                const levelId = l.id;
+                try {
+                  const url = await attachAsset(file, 'image');
+                  change((g) => {
+                    const chapter = g.levels.find((item) => item.id === levelId);
+                    if (chapter) chapter.powerupArt = url;
+                  });
+                } catch (error) {
+                  notify((error as Error).message);
+                }
+              }}
+            />
+            {l.powerupArt && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => change((g) => delete g.levels[level].powerupArt)}
+              >
+                Use built-in art
+              </button>
+            )}
+          </div>
+        </Field>
         <Field label="Final boss">
           <input
             type="checkbox"
@@ -121,17 +207,6 @@ export function EncounterEditor({ game, change, level }: EditorProps & { level: 
                 </option>
               ))}
             </select>
-          </Field>
-          <Field label="Boss name">
-            <input
-              value={boss.name}
-              maxLength={60}
-              onChange={(e) =>
-                change((g) => {
-                  g.levels[level].boss = { ...boss, name: e.target.value };
-                })
-              }
-            />
           </Field>
           {(['health', 'damage', 'enrageAt', 'armor'] as const).map((k) => (
             <Field

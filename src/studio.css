@@ -1123,6 +1123,17 @@ input[type='color'] {
   height: 32px;
   order: 3;
 }
+.number-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(90px, 150px) 44px;
+  gap: 8px;
+  align-items: center;
+}
+.number-stepper button,
+.number-stepper input {
+  min-height: 42px;
+  text-align: center;
+}
 .preset-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

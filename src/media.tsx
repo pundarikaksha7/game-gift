@@ -6,6 +6,9 @@ import { assetReferences } from '../shared/schema';
 function isLocalAsset(url: string) {
   return url.startsWith('blob:');
 }
+function isBundledAsset(url: string) {
+  return url.startsWith('/assets/');
+}
 function rewriteAssets(game: Game, mapped: Record<string, string>) {
   return JSON.parse(JSON.stringify(game), (_key, value) =>
     typeof value === 'string' && mapped[value] ? mapped[value] : value,
@@ -42,7 +45,7 @@ export function useMedia(url: string) {
       setResolved('');
       return;
     }
-    if (isLocalAsset(url) || url.startsWith('data:')) {
+    if (isLocalAsset(url) || isBundledAsset(url) || url.startsWith('data:')) {
       setResolved(url);
       return;
     }

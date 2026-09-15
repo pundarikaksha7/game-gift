@@ -38,7 +38,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
             change((g) =>
               g.characters.push({
                 id,
-                name: `New friend ${g.characters.length}`,
+                name: '',
                 role: 'friend',
                 sprite: '',
                 color: '#bbadcf',
@@ -95,6 +95,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
               onClick={() => {
                 change((g) => {
                   g.characters = g.characters.filter((x) => x.id !== c.id);
+                  if (g.story.narratorId === c.id) delete g.story.narratorId;
                   g.levels.forEach((l) => {
                     if (l.boss?.characterId === c.id) {
                       l.boss.enabled = false;
@@ -121,6 +122,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
           <Field label="Character name">
             <input
               value={c.name}
+              placeholder="Enter the name you want shown"
               maxLength={60}
               onChange={(e) => update({ name: e.target.value })}
             />
@@ -136,6 +138,8 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
                       if (x.role === 'hero') x.role = 'friend';
                     });
                   g.characters.find((x) => x.id === c.id)!.role = role;
+                  if (role !== 'friend' && g.story.narratorId === c.id)
+                    delete g.story.narratorId;
                 })
               }
               disabled={c.role === 'hero'}

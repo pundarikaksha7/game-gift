@@ -3,8 +3,11 @@ import { ArrowLeft, ArrowRight, ArrowUp, Swords, Play, RotateCcw } from 'lucide-
 import type { Game } from '../../shared/schema';
 import { GameCanvas } from './GameCanvas';
 export function PlayGame({ game, startLevel = 0 }: { game: Game; startLevel?: number }) {
+  const storyManagedByEngine = game.engine !== 'classic';
   const [level, setLevel] = useState(startLevel),
-    [stage, setStage] = useState<'intro' | 'playing' | 'win' | 'lose' | 'end'>('intro'),
+    [stage, setStage] = useState<'intro' | 'playing' | 'win' | 'lose' | 'end'>(
+      storyManagedByEngine ? 'playing' : 'intro',
+    ),
     [run, setRun] = useState(0);
   const controls = useRef(new Set<string>());
   const current = game.levels[level];
@@ -21,7 +24,7 @@ export function PlayGame({ game, startLevel = 0 }: { game: Game; startLevel?: nu
           levelIndex={level}
           playing={stage === 'playing'}
           controls={controls}
-          onEnd={setStage}
+          onEnd={storyManagedByEngine ? undefined : setStage}
         />
         {stage !== 'playing' && (
           <div className="play-overlay">

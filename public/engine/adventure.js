@@ -5,6 +5,8 @@
  * ground/platform collision, and a camera that follows the player.
  */
 async function run(mode) {
+  let disposed = false;
+  let animationFrame = 0;
   const gameWorld = document.getElementById('game-world');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d');
@@ -383,6 +385,9 @@ async function run(mode) {
         vx: 0,
         vy: 0,
         onGround: false,
+        support: routePlatform?.id
+          ? { id: routePlatform.id, x: routePlatform.x, y: routePlatform.y }
+          : null,
         facingRight: false,
         health: Number(
           enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88),
@@ -582,6 +587,7 @@ async function run(mode) {
     attackCooldowns[type] = data.cooldown;
     player.vx = 0;
     playSound(type === 'kick' ? 'kick' : 'punch', type === 'kick' ? 0.72 : 0.5);
+    playSound('heroAttack', 0.34);
     screenShakeTimer = type === 'kick' ? 0.1 : 0.055;
     screenShakePower = type === 'kick' ? 7 : 3;
     return true;
@@ -644,6 +650,9 @@ async function run(mode) {
   );
   const backgroundImageStates = Object.fromEntries(
     cfg.levels.map((l) => [l.id, loadImageAsset(l.id)]),
+  );
+  const powerupImageStates = Object.fromEntries(
+    cfg.levels.map((l) => [l.id, loadImageAsset(`powerup-${l.id}`)]),
   );
   const specialImageStates = {
     phone: loadImageAsset('hidden_phone_icon'),
@@ -749,6 +758,30 @@ async function run(mode) {
     motorOscillator.disconnect();
     motorOscillator = null;
     motorGain = null;
+  }
+
+  function disposeRuntime() {
+    if (disposed) return;
+    disposed = true;
+    cancelAnimationFrame(animationFrame);
+    levelMusic?.pause();
+    if (levelMusic) levelMusic.src = '';
+    levelMusic = null;
+    for (const pool of Object.values(soundPools))
+      for (const audio of pool) {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      }
+    stopMotorcycleSound();
+    if (motorAudioContext && motorAudioContext.state !== 'closed') void motorAudioContext.close();
+    motorAudioContext = null;
+    for (const image of Object.values(assetCache)) {
+      image.onload = null;
+      image.onerror = null;
+      image.src = '';
+    }
+    frameCache.clear();
   }
 
   // ── Input state ──
@@ -953,6 +986,85 @@ async function run(mode) {
   gameWorld.appendChild(levelTransitionOverlay);
   const transitionTitleEl = levelTransitionOverlay.querySelector('.stage-title');
   const transitionCopyEl = levelTransitionOverlay.querySelector('.stage-copy');
+
+  const storyOverlay = document.createElement('div');
+  storyOverlay.className = 'story-scene-overlay is-hidden';
+  storyOverlay.innerHTML = `
+    <div class="story-scene-card" role="dialog" aria-modal="true" aria-label="Story scene">
+      <p class="stage-kicker story-scene-kicker"></p>
+      <h2 class="stage-title story-scene-title"></h2>
+      <div class="story-cast">
+        <figure class="story-character story-narrator"><img alt=""><figcaption></figcaption></figure>
+        <div class="story-bubble"><p class="stage-copy story-scene-copy"></p></div>
+        <figure class="story-character story-listener"><img alt=""><figcaption></figcaption></figure>
+      </div>
+      <button class="story-continue" type="button">Begin chapter</button>
+    </div>`;
+  gameWorld.appendChild(storyOverlay);
+  const storyKickerEl = storyOverlay.querySelector('.story-scene-kicker');
+  const storyTitleEl = storyOverlay.querySelector('.story-scene-title');
+  const storyCopyEl = storyOverlay.querySelector('.story-scene-copy');
+  const storyContinueButton = storyOverlay.querySelector('.story-continue');
+  const narrator =
+    cfg.characters.find(
+      (character) => character.role === 'friend' && character.id === cfg.story?.narratorId,
+    ) || cfg.characters.find((character) => character.role === 'friend');
+  const hero = cfg.characters.find((character) => character.role === 'hero');
+  let storyAction = null;
+
+  function setStoryCharacter(selector, character) {
+    const figure = storyOverlay.querySelector(selector);
+    const image = figure.querySelector('img');
+    const caption = figure.querySelector('figcaption');
+    figure.classList.toggle('is-hidden', !character);
+    if (!character) return;
+    image.src = cfg.assets[character.id] || '';
+    image.alt = character.name;
+    caption.textContent = character.name;
+  }
+
+  function showStoryScene(kind, levelIndex) {
+    if (mode !== 'play') return;
+    const level = getLevelConfig(levelIndex);
+    const isIntro = kind === 'intro';
+    const copy = [
+      isIntro && levelIndex === 0 ? cfg.story?.opening : '',
+      isIntro ? level.intro : level.outro,
+      !isIntro && levelIndex === cfg.levels.length - 1 ? cfg.story?.ending : '',
+    ].filter(Boolean).join('\n\n');
+    storyKickerEl.textContent = isIntro ? `CHAPTER ${levelIndex + 1} · BEFORE` : `CHAPTER ${levelIndex + 1} · COMPLETE`;
+    storyTitleEl.textContent = level.name;
+    storyCopyEl.textContent = copy;
+    storyContinueButton.textContent = isIntro
+      ? 'Begin chapter'
+      : levelIndex < cfg.levels.length - 1
+        ? 'Next chapter'
+        : 'Finish adventure';
+    setStoryCharacter('.story-narrator', narrator);
+    setStoryCharacter('.story-listener', hero);
+    storyAction = { kind, levelIndex };
+    paused = true;
+    storyOverlay.classList.remove('is-hidden');
+  }
+
+  storyContinueButton.addEventListener('click', () => {
+    const action = storyAction;
+    storyAction = null;
+    storyOverlay.classList.add('is-hidden');
+    if (!action || action.kind === 'intro') {
+      paused = false;
+      return;
+    }
+    const nextIndex = action.levelIndex + 1;
+    if (nextIndex < cfg.levels.length) {
+      beginLevel(nextIndex);
+      showStoryScene('intro', nextIndex);
+    } else {
+      allLevelsComplete = true;
+      completionOverlay.classList.remove('is-hidden');
+      paused = true;
+    }
+  });
 
   const completionOverlay = document.createElement('div');
   completionOverlay.className = 'completion-overlay is-hidden';
@@ -1190,7 +1302,7 @@ async function run(mode) {
     levelComplete = true;
     playSound('win');
     parent.postMessage({ type: 'game-gift:end', result: 'win' }, location.origin);
-    paused = true;
+    showStoryScene('outro', currentLevelIndex);
   }
 
   function updateLevelTransition(dt) {
@@ -1672,7 +1784,7 @@ async function run(mode) {
       if (!defeated) drawEnemyAttackEffect(enemy, sx, sy);
 
       if (!defeated && cfg.mechanics.healthBars) {
-        ctx.font = '700 16px Inter';
+        ctx.font = '800 22px ui-rounded, "Arial Rounded MT Bold", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#fff';
         ctx.fillText(
@@ -1750,6 +1862,26 @@ async function run(mode) {
     powerupMessage = message;
     powerupMessageTimer = 4;
     powerupNotice.textContent = message;
+  }
+  function drawCharacterName(name, x, y, accent = '#ffe6a3') {
+    if (!name) return;
+    ctx.save();
+    ctx.font = '900 40px ui-rounded, "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = Math.max(124, ctx.measureText(name).width + 42);
+    ctx.fillStyle = 'rgba(12,18,36,.9)';
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(x - width / 2, y - 27, width, 54, 24);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,.8)';
+    ctx.shadowBlur = 3;
+    ctx.fillText(name, x, y + 2);
+    ctx.restore();
   }
   function dropPowerup(kind, enemy) {
     const platform = getPlatforms()
@@ -1845,7 +1977,15 @@ async function run(mode) {
       ctx.arc(0, 0, 49, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, item.time));
       ctx.stroke();
       ctx.shadowBlur = 0;
-      if (item.kind === 'companion') {
+      const customArt = powerupImageStates[getLevelConfig().id];
+      if (customArt?.ready && customArt.image) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, 39, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(customArt.image, -39, -39, 78, 78);
+        ctx.restore();
+      } else if (item.kind === 'companion') {
         ctx.font = '58px system-ui';
         ctx.fillText('🐈', 0, 20);
       } else if (item.kind === 'beam') {
@@ -1895,7 +2035,7 @@ async function run(mode) {
         ctx.lineWidth = 3;
         ctx.stroke();
       }
-      ctx.font = '700 17px Inter';
+      ctx.font = '800 20px ui-rounded, "Arial Rounded MT Bold", sans-serif';
       ctx.fillStyle = '#fff';
       ctx.fillText(info.name, 0, -61);
       ctx.font = '700 13px Inter';
@@ -1922,10 +2062,7 @@ async function run(mode) {
         ctx.rotate(Math.sin(worldTime * 12) * (Math.abs(player.vx) > 5 ? 0.035 : 0.008));
         ctx.drawImage(art.image, -w / 2, -h, w, h);
         ctx.restore();
-        ctx.fillStyle = color;
-        ctx.font = '700 16px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillText(ally.name, sx + 27, sy - 22);
+        drawCharacterName(ally.name, sx + 27, sy - 27, color);
       } else {
         ctx.save();
         ctx.translate(sx, sy);
@@ -1971,11 +2108,8 @@ async function run(mode) {
         ctx.stroke();
         ctx.fillStyle = color;
         ctx.fillRect(48, 40, 16, 22);
-        ctx.font = '700 13px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#fff';
-        ctx.fillText(ally.name, 27, -15);
         ctx.restore();
+        drawCharacterName(ally.name, sx + 27, sy - 20, color);
       }
       if (ally.flash > 0 && ally.target) {
         ctx.strokeStyle = color;
@@ -2241,13 +2375,11 @@ async function run(mode) {
     );
     const heroImage = heroArt.image;
     const px = player.x - cameraX;
-    ctx.font = '700 16px Inter';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe6a3';
-    ctx.fillText(
+    drawCharacterName(
       cfg.characters.find((c) => c.role === 'hero').name,
       px + player.w / 2,
-      player.y - 12,
+      player.y - 22,
+      '#ffe6a3',
     );
     const py = player.y;
     const idleBob = player.animState === 'idle' ? Math.sin(player.animTime * 3.2) * 1.5 : 0;
@@ -2352,6 +2484,7 @@ async function run(mode) {
   pauseButton.style.cssText =
     'position:absolute;right:16px;top:16px;z-index:30;background:#14243de6;color:white;border:1px solid #ffffff55;border-radius:10px;padding:12px;cursor:pointer';
   pauseButton.addEventListener('click', () => {
+    if (storyAction) return;
     paused = !paused;
   });
   gameWorld.appendChild(pauseButton);
@@ -2382,7 +2515,7 @@ async function run(mode) {
     jumpPressed = false;
   });
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyP' && !e.repeat) paused = !paused;
+    if (e.code === 'KeyP' && !e.repeat && !storyAction) paused = !paused;
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -2390,6 +2523,7 @@ async function run(mode) {
   });
 
   function gameLoop(timestamp) {
+    if (disposed) return;
     const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
     lastTime = timestamp;
     // World time advances with physics below.
@@ -2437,7 +2571,17 @@ async function run(mode) {
       mode === 'preview' ? cfg.camera : cameraX + (targetCamX - cameraX) * (1 - Math.exp(-8 * dt));
     if (mode === 'preview') {
       worldTime += dt;
-      enemies.forEach((e) => (e.animTime += dt));
+      const previewPlatforms = getPlatforms();
+      enemies.forEach((enemy) => {
+        enemy.animTime += dt;
+        if (!enemy.support) return;
+        const platform = previewPlatforms.find((item) => item.id === enemy.support.id);
+        if (!platform) return;
+        enemy.x += platform.x - enemy.support.x;
+        enemy.y += platform.y - enemy.support.y;
+        enemy.support = { id: platform.id, x: platform.x, y: platform.y };
+        enemy.onGround = true;
+      });
     }
 
     const shake =
@@ -2483,7 +2627,7 @@ async function run(mode) {
     drawCombatPopups();
     ctx.restore();
     updateHud();
-    if (paused) {
+    if (paused && !storyAction) {
       ctx.fillStyle = 'rgba(12,18,32,.78)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#fff';
@@ -2494,7 +2638,7 @@ async function run(mode) {
       ctx.fillText('Press P or tap Pause / Resume', 640, 375);
     }
 
-    requestAnimationFrame(gameLoop);
+    animationFrame = requestAnimationFrame(gameLoop);
   }
 
   function updateBoss(enemy, dt) {
@@ -2736,6 +2880,7 @@ async function run(mode) {
         enemy.attackTimer = spec.attackCooldown;
         enemy.attackPulse = 0.52 - enemy.iq * 0.16;
         enemy.attackHitDone = false;
+        playSound('villainAttack', 0.38);
       }
       if (enemy.attackPulse > 0 && enemy.attackPulse <= 0.16 && !enemy.attackHitDone) {
         const attackBox = {
@@ -2980,6 +3125,10 @@ async function run(mode) {
   let virtualKeys = [];
   window.addEventListener('message', (event) => {
     if (event.source !== parent || event.origin !== location.origin) return;
+    if (event.data?.type === 'game-gift:dispose') {
+      disposeRuntime();
+      return;
+    }
     if (event.data?.type === 'game-gift:viewport' && mode === 'preview') {
       cfg.camera = event.data.camera;
       cfg.grid = !!event.data.grid;
@@ -2994,7 +3143,8 @@ async function run(mode) {
     }
   });
   beginLevel(cfg.startLevel || 0);
-  if (cfg.mechanics.helpersAtStart || mode === 'preview') activatePowerup('companion');
+  if (mode === 'play') showStoryScene('intro', currentLevelIndex);
+  if (cfg.mechanics.helpersAtStart && mode === 'play') activatePowerup('companion');
   if (mode === 'preview') {
     player.x = cfg.camera + 220;
     companions.forEach((h, i) => {
@@ -3015,7 +3165,7 @@ async function run(mode) {
   });
 
   lastTime = performance.now();
-  requestAnimationFrame(gameLoop);
+  animationFrame = requestAnimationFrame(gameLoop);
 }
 
 let started = false;

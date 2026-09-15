@@ -6,6 +6,7 @@ import { uploadAsset } from '../../api';
 import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function StoryEditor({ game, change }: EditorProps) {
+  const companions = game.characters.filter((character) => character.role === 'friend');
   return (
     <>
       <div className="section-top">
@@ -16,6 +17,27 @@ export function StoryEditor({ game, change }: EditorProps) {
         <span className="pill">{game.levels.length + 2} story moments</span>
       </div>
       <div className="form-card">
+        <Field
+          label="Story narrator"
+          hint="This companion speaks in the chapter scenes while the hero listens."
+        >
+          <select
+            value={game.story.narratorId || companions[0]?.id || ''}
+            disabled={!companions.length}
+            onChange={(e) =>
+              change((g) => {
+                g.story.narratorId = e.target.value || undefined;
+              })
+            }
+          >
+            {!companions.length && <option value="">Add a companion first</option>}
+            {companions.map((companion) => (
+              <option key={companion.id} value={companion.id}>
+                {companion.name}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Made especially for">
           <input
             value={game.recipient}

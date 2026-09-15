@@ -99,7 +99,20 @@ export function createTemplate(): Game {
       ending: 'You made it! Thanks for playing.',
     },
     physics: { speed: 270, jump: 590, gravity: 1500, health: 5 },
-    sounds: { music: '', jump: '', hit: '', win: '', volume: 0.45 },
+    sounds: {
+      music:
+        '/assets/sounds/background/nickpanek-energetic-chiptune-video-game-music-platformer-8-bit-318348.mp3',
+      jump: '/assets/sounds/jump/bestuploadsever67aryan-jump-sound-531048.mp3',
+      hit: '/assets/sounds/attack/punch/universfield-punch-03-352040.mp3',
+      punch: '/assets/sounds/attack/punch/universfield-punch-03-352040.mp3',
+      kick: '/assets/sounds/attack/kick/khoamthanh-kick-bright-medium-504170.mp3',
+      heroAttack:
+        '/assets/sounds/hero/female/freesound_gamestudio-female-character-attack-vocal-6-408474.mp3',
+      villainAttack:
+        '/assets/sounds/villains/female/phatphrogstudio-rpg-female-attack-grunt-no-ai-481720.mp3',
+      win: '',
+      volume: 0.45,
+    },
     animation: { preset: 'bounce', speed: 1, squash: 0.08, frames: [], fps: 8 },
   };
 }

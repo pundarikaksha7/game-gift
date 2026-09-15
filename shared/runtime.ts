@@ -21,7 +21,10 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
       ? resolveAvatarAsset(c.avatar)
       : c.sprite || (c.role === 'hero' ? heroArt : roleSprite(c.role, index));
   });
-  game.levels.forEach((l) => (assets[l.id] = l.background || ''));
+  game.levels.forEach((l) => {
+    assets[l.id] = l.background || '';
+    assets[`powerup-${l.id}`] = l.powerupArt || '';
+  });
   const enemyTypes = Object.fromEntries(
     enemies.map((c) => {
       const size = c.archetype || 'small',
@@ -54,6 +57,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
   });
   return {
     title: game.title,
+    story: game.story,
     startLevel,
     camera: camera / WORLD_UNIT,
     assets,
@@ -105,7 +109,15 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
       skyColor: l.theme === 'midnight' ? '#241b42' : l.theme === 'sunset' ? '#e5bbaa' : '#87CEEB',
       groundColor:
         l.theme === 'midnight' ? '#35374e' : l.theme === 'sunset' ? '#8c8589' : '#618b7a',
-      boss: { ...defaultBoss, ...l.boss, enabled: !!l.boss?.enabled && enemies.length > 0 },
+      boss: {
+        ...defaultBoss,
+        ...l.boss,
+        name:
+          enemies.find((enemy) => enemy.id === l.boss?.characterId)?.name ||
+          enemies[0]?.name ||
+          '',
+        enabled: !!l.boss?.enabled && enemies.length > 0,
+      },
       requireDefeatAll: l.requireDefeatAll ?? false,
       enemyIq: l.enemyIq || 'low',
       powerup: l.powerup || 'none',
@@ -123,9 +135,11 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
       })),
     })),
     sounds: {
-      punch: game.sounds.hit,
-      kick: game.sounds.hit,
-      hurt: game.sounds.hit,
+      punch: game.sounds.punch || game.sounds.hit,
+      kick: game.sounds.kick || game.sounds.hit,
+      heroAttack: game.sounds.heroAttack || '',
+      villainAttack: game.sounds.villainAttack || '',
+      hurt: game.sounds.heroAttack || game.sounds.hit,
       defeat: game.sounds.hit,
       jump: game.sounds.jump,
       win: game.sounds.win,

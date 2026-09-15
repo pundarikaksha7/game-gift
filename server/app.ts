@@ -337,7 +337,8 @@ export function createApp(db: DB) {
       if (url.startsWith('blob:') || url.startsWith('data:'))
         throw fail(400, 'Upload your media before saving');
       if (url.startsWith('/assets/')) {
-        if (kind !== 'image') throw fail(400, 'Sound slots require an audio upload');
+        // Static media has already been restricted to approved local paths by assetUrl.
+        // It is application-owned, so it does not need an entry in the user's asset table.
         continue;
       }
       const [asset] = await db.query('SELECT mime FROM assets WHERE id=$1 AND owner_id=$2', [

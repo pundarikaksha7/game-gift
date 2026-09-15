@@ -82,7 +82,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     );
     const game = createTemplate();
     const created = await request('/projects', 'POST', { game }, alice);
-    assert.equal(created.status, 201);
+    assert.equal(created.status, 201, JSON.stringify(created.data));
     const id = created.data.id;
     assert.equal((await request(`/projects/${id}`, 'GET', undefined, bob)).status, 404);
     assert.equal((await request(`/projects/${id}`, 'PUT', { game, revision: 1 }, bob)).status, 404);
