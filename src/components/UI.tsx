@@ -40,9 +40,9 @@ export function Field({
 }) {
   return (
     <label className="field">
-      <span>{label}</span>
-      {children}
-      {hint && <small>{hint}</small>}
+      <span className="field-label">{label}</span>
+      <span className="field-control">{children}</span>
+      {hint && <small className="field-hint">{hint}</small>}
     </label>
   );
 }

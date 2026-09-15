@@ -10,6 +10,10 @@ async function run(mode) {
   const gameWorld = document.getElementById('game-world');
   const canvas = document.getElementById('game-canvas');
   const ctx = canvas.getContext('2d');
+  await Promise.allSettled([
+    document.fonts.load('700 24px "Gamegift Arcade"'),
+    document.fonts.load('900 42px "Gamegift Arcade"'),
+  ]);
   const isTouchDevice =
     window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
   const mobileLandscapeQuery = window.matchMedia(
@@ -613,24 +617,28 @@ async function run(mode) {
 
   // ── Cached character art ──
   // Load the generated protagonist once at startup; never fetch assets in the game loop.
-  const assetCache = {};
+  const assetCache = new Map();
   const fallbackAssetUrls = cfg.assets;
   function loadImageAsset(id) {
+    if (assetCache.has(id)) return assetCache.get(id);
     const info = (window.lib &&
       typeof window.lib.getAsset === 'function' &&
       window.lib.getAsset(id)) || { url: fallbackAssetUrls[id] };
     if (!info || !info.url) {
       if (window.lib && typeof window.lib.log === 'function')
         window.lib.log(`Warning: ${id} asset not found; using the vector fallback.`);
-      return { image: null, ready: false };
+      const missing = { image: null, ready: false };
+      assetCache.set(id, missing);
+      return missing;
     }
     const image = new Image();
+    image.decoding = 'async';
     const result = { image, ready: false };
     image.onload = () => {
       result.ready = true;
     };
     image.src = info.url;
-    assetCache[id] = image;
+    assetCache.set(id, result);
     return result;
   }
 
@@ -648,12 +656,6 @@ async function run(mode) {
   const enemyImageStates = Object.fromEntries(
     Object.keys(enemyTypes).map((id) => [id, loadImageAsset(id)]),
   );
-  const backgroundImageStates = Object.fromEntries(
-    cfg.levels.map((l) => [l.id, loadImageAsset(l.id)]),
-  );
-  const powerupImageStates = Object.fromEntries(
-    cfg.levels.map((l) => [l.id, loadImageAsset(`powerup-${l.id}`)]),
-  );
   const specialImageStates = {
     phone: loadImageAsset('hidden_phone_icon'),
     motorcycle: loadImageAsset('biker_motorcycle'),
@@ -667,6 +669,7 @@ async function run(mode) {
     ]) {
       if (!frameCache.has(url)) {
         const image = new Image();
+        image.decoding = 'async';
         image.src = url;
         frameCache.set(url, image);
       }
@@ -686,8 +689,8 @@ async function run(mode) {
     const image = frameCache.get(frames[Math.floor(worldTime * fps) % frames.length]);
     return image?.complete && image.naturalWidth ? { image, ready: true } : fallback;
   }
-  // Sound is optional and starts after the first input, satisfying browser
-  // autoplay rules while keeping the game playable if audio is unavailable.
+  // Sound is optional and starts only from a gameplay control. Clicking the
+  // canvas or advancing story UI must remain silent.
   const soundUrls = cfg.sounds;
   let soundEnabled = false;
   let levelMusic = null;
@@ -776,10 +779,11 @@ async function run(mode) {
     stopMotorcycleSound();
     if (motorAudioContext && motorAudioContext.state !== 'closed') void motorAudioContext.close();
     motorAudioContext = null;
-    for (const image of Object.values(assetCache)) {
-      image.onload = null;
-      image.onerror = null;
-      image.src = '';
+    for (const state of assetCache.values()) {
+      if (!state.image) continue;
+      state.image.onload = null;
+      state.image.onerror = null;
+      state.image.src = '';
     }
     frameCache.clear();
   }
@@ -795,7 +799,12 @@ async function run(mode) {
   // Keyboard. J and K queue one attack per press instead of repeating
   // continuously when a key is held down.
   window.addEventListener('keydown', (e) => {
-    enableSound();
+    if (
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyJ', 'KeyK'].includes(
+        e.code,
+      )
+    )
+      enableSound();
     if (gameOver && !e.repeat && (e.code === 'KeyR' || e.code === 'Enter')) {
       e.preventDefault();
       restartLevel();
@@ -805,7 +814,6 @@ async function run(mode) {
     if (!e.repeat && e.code === 'KeyJ') pendingAttack = 'punch';
     if (!e.repeat && e.code === 'KeyK') pendingAttack = 'kick';
   });
-  window.addEventListener('pointerdown', enableSound, { once: true });
   window.addEventListener('keyup', (e) => {
     keys[e.code] = false;
   });
@@ -861,6 +869,7 @@ async function run(mode) {
     function bindAttackButton(button, type) {
       const press = (e) => {
         e.preventDefault();
+        enableSound();
         pendingAttack = type;
         mobileHaptic(type === 'kick' ? 18 : 10);
         button.classList.add('pressed');
@@ -885,6 +894,7 @@ async function run(mode) {
       'touchstart',
       (e) => {
         e.preventDefault();
+        enableSound();
         jumpPressed = true;
         mobileHaptic(9);
       },
@@ -911,6 +921,7 @@ async function run(mode) {
 
   function handleJoystickStart(e) {
     e.preventDefault();
+    enableSound();
     joystickTouch = e.changedTouches[0].identifier;
     handleJoystickMove(e);
   }
@@ -991,20 +1002,29 @@ async function run(mode) {
   storyOverlay.className = 'story-scene-overlay is-hidden';
   storyOverlay.innerHTML = `
     <div class="story-scene-card" role="dialog" aria-modal="true" aria-label="Story scene">
-      <p class="stage-kicker story-scene-kicker"></p>
-      <h2 class="stage-title story-scene-title"></h2>
-      <div class="story-cast">
-        <figure class="story-character story-narrator"><img alt=""><figcaption></figcaption></figure>
-        <div class="story-bubble"><p class="stage-copy story-scene-copy"></p></div>
-        <figure class="story-character story-listener"><img alt=""><figcaption></figcaption></figure>
+      <div class="story-card-header">
+        <span class="story-card-mark" aria-hidden="true">✦</span>
+        <p class="stage-kicker story-scene-kicker"></p>
       </div>
-      <button class="story-continue" type="button">Begin chapter</button>
+      <div class="story-cast">
+        <figure class="story-character story-narrator"><div class="story-portrait"><img alt=""></div><figcaption><span>Companion</span><strong></strong></figcaption></figure>
+        <div class="story-message">
+          <span class="story-message-label">A note for your journey</span>
+          <h2 class="stage-title story-scene-title"></h2>
+          <p class="stage-copy story-scene-copy"></p>
+          <button class="story-continue" type="button"><span>Begin chapter</span><b>→</b></button>
+        </div>
+        <figure class="story-character story-listener"><div class="story-portrait"><img alt=""></div><figcaption><span>Hero</span><strong></strong></figcaption></figure>
+      </div>
+      <div class="story-progress" aria-hidden="true"></div>
     </div>`;
   gameWorld.appendChild(storyOverlay);
   const storyKickerEl = storyOverlay.querySelector('.story-scene-kicker');
   const storyTitleEl = storyOverlay.querySelector('.story-scene-title');
   const storyCopyEl = storyOverlay.querySelector('.story-scene-copy');
   const storyContinueButton = storyOverlay.querySelector('.story-continue');
+  const storyContinueLabel = storyContinueButton.querySelector('span');
+  const storyProgressEl = storyOverlay.querySelector('.story-progress');
   const narrator =
     cfg.characters.find(
       (character) => character.role === 'friend' && character.id === cfg.story?.narratorId,
@@ -1015,31 +1035,54 @@ async function run(mode) {
   function setStoryCharacter(selector, character) {
     const figure = storyOverlay.querySelector(selector);
     const image = figure.querySelector('img');
-    const caption = figure.querySelector('figcaption');
+    const caption = figure.querySelector('figcaption strong');
     figure.classList.toggle('is-hidden', !character);
     if (!character) return;
-    image.src = cfg.assets[character.id] || '';
+    const source = cfg.assets[character.id] || '';
+    image.src = source;
     image.alt = character.name;
     caption.textContent = character.name;
+    figure.classList.toggle('has-no-art', !source);
+  }
+
+  function readableStoryCopy(parts, fallback) {
+    const copy = parts
+      .map((part) => (typeof part === 'string' ? part.trim() : ''))
+      .filter(Boolean)
+      .join('\n\n');
+    return copy || fallback;
   }
 
   function showStoryScene(kind, levelIndex) {
     if (mode !== 'play') return;
     const level = getLevelConfig(levelIndex);
     const isIntro = kind === 'intro';
-    const copy = [
-      isIntro && levelIndex === 0 ? cfg.story?.opening : '',
-      isIntro ? level.intro : level.outro,
-      !isIntro && levelIndex === cfg.levels.length - 1 ? cfg.story?.ending : '',
-    ].filter(Boolean).join('\n\n');
-    storyKickerEl.textContent = isIntro ? `CHAPTER ${levelIndex + 1} · BEFORE` : `CHAPTER ${levelIndex + 1} · COMPLETE`;
-    storyTitleEl.textContent = level.name;
+    const copy = readableStoryCopy(
+      [
+        isIntro && levelIndex === 0 ? cfg.story?.opening : '',
+        isIntro ? level.intro : level.outro,
+        !isIntro && levelIndex === cfg.levels.length - 1 ? cfg.story?.ending : '',
+      ],
+      isIntro
+        ? `A new chapter is ready for ${hero?.name || 'you'}.`
+        : 'Chapter complete. Your story continues.',
+    );
+    storyKickerEl.textContent = isIntro
+      ? `CHAPTER ${String(levelIndex + 1).padStart(2, '0')} · BEGINNING`
+      : `CHAPTER ${String(levelIndex + 1).padStart(2, '0')} · COMPLETE`;
+    storyTitleEl.textContent = level.name || `Chapter ${levelIndex + 1}`;
     storyCopyEl.textContent = copy;
-    storyContinueButton.textContent = isIntro
+    storyContinueLabel.textContent = isIntro
       ? 'Begin chapter'
       : levelIndex < cfg.levels.length - 1
         ? 'Next chapter'
         : 'Finish adventure';
+    storyProgressEl.innerHTML = cfg.levels
+      .map(
+        (_, index) =>
+          `<span class="${index === levelIndex ? 'is-current' : index < levelIndex ? 'is-complete' : ''}"></span>`,
+      )
+      .join('');
     setStoryCharacter('.story-narrator', narrator);
     setStoryCharacter('.story-listener', hero);
     storyAction = { kind, levelIndex };
@@ -1068,8 +1111,26 @@ async function run(mode) {
 
   const completionOverlay = document.createElement('div');
   completionOverlay.className = 'completion-overlay is-hidden';
-  completionOverlay.innerHTML = '<div class="stage-card"><h2>Experience complete</h2></div>';
+  completionOverlay.innerHTML = `
+    <div class="stage-card completion-card" role="dialog" aria-modal="true" aria-label="Experience complete">
+      <span class="completion-star">✦</span>
+      <p class="stage-kicker">THE END · AND A KEEPSAKE</p>
+      <h2 class="stage-title"></h2>
+      <p class="stage-copy"></p>
+      <button class="story-continue completion-restart" type="button"><span>Play it again</span><b>↻</b></button>
+    </div>`;
   gameWorld.appendChild(completionOverlay);
+  completionOverlay.querySelector('.stage-title').textContent = cfg.recipient
+    ? `For ${cfg.recipient}, always.`
+    : `${hero?.name || 'You'} made it.`;
+  completionOverlay.querySelector('.stage-copy').textContent =
+    (typeof cfg.story?.ending === 'string' && cfg.story.ending.trim()) ||
+    'You reached the end of this little world. The memories are yours to keep.';
+  completionOverlay.querySelector('.completion-restart').addEventListener('click', () => {
+    completionOverlay.classList.add('is-hidden');
+    beginLevel(0);
+    showStoryScene('intro', 0);
+  });
 
   // This overlay is intentionally DOM-based so the restart control remains
   // large, readable, and easy to tap on the fixed 720x1280 game surface.
@@ -1387,7 +1448,7 @@ async function run(mode) {
     ctx.fillStyle = level.skyColor || '#87CEEB';
     ctx.fillRect(0, 0, viewportWidth(), viewportHeight());
 
-    const state = backgroundImageStates[level.id];
+    const state = loadImageAsset(level.id);
     const image = state && state.image;
     if (state && state.ready && image) {
       // Fill the entire responsive canvas and tile only horizontally for
@@ -1784,14 +1845,17 @@ async function run(mode) {
       if (!defeated) drawEnemyAttackEffect(enemy, sx, sy);
 
       if (!defeated && cfg.mechanics.healthBars) {
-        ctx.font = '800 22px ui-rounded, "Arial Rounded MT Bold", sans-serif';
+        ctx.font = '900 30px "Gamegift Arcade", ui-rounded, sans-serif';
+        ctx.letterSpacing = '.4px';
         ctx.textAlign = 'center';
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(10, 14, 24, .66)';
         ctx.fillStyle = '#fff';
-        ctx.fillText(
-          enemy.boss ? getLevelConfig().boss.name + ' · FINAL BOSS' : spec.name,
-          sx + enemy.w / 2,
-          sy - 23,
-        );
+        const enemyLabel = enemy.boss
+          ? getLevelConfig().boss.name + ' · FINAL BOSS'
+          : spec.name;
+        ctx.strokeText(enemyLabel, sx + enemy.w / 2, sy - 23);
+        ctx.fillText(enemyLabel, sx + enemy.w / 2, sy - 23);
         const barW = Math.max(48, enemy.w + 12);
         const barX = sx + enemy.w / 2 - barW / 2;
         const barY = sy - 14;
@@ -1866,21 +1930,26 @@ async function run(mode) {
   function drawCharacterName(name, x, y, accent = '#ffe6a3') {
     if (!name) return;
     ctx.save();
-    ctx.font = '900 40px ui-rounded, "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const width = Math.max(124, ctx.measureText(name).width + 42);
-    ctx.fillStyle = 'rgba(12,18,36,.9)';
+    ctx.shadowColor = 'rgba(8, 12, 22, .72)';
+    ctx.shadowBlur = 5;
+    ctx.font = '900 40px "Gamegift Arcade", ui-rounded, sans-serif';
+    ctx.letterSpacing = '.5px';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(10, 14, 24, .66)';
+    ctx.strokeText(name, x, y);
+    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = 3;
+    ctx.fillText(name, x, y);
+    ctx.shadowBlur = 0;
     ctx.strokeStyle = accent;
     ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.roundRect(x - width / 2, y - 27, width, 54, 24);
-    ctx.fill();
+    ctx.moveTo(x - 18, y + 27);
+    ctx.lineTo(x + 18, y + 27);
     ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = 'rgba(0,0,0,.8)';
-    ctx.shadowBlur = 3;
-    ctx.fillText(name, x, y + 2);
     ctx.restore();
   }
   function dropPowerup(kind, enemy) {
@@ -1977,7 +2046,7 @@ async function run(mode) {
       ctx.arc(0, 0, 49, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, item.time));
       ctx.stroke();
       ctx.shadowBlur = 0;
-      const customArt = powerupImageStates[getLevelConfig().id];
+      const customArt = loadImageAsset(`powerup-${getLevelConfig().id}`);
       if (customArt?.ready && customArt.image) {
         ctx.save();
         ctx.beginPath();
@@ -3135,6 +3204,7 @@ async function run(mode) {
     }
     if (event.data?.type === 'game-gift:keys' && Array.isArray(event.data.keys)) {
       const next = event.data.keys;
+      if (next.length) enableSound();
       if (next.includes('KeyJ') && !keys.KeyJ) pendingAttack = 'punch';
       if (next.includes('KeyK') && !keys.KeyK) pendingAttack = 'kick';
       for (const key of virtualKeys) if (!next.includes(key)) keys[key] = false;

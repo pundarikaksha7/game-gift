@@ -71,7 +71,6 @@ function ClassicGameCanvas({
       alive: true,
     }));
     const sound = new GameAudio(game.sounds);
-    if (playing) sound.start();
     const down = (e: KeyboardEvent) => {
       if (
         [
@@ -87,6 +86,7 @@ function ClassicGameCanvas({
         ].includes(e.code)
       ) {
         e.preventDefault();
+        sound.start();
         keys.add(e.code);
       }
     };
@@ -105,6 +105,7 @@ function ClassicGameCanvas({
     function tick(dt: number) {
       elapsed += dt;
       if (!playing || finished) return;
+      if (controls?.current.size) sound.start();
       hurt = Math.max(0, hurt - dt);
       attack = Math.max(0, attack - dt);
       player.vx =

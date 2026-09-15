@@ -100,16 +100,13 @@ export function createTemplate(): Game {
     },
     physics: { speed: 270, jump: 590, gravity: 1500, health: 5 },
     sounds: {
-      music:
-        '/assets/sounds/background/nickpanek-energetic-chiptune-video-game-music-platformer-8-bit-318348.mp3',
-      jump: '/assets/sounds/jump/bestuploadsever67aryan-jump-sound-531048.mp3',
-      hit: '/assets/sounds/attack/punch/universfield-punch-03-352040.mp3',
-      punch: '/assets/sounds/attack/punch/universfield-punch-03-352040.mp3',
-      kick: '/assets/sounds/attack/kick/khoamthanh-kick-bright-medium-504170.mp3',
-      heroAttack:
-        '/assets/sounds/hero/female/freesound_gamestudio-female-character-attack-vocal-6-408474.mp3',
-      villainAttack:
-        '/assets/sounds/villains/female/phatphrogstudio-rpg-female-attack-grunt-no-ai-481720.mp3',
+      music: '',
+      jump: '',
+      hit: '',
+      punch: '',
+      kick: '',
+      heroAttack: '',
+      villainAttack: '',
       win: '',
       volume: 0.45,
     },

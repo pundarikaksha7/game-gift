@@ -8,6 +8,32 @@ import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function SettingsEditor(props: EditorProps) {
   const { game, change } = props;
+  const playStyles = [
+    {
+      name: 'Relaxed',
+      note: 'Room to explore',
+      speed: 220,
+      jump: 650,
+      gravity: 1200,
+      health: 8,
+    },
+    {
+      name: 'Classic',
+      note: 'Balanced adventure',
+      speed: 270,
+      jump: 590,
+      gravity: 1500,
+      health: 5,
+    },
+    {
+      name: 'Fast',
+      note: 'Quick and daring',
+      speed: 380,
+      jump: 700,
+      gravity: 1800,
+      health: 3,
+    },
+  ];
   return (
     <>
       <div className="section-top">
@@ -43,24 +69,28 @@ export function SettingsEditor(props: EditorProps) {
       </div>
       <div className="form-card">
         <h3>How it feels to play</h3>
-        <div className="inline-actions">
-          {[
-            { name: 'Relaxed', speed: 220, jump: 650, gravity: 1200, health: 8 },
-            { name: 'Classic', speed: 270, jump: 590, gravity: 1500, health: 5 },
-            { name: 'Fast', speed: 380, jump: 700, gravity: 1800, health: 3 },
-          ].map(({ name, ...physics }) => (
-            <button
-              key={name}
-              className="secondary"
-              onClick={() =>
-                change((g) => {
-                  g.physics = { ...g.physics, ...physics };
-                })
-              }
-            >
-              {name}
-            </button>
-          ))}
+        <div className="play-style-grid" aria-label="Choose how the game feels">
+          {playStyles.map(({ name, note, ...physics }) => {
+            const selected = (Object.keys(physics) as (keyof typeof physics)[]).every(
+              (key) => game.physics[key] === physics[key],
+            );
+            return (
+              <button
+                key={name}
+                className={`play-style-card ${selected ? 'selected' : ''}`}
+                aria-pressed={selected}
+                onClick={() =>
+                  change((g) => {
+                    g.physics = { ...g.physics, ...physics };
+                  })
+                }
+              >
+                <span>{name}</span>
+                <small>{note}</small>
+                <i aria-hidden="true">{selected ? '✓' : '→'}</i>
+              </button>
+            );
+          })}
         </div>
         <Field label="Extra jumps in the air">
           <select

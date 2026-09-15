@@ -110,7 +110,7 @@ function App() {
             </div>
             <div className="photo-card">
               <img
-                src="/hero-memory-collage.png"
+                src="/hero-memory-collage.webp"
                 alt="A tactile collection of photographs and game keepsakes"
               />
             </div>

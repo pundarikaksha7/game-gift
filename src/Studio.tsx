@@ -364,20 +364,42 @@ export default function App() {
   const props = { game, change, notify, authed: !!user };
   if (publicId)
     return (
-      <div className="public-page">
-        <a className="brand" href="/">
-          <span className="brand-mark">✦</span>
-          gamegift
-        </a>
+      <div className="public-page game-page">
+        <header className="game-page-header">
+          <a className="brand" href="/" aria-label="Gamegift home">
+            <span className="brand-mark">✦</span>
+            gamegift
+          </a>
+          <span className="game-page-keepsake">A playable keepsake</span>
+        </header>
         {publicGame ? (
           <>
-            <h1>{publicGame.title}</h1>
-            <p>{publicGame.description}</p>
-            <PlayGame game={publicGame} />
-            <p className="muted">
-              A little world, made for {publicGame.recipient || 'you'} with <Heart size={12} />{' '}
-              Gamegift.
-            </p>
+            <section className="game-page-intro">
+              <div>
+                <span className="game-page-eyebrow">
+                  <i /> Made especially for {publicGame.recipient || 'you'}
+                </span>
+                <h1>{publicGame.title}</h1>
+              </div>
+              <p>{publicGame.description}</p>
+            </section>
+            <div className="game-page-frame">
+              <div className="game-page-frame-label">
+                <span>
+                  <i /> Ready to play
+                </span>
+                <span>{publicGame.levels.length} chapters · one little world</span>
+              </div>
+              <PlayGame game={publicGame} />
+            </div>
+            <footer className="game-page-footer">
+              <span>✦</span>
+              <p>
+                Made for {publicGame.recipient || 'you'}, with{' '}
+                <Heart size={13} fill="currentColor" />
+              </p>
+              <a href="/">Make a world for someone</a>
+            </footer>
           </>
         ) : (
           <p role="status">{publicError || 'Opening your adventure…'}</p>
@@ -1246,18 +1268,11 @@ export default function App() {
           </p>
           {!aiEnabled && (
             <div className="ai-notice">
-              AI isn’t connected yet. Your server administrator can enable it with an API key and
-              model. All manual editors are ready to use.
+              AI coming to Gamegift soon. In the meantime, you can still build your world and playtest it.
             </div>
           )}
-          <Field label="What are you imagining?">
-            <textarea
-              rows={4}
-              maxLength={2000}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Make the first chapter a dreamy sunset, give our hero a floaty jump, and write a surprising final chapter…"
-            />
+          <Field label="Describe a change you want to see in your world">
+            <span>Coming Soon!</span>
           </Field>
           <div className="prompt-chips">
             {[

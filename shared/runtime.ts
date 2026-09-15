@@ -57,6 +57,8 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
   });
   return {
     title: game.title,
+    description: game.description,
+    recipient: game.recipient,
     story: game.story,
     startLevel,
     camera: camera / WORLD_UNIT,
