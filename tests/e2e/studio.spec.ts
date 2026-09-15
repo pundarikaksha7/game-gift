@@ -44,8 +44,9 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   const visitor = await browser.newContext();
   const publicPage = await visitor.newPage();
   await publicPage.goto(`http://127.0.0.1:4173${publicUrl}`);
-  await publicPage.getByRole('button', { name: 'Let’s go' }).click();
-  await expect(publicPage.frameLocator('iframe').locator('canvas')).toBeVisible();
+  const publicGame = publicPage.frameLocator('iframe');
+  await expect(publicGame.locator('canvas')).toBeVisible();
+  await publicGame.getByRole('button', { name: 'Begin chapter' }).click();
   await publicPage.keyboard.press('ArrowRight');
   await page.getByRole('button', { name: 'Unpublish game' }).click();
   await publicPage.reload();
@@ -108,9 +109,9 @@ test('templates create independent projects and viewport updates keep runtime al
     .isDisabled()
     .then((v) => expect(v).toBe(true));
   await page.getByRole('button', { name: 'Playtest your game' }).click();
-  await page.getByRole('button', { name: 'Let’s go' }).click();
   const playable = page.locator('dialog').frameLocator('iframe');
   await expect(playable.locator('canvas')).toBeVisible();
+  await playable.getByRole('button', { name: 'Begin chapter' }).click();
   await expect(playable.locator('.hud-label')).toHaveText('Arcade challenge');
   await page.screenshot({ path: 'test-results/game-gift-playtest.png' });
   expect(errors).toEqual([]);
@@ -144,13 +145,15 @@ test('a creator-authored story can be completed using real game controls', async
   );
   await page.goto('/studio');
   await page.getByRole('button', { name: 'Playtest your game' }).click();
-  await page.getByRole('button', { name: 'Let’s go' }).click();
+  const playable = page.locator('dialog').frameLocator('iframe');
+  await playable.getByRole('button', { name: 'Begin chapter' }).click();
   const right = page.locator('dialog').getByRole('button', { name: 'ArrowRight', exact: true });
   await right.dispatchEvent('pointerdown', { pointerId: 1 });
-  await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible({
+  await expect(playable.getByRole('button', { name: 'Finish adventure' })).toBeVisible({
     timeout: 10000,
   });
   await right.dispatchEvent('pointerup', { pointerId: 1 });
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await expect(page.getByText(game.story.ending, { exact: true })).toBeVisible();
+  await expect(playable.locator('.story-scene-copy')).toContainText(game.story.ending);
+  await playable.getByRole('button', { name: 'Finish adventure' }).click();
+  await expect(playable.getByRole('heading', { name: 'Experience complete' })).toBeVisible();
 });
