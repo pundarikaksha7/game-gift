@@ -42,22 +42,6 @@ export async function accessToken() {
   if (error) throw error;
   return data.session?.access_token;
 }
-export async function authenticate(mode: 'login' | 'register', input: any) {
-  if (!supabase) throw new Error('Supabase Auth is not configured.');
-  const result =
-    mode === 'register'
-      ? await supabase.auth.signUp({
-          email: input.email,
-          password: input.password,
-          options: { data: { name: input.name }, emailRedirectTo: redirectTo() },
-        })
-      : await supabase.auth.signInWithPassword({ email: input.email, password: input.password });
-  if (result.error) throw result.error;
-  if (!result.data.session)
-    throw new Error('Check your email to verify your account, then sign in.');
-  return result.data;
-}
-
 export async function authenticateWithGoogle() {
   if (!supabase) throw new Error('Supabase Auth is not configured.');
   const { data, error } = await supabase.auth.signInWithOAuth({

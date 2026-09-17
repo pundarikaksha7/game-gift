@@ -1,9 +1,10 @@
 import type { DB } from './db';
 export const supabaseAuthEnabled = () => process.env.AUTH_PROVIDER === 'supabase';
-const denied = () =>
-  Object.assign(new Error('Sign in again with a verified email'), { status: 401 });
+const denied = () => Object.assign(new Error('Sign in again with Google'), { status: 401 });
 /** Auth service verifies signature, expiry and user existence; never decode and trust a JWT. */
 export async function supabaseIdentity(authorization: string | undefined) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY)
+    throw Object.assign(new Error('Google sign-in is not configured'), { status: 503 });
   if (!authorization?.startsWith('Bearer ')) throw denied();
   const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: authorization },
@@ -15,7 +16,14 @@ export async function supabaseIdentity(authorization: string | undefined) {
     throw denied();
   }
   const user = (await response.json()) as any;
-  if (!user.id || !user.email || !user.email_confirmed_at || user.is_anonymous) throw denied();
+  if (
+    !user.id ||
+    !user.email ||
+    !user.email_confirmed_at ||
+    user.is_anonymous ||
+    user.app_metadata?.provider !== 'google'
+  )
+    throw denied();
   return {
     id: String(user.id),
     email: String(user.email).toLowerCase(),

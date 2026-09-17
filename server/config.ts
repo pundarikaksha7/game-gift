@@ -9,8 +9,8 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
     if (url.protocol !== 'https:' || url.origin !== env.SUPABASE_URL)
       throw new Error('SUPABASE_URL must be an exact HTTPS origin');
   }
-  if (env.AUTH_PROVIDER && !['legacy', 'supabase'].includes(env.AUTH_PROVIDER))
-    throw new Error('Invalid AUTH_PROVIDER');
+  if (env.AUTH_PROVIDER && env.AUTH_PROVIDER !== 'supabase')
+    throw new Error('AUTH_PROVIDER must be supabase; Google is the only sign-in channel');
   if (
     env.AUTH_PROVIDER === 'supabase' &&
     (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !env.SUPABASE_SERVICE_ROLE_KEY)

@@ -27,59 +27,44 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     process.env.DATABASE_URL = url.toString();
   }
   const db = await openDatabase();
-  const server = createApp(db).listen(0, '127.0.0.1');
+  const identities = {
+    'Bearer alice-token': { id: 'alice', email: 'alice@example.com', name: 'Alice' },
+    'Bearer bob-token': { id: 'bob', email: 'bob@example.com', name: 'Bob' },
+  } as const;
+  for (const user of Object.values(identities))
+    await db.query(
+      "INSERT INTO users(id,email,password,name,auth_provider,auth_subject) VALUES ($1,$2,'!supabase',$3,'supabase',$1)",
+      [user.id, user.email, user.name],
+    );
+  const server = createApp(db, {
+    authenticate: async (authorization) => {
+      const user = identities[authorization as keyof typeof identities];
+      if (!user) throw Object.assign(new Error('Sign in again with Google'), { status: 401 });
+      return { ...user, authSubject: user.id };
+    },
+  }).listen(0, '127.0.0.1');
   await new Promise<void>((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as any).port}/api`;
-  async function request(route: string, method = 'GET', body?: any, cookie = '') {
+  async function request(route: string, method = 'GET', body?: any, token = '') {
     const r = await fetch(base + route, {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'X-game-gift-Request': 'test',
-        Cookie: cookie,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
     });
     return {
       status: r.status,
       data: await r.json(),
-      cookie: r.headers.get('set-cookie')?.split(';')[0] || '',
     };
   }
   try {
     assert.equal((await request('/projects')).status, 401);
-    process.env.REGISTRATION_CODE = 'a'.repeat(32);
-    const first = await request('/auth/register', 'POST', {
-      email: 'alice@example.com',
-      name: 'Alice',
-      password: 'a-long-password',
-    });
-    assert.equal(first.status, 200);
-    assert.ok(first.cookie.includes('session='));
-    const alice = first.cookie;
-    const second = await request('/auth/register', 'POST', {
-      email: 'bob@example.com',
-      password: 'a-long-password',
-    });
-    const bob = second.cookie;
-    assert.equal(
-      (
-        await request('/auth/login', 'POST', {
-          email: 'alice@example.com',
-          password: 'not-the-password',
-        })
-      ).status,
-      401,
-    );
-    assert.equal(
-      (
-        await request('/auth/login', 'POST', {
-          email: 'alice@example.com',
-          password: 'a-long-password',
-        })
-      ).status,
-      200,
-    );
+    const alice = 'alice-token';
+    const bob = 'bob-token';
+    assert.equal((await request('/auth/register', 'POST', {}, alice)).status, 404);
+    assert.equal((await request('/auth/login', 'POST', {}, alice)).status, 404);
     const game = createTemplate();
     const created = await request('/projects', 'POST', { game }, alice);
     assert.equal(created.status, 201, JSON.stringify(created.data));
@@ -111,9 +96,22 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     const published = await request(`/projects/${id}/publish`, 'POST', { revision: 3 }, alice);
     assert.equal(published.status, 200);
     const publishedId = published.data.publishedId;
+    assert.equal(published.data.url, `/play/alice/${publishedId}`);
+    assert.equal(
+      (await request(`/projects/${id}`, 'GET', undefined, alice)).data.publishedUrl,
+      published.data.url,
+    );
+    assert.equal((await request(`/projects/${id}/export`, 'GET', undefined, bob)).status, 404);
+    const exported = await fetch(`${base}/projects/${id}/export`, {
+      headers: { Authorization: `Bearer ${alice}` },
+    });
+    assert.equal(exported.status, 200);
+    assert.match(exported.headers.get('content-disposition') || '', /\.game-gift\.json/);
+    assert.equal((await exported.json()).title, 'Version two');
     game.title = 'Private draft';
     await request(`/projects/${id}`, 'PUT', { game, revision: 3 }, alice);
-    assert.equal((await request(`/play/${publishedId}`)).data.game.title, 'Version two');
+    assert.equal((await request(`/play/alice/${publishedId}`)).data.game.title, 'Version two');
+    assert.equal((await request(`/play/bob/${publishedId}`)).status, 404);
     const malformed = structuredClone(game);
     malformed.physics.speed = 99999;
     assert.equal(
@@ -134,7 +132,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     );
     const bad = await fetch(base + '/assets', {
       method: 'POST',
-      headers: { Cookie: alice, 'X-game-gift-Request': 'test' },
+      headers: { Authorization: `Bearer ${alice}` },
       body: form,
     });
     assert.equal(bad.status, 400);
@@ -155,7 +153,7 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     );
     const upload = await fetch(base + '/assets', {
       method: 'POST',
-      headers: { Cookie: alice, 'X-game-gift-Request': 'test' },
+      headers: { Authorization: `Bearer ${alice}` },
       body: png,
     });
     assert.equal(upload.status, 201);
@@ -166,7 +164,11 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     assert.equal((await request('/projects', 'POST', { game: wrongSlot }, alice)).status, 400);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 404);
     assert.equal(
-      (await fetch(base.replace('/api', '') + asset.url, { headers: { Cookie: alice } })).status,
+      (
+        await fetch(base.replace('/api', '') + asset.url, {
+          headers: { Authorization: `Bearer ${alice}` },
+        })
+      ).status,
       200,
     );
     const stolen = createTemplate();
@@ -177,29 +179,31 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     await request(`/projects/${id}/publish`, 'POST', { revision: 5 }, alice);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 200);
     await request(`/projects/${id}/publish`, 'DELETE', undefined, alice);
-    assert.equal((await request(`/play/${publishedId}`)).status, 404);
+    assert.equal((await request(`/play/alice/${publishedId}`)).status, 404);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 404);
     assert.equal(
       (await request('/ai/propose', 'POST', { game, prompt: 'make it easy' }, alice)).status,
       503,
     );
-    const csrf = await fetch(base + '/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: alice },
-      body: JSON.stringify({ game }),
-    });
-    assert.equal(csrf.status, 403);
     const origin = await fetch(base + '/projects', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Cookie: alice,
-        'X-game-gift-Request': 'test',
         Origin: 'https://evil.example',
       },
       body: JSON.stringify({ game }),
     });
     assert.equal(origin.status, 403);
+    const proxiedBearer = await fetch(base + '/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${bob}`,
+        Origin: 'https://frontend-proxy.example',
+      },
+      body: JSON.stringify({ game: createTemplate() }),
+    });
+    assert.equal(proxiedBearer.status, 201);
     for (let revision = 5; revision < 105; revision++) {
       assert.equal(
         (await request(`/projects/${id}`, 'PUT', { game, revision }, alice)).status,
@@ -227,51 +231,22 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
       404,
     );
     assert.equal((await request(`/projects/${id}`, 'DELETE', undefined, bob)).status, 404);
-    assert.equal(
-      (
-        await request(
-          '/auth/password',
-          'POST',
-          { currentPassword: 'wrong-password', password: 'new-long-password' },
-          alice,
-        )
-      ).status,
-      401,
-    );
-    const changed = await request(
-      '/auth/password',
-      'POST',
-      { currentPassword: 'a-long-password', password: 'new-long-password' },
-      alice,
-    );
-    assert.equal(changed.status, 200);
-    assert.equal((await request('/auth/me', 'GET', undefined, alice)).status, 401);
-    assert.equal(
-      (
-        await request('/auth/login', 'POST', {
-          email: 'alice@example.com',
-          password: 'a-long-password',
-        })
-      ).status,
-      401,
-    );
-    assert.equal(
-      (await request('/auth/account', 'DELETE', { password: 'wrong-password' }, changed.cookie))
-        .status,
-      401,
-    );
-    assert.equal(
-      (await request('/auth/account', 'DELETE', { password: 'new-long-password' }, changed.cookie))
-        .status,
-      200,
-    );
-    assert.equal((await request('/auth/me', 'GET', undefined, changed.cookie)).status, 401);
+    assert.equal((await request('/auth/password', 'POST', {}, alice)).status, 404);
+    assert.equal((await request('/auth/account', 'DELETE', {}, alice)).status, 400);
+    const deleted = await fetch(`${base}/auth/account`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${alice}`,
+        'X-Confirm-Account-Deletion': 'delete',
+      },
+    });
+    assert.equal(deleted.status, 200);
     assert.equal((await db.query('SELECT * FROM projects WHERE id=$1', [id])).length, 0);
+    // Remote Supabase deletion is covered separately; keep this test focused on local cleanup.
+    await db.query("UPDATE deleted_accounts SET processed_at='test'");
     await maintain(db);
     assert.deepEqual(await readdir(`${directory}/uploads`), []);
     assert.equal((await request('/auth/me', 'GET', undefined, bob)).status, 200);
-    await request('/auth/logout', 'POST', undefined, alice);
-    assert.equal((await request('/auth/me', 'GET', undefined, alice)).status, 401);
   } finally {
     await new Promise<void>((r) => server.close(() => r()));
     await db.close();

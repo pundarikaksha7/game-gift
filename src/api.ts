@@ -1,4 +1,4 @@
-import { accessToken, supabase, authenticate } from './auth';
+import { accessToken, supabase } from './auth';
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 export class ApiError extends Error {
   constructor(
@@ -20,26 +20,9 @@ export async function requestHeaders() {
   };
 }
 export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
-  if (supabase && ['/auth/login', '/auth/register'].includes(url)) {
-    await authenticate(
-      url.endsWith('register') ? 'register' : 'login',
-      JSON.parse(String(options.body)),
-    );
-    return api('/auth/me');
-  }
   if (supabase && url === '/auth/logout') {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    return { ok: true } as T;
-  }
-  if (supabase && url === '/auth/password') {
-    const input = JSON.parse(String(options.body));
-    const { error } = await supabase.auth.updateUser({
-      password: input.password,
-      current_password: input.currentPassword,
-    });
-    if (error) throw error;
-    await supabase.auth.signOut({ scope: 'others' });
     return { ok: true } as T;
   }
   const res = await fetch(`${API_BASE_URL}/api${url}`, {
@@ -62,6 +45,20 @@ export async function api<T = any>(url: string, options: RequestInit = {}): Prom
   if (supabase && url === '/auth/account' && options.method === 'DELETE')
     await supabase.auth.signOut({ scope: 'local' });
   return data;
+}
+export async function downloadProject(id: string) {
+  const res = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/export`, {
+    signal: AbortSignal.timeout(30000),
+    credentials: 'omit',
+    headers: await requestHeaders(),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(data.error || 'Export failed', res.status);
+  }
+  const disposition = res.headers.get('content-disposition') || '';
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'experience.game-gift.json';
+  return { blob: await res.blob(), filename };
 }
 export async function uploadAsset(file: File, kind: 'image' | 'audio') {
   if (file.size > 10 * 1024 * 1024) throw new Error('Choose a file smaller than 10 MB');

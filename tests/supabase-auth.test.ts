@@ -21,6 +21,7 @@ test('Supabase identity is remotely verified and requires a confirmed, non-anony
         email: 'Creator@Example.com',
         email_confirmed_at: '2026-09-14T00:00:00Z',
         is_anonymous: false,
+        app_metadata: { provider: 'google' },
         user_metadata: { name: 'Creator' },
       });
     }) as typeof fetch;
@@ -36,7 +37,16 @@ test('Supabase identity is remotely verified and requires a confirmed, non-anony
         email: 'guest@example.com',
         is_anonymous: true,
       })) as typeof fetch;
-    await assert.rejects(() => supabaseIdentity('Bearer guest-token'), /verified email/);
+    await assert.rejects(() => supabaseIdentity('Bearer guest-token'), /Google/);
+
+    globalThis.fetch = (async () =>
+      Response.json({
+        id: 'password-user',
+        email: 'password@example.com',
+        email_confirmed_at: '2026-09-14T00:00:00Z',
+        app_metadata: { provider: 'email' },
+      })) as typeof fetch;
+    await assert.rejects(() => supabaseIdentity('Bearer password-token'), /Google/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -60,6 +70,7 @@ test('a verified Supabase identity adopts its legacy profile without losing its 
         email: 'Creator@Example.com',
         email_confirmed_at: '2026-09-14T00:00:00Z',
         is_anonymous: false,
+        app_metadata: { provider: 'google' },
         user_metadata: { name: 'Google Creator' },
       })) as typeof fetch;
 
@@ -88,8 +99,9 @@ test('a verified Supabase identity adopts its legacy profile without losing its 
         email: 'creator@example.com',
         email_confirmed_at: '2026-09-14T00:00:00Z',
         is_anonymous: false,
+        app_metadata: { provider: 'google' },
       })) as typeof fetch;
-    await assert.rejects(() => authenticateSupabase(db, 'Bearer another-token'), /verified email/);
+    await assert.rejects(() => authenticateSupabase(db, 'Bearer another-token'), /Google/);
   } finally {
     globalThis.fetch = originalFetch;
     await db.close();

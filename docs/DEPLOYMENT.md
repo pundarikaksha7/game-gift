@@ -30,14 +30,14 @@ Without Supabase storage, use a paid Render service with a persistent disk mount
 
 ## Supabase Auth
 
-1. In **Authentication > Providers > Email**, disable new email/password signups. Disable anonymous sign-ins as well; the creator UI intentionally offers Google only.
-2. In **Authentication > URL Configuration**, set Site URL to `https://game-gift.shop`. Add exact redirect URLs `https://game-gift.shop/auth/callback` and `http://localhost:5173/auth/callback` (development only). In the confirmation email template, use `{{ .RedirectTo }}` rather than `{{ .SiteURL }}` so the email honors the callback selected by the app.
+1. In **Authentication > Providers > Email**, disable email/password signups and sign-ins. Disable anonymous sign-ins as well. The API also rejects valid Supabase users whose primary provider is not Google.
+2. In **Authentication > URL Configuration**, set Site URL to `https://game-gift.shop`. Add exact redirect URLs `https://game-gift.shop/auth/callback` and `http://localhost:5173/auth/callback` (development only).
 3. In **Authentication > Providers > Google**, enable Google and add the client ID and secret from Google Cloud. In Google Cloud, use the Supabase callback shown on that provider page (normally `https://<project-ref>.supabase.co/auth/v1/callback`) as the authorized redirect URI; do not use the Gamegift callback there.
-4. Configure custom SMTP before launch and enable CAPTCHA/bot protection for public signup.
+4. Enable CAPTCHA/bot protection for public sign-in.
 5. Put `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` on Render. Never put the service-role key on Vercel or in a `VITE_` variable.
-6. Keep `AUTH_PROVIDER=supabase`. Production validation rejects legacy auth, and legacy login/registration endpoints return 404 in this mode.
+6. Keep `AUTH_PROVIDER=supabase`. Any other configured provider mode is rejected, and email/password endpoints do not exist.
 
-The studio obtains public Supabase configuration from `/api/config`, so Vercel needs no duplicate Supabase variables. Confirmation and Google OAuth links return to `/auth/callback`; the SPA consumes the Supabase response, moves the signed-in user to `/my-games`, and sends the access token with API requests.
+The studio obtains public Supabase configuration from `/api/config`, so Vercel needs no duplicate Supabase variables. Google OAuth returns to `/auth/callback`; the SPA consumes the Supabase response, moves the signed-in user to `/my-games`, and sends the access token with API requests.
 
 ## Custom domain: game-gift.shop
 
@@ -47,7 +47,7 @@ The canonical domain belongs to the Vercel frontend; keep the Render `onrender.c
 2. Run `vercel domains inspect game-gift.shop` and create the exact DNS records it reports at your DNS provider. The general defaults are apex `A @ 76.76.21.21` and `CNAME www cname.vercel-dns-0.com`, but project-specific values win.
 3. Wait for Vercel to verify DNS and issue TLS, then assign `game-gift.shop` to the production deployment.
 4. On Render set `APP_ORIGIN=https://game-gift.shop` and, if used, `CORS_ORIGINS=https://game-gift.shop`—without trailing slashes.
-5. Redeploy Render and Vercel. Through the custom domain, verify `/api/health`, signup confirmation, sign-in, media upload, and a published `/play/...` link.
+5. Redeploy Render and Vercel. Through the custom domain, verify `/api/health`, Google sign-in, media upload, authenticated export, and a published `/play/{user-id}/{public-project-uuid}` link.
 
 ## Vercel routing
 
@@ -57,10 +57,10 @@ Vercel external rewrites keep API calls on the browser's origin: [official routi
 
 ## Optional integrations
 
-Set `OPENAI_API_KEY` and `OPENAI_MODEL` on Render to enable reviewed AI changes. Google/legacy authentication is intentionally disabled in production; Supabase Auth is the only sign-in path.
+Set `OPENAI_API_KEY` and `OPENAI_MODEL` on Render to enable reviewed AI changes. Google through Supabase Auth is the only sign-in path.
 
 ## Release checklist
 
-Run unit/API tests, the production build, formatting checks, and desktop/mobile browser tests before deploying. Verify the live health endpoint, signup, save/reopen, media upload, publish/play/unpublish, and logs. Check that private media returns 404 to a different account. Confirm media survives a backend restart. Back up PostgreSQL and the storage bucket independently and test restoration.
+Run unit/API tests, the production build, formatting checks, and desktop/mobile browser tests before deploying. Verify the live health endpoint, Google sign-in, save/reopen, authenticated export, media upload, publish/play/unpublish, and logs. Check that private projects and media return 404 to a different account. Confirm media survives a backend restart. Back up PostgreSQL and the storage bucket independently and test restoration.
 
-Anyone can create a creator account. Public self-service billing, automated password recovery, abuse reporting, distributed rate limits, and multiple API replicas require additional implementation.
+Anyone with a supported Google account can create a creator profile. Public self-service billing, abuse reporting, distributed rate limits, and multiple API replicas require additional implementation.

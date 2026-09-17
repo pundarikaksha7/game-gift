@@ -8,7 +8,7 @@ export async function deliverEmails(db: DB) {
   for (const message of messages) {
     await db.query('UPDATE email_outbox SET attempts=attempts+1 WHERE id=$1', [message.id]);
     const payload = JSON.parse(message.payload);
-    const origin = process.env.APP_URL || process.env.APP_ORIGIN;
+    const origin = process.env.APP_ORIGIN;
     const content =
       message.kind === 'welcome'
         ? [
@@ -23,7 +23,7 @@ export async function deliverEmails(db: DB) {
           : message.kind === 'published'
             ? [
                 'Your Gamegift is ready to share',
-                `Your game is published: ${origin}/g/${payload.slug}`,
+                `Your game is published: ${origin}/play/${encodeURIComponent(payload.ownerId)}/${encodeURIComponent(payload.publishedId)}`,
               ]
             : ['Gamegift account notification', 'Your account settings have changed.'];
     const response = await fetch('https://api.resend.com/emails', {

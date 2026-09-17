@@ -2,14 +2,11 @@ import { authenticateSupabase, supabaseAuthEnabled } from './supabase-auth';
 import { mountPayments, paymentWebhook, paymentsRequired, entitled } from './payments';
 import { mountPublic } from './public';
 import sharp from 'sharp';
-import { googleEnabled, googleFlow } from './google';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import cookieParser from 'cookie-parser';
 import multer from 'multer';
-import { randomUUID, randomBytes, scrypt, timingSafeEqual, createHash } from 'node:crypto';
-import { promisify } from 'node:util';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { putAsset, readAsset, deleteAsset } from './storage';
 import path from 'node:path';
 import { z, ZodError } from 'zod';
@@ -18,11 +15,6 @@ import { gameSchema, assetReferences, type Game } from '../shared/schema';
 import { createTemplate } from '../shared/template';
 import { propose } from './ai';
 import { validateEnvironment, trustedOrigin } from './config';
-const hashToken = (s: string) => createHash('sha256').update(s).digest('hex');
-const scryptAsync = promisify(scrypt);
-async function passwordHash(password: string, salt = randomBytes(16).toString('hex')) {
-  return `${salt}:${((await scryptAsync(password, salt, 64)) as Buffer).toString('hex')}`;
-}
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 const present = (p: any) => ({
   id: p.id,
@@ -31,8 +23,21 @@ const present = (p: any) => ({
   updatedAt: p.updated_at,
   publishedId: p.published_id,
   slug: p.slug,
+  publishedUrl:
+    p.published_id && p.owner_id
+      ? `/play/${encodeURIComponent(p.owner_id)}/${encodeURIComponent(p.published_id)}`
+      : null,
 });
-export function createApp(db: DB) {
+type AppOptions = {
+  /** Tests can exercise authorization without shipping a test-only HTTP auth endpoint. */
+  authenticate?: (authorization: string | undefined) => Promise<{
+    id: string;
+    email: string;
+    name: string;
+    authSubject?: string;
+  }>;
+};
+export function createApp(db: DB, options: AppOptions = {}) {
   validateEnvironment();
   const app = express(),
     production = process.env.NODE_ENV === 'production';
@@ -48,7 +53,10 @@ export function createApp(db: DB) {
               styleSrc: ["'self'", "'unsafe-inline'"],
               imgSrc: ["'self'", 'blob:', 'data:'],
               mediaSrc: ["'self'", 'blob:'],
-              connectSrc: ["'self'"],
+              connectSrc: [
+                "'self'",
+                ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : []),
+              ],
               upgradeInsecureRequests: [],
             },
           }
@@ -64,7 +72,7 @@ export function createApp(db: DB) {
         .vary('Origin');
       res.set(
         'Access-Control-Allow-Headers',
-        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id',
+        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id, X-Confirm-Account-Deletion',
       );
       res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     }
@@ -80,7 +88,7 @@ export function createApp(db: DB) {
     express.raw({ type: 'application/json', limit: '256kb' }),
     paymentWebhook(db),
   );
-  app.use(express.json({ limit: '1mb' }), cookieParser());
+  app.use(express.json({ limit: '1mb' }));
   app.use(
     '/api',
     rateLimit({ windowMs: 60000, limit: 180, standardHeaders: 'draft-7', legacyHeaders: false }),
@@ -89,9 +97,12 @@ export function createApp(db: DB) {
     res.set('Cache-Control', 'no-store');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin;
-      if (origin && !trustedOrigin(origin)) return next(fail(403, 'Untrusted request origin'));
-      if (!supabaseAuthEnabled() && !req.headers['x-game-gift-request'])
-        return next(fail(403, 'Missing request header'));
+      // Bearer tokens are explicitly attached by the client rather than ambient browser
+      // credentials. Cross-origin browsers must still pass the OPTIONS gate above before they
+      // can send Authorization, while same-origin frontend proxies may preserve a public Origin
+      // that differs from the API's APP_ORIGIN configuration.
+      if (origin && !trustedOrigin(origin) && !req.get('authorization'))
+        return next(fail(403, 'Untrusted request origin'));
     }
     next();
   });
@@ -101,8 +112,8 @@ export function createApp(db: DB) {
   });
   app.get('/api/config', (req, res) =>
     res.json({
-      googleEnabled: supabaseAuthEnabled() || googleEnabled(),
-      authProvider: supabaseAuthEnabled() ? 'supabase' : 'legacy',
+      googleEnabled: supabaseAuthEnabled(),
+      authProvider: 'supabase',
       supabaseUrl: supabaseAuthEnabled() ? process.env.SUPABASE_URL : undefined,
       // Supabase publishable/anon keys are designed for public clients; service-role stays server-only.
       supabaseAnonKey: supabaseAuthEnabled() ? process.env.SUPABASE_ANON_KEY : undefined,
@@ -118,131 +129,14 @@ export function createApp(db: DB) {
     standardHeaders: 'draft-7',
     legacyHeaders: false,
   });
-  const credentials = z.object({
-    email: z
-      .string()
-      .email()
-      .max(254)
-      .transform((s) => s.toLowerCase()),
-    password: z.string().min(10).max(128),
-    name: z.string().trim().min(1).max(60).optional(),
-  });
-  async function session(user: any, res: express.Response, redirect = false) {
-    await db.query('DELETE FROM sessions WHERE expires<$1', [Date.now()]);
-    const token = randomBytes(32).toString('hex');
-    await db.query('INSERT INTO sessions(token,user_id,expires) VALUES ($1,$2,$3)', [
-      hashToken(token),
-      user.id,
-      Date.now() + 7 * 86400000,
-    ]);
-    res.cookie('session', token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: production,
-      maxAge: 7 * 86400000,
-      path: '/',
-    });
-    if (redirect) res.redirect(303, '/');
-    else res.json({ user: { id: user.id, name: user.name, email: user.email } });
-  }
   app.use('/api/auth', (req, _res, next) => {
-    if (supabaseAuthEnabled() && !['/me', '/account'].includes(req.path))
-      return next(fail(404, 'Use Supabase Auth'));
+    if (!['/me', '/account'].includes(req.path)) return next(fail(404, 'Use Google sign-in'));
     next();
   });
-  const google = googleFlow();
-  app.post('/api/auth/google/start', authLimit, async (req, res) => {
-    if (!googleEnabled()) throw fail(503, 'Google sign-in is not configured');
-    const input = z
-      .object({
-        password: z.string().min(10).max(128).optional(),
-      })
-      .parse(req.body);
-    res.json({
-      url: google.start(res, input.password ? await passwordHash(input.password) : ''),
-    });
-  });
-  app.get('/api/auth/google/callback', authLimit, async (req, res) => {
-    if (!googleEnabled()) throw fail(503, 'Google sign-in is not configured');
-    try {
-      const profile = await google.finish(req, res);
-      let [user] = await db.query('SELECT * FROM users WHERE google_sub=$1', [profile.sub]);
-      if (!user) {
-        if (!profile.password)
-          throw new Error(
-            'Choose Create account and set a recovery password before your first Google sign-in.',
-          );
-        const [existing] = await db.query('SELECT id FROM users WHERE email=$1', [profile.email]);
-        if (existing)
-          throw new Error('This email already has a password account. Sign in with your password.');
-        user = { id: randomUUID(), email: profile.email, name: profile.name };
-        await db.query(
-          'INSERT INTO users(id,email,password,name,google_sub) VALUES ($1,$2,$3,$4,$5)',
-          [user.id, user.email, profile.password, user.name, profile.sub],
-        );
-      }
-      await session(user, res, true);
-    } catch (e) {
-      const message = (e as Error).message;
-      res.redirect(
-        303,
-        '/?authError=' +
-          encodeURIComponent(
-            message.startsWith('Google') ||
-              message.startsWith('Choose Create') ||
-              message.startsWith('This email')
-              ? message
-              : 'Google sign-in failed. Please try again.',
-          ),
-      );
-    }
-  });
-  app.post('/api/auth/register', authLimit, async (req, res) => {
-    const input = credentials.parse(req.body);
-    const user = {
-      id: randomUUID(),
-      email: input.email,
-      name: input.name || input.email.split('@')[0],
-    };
-    try {
-      await db.query('INSERT INTO users(id,email,password,name) VALUES ($1,$2,$3,$4)', [
-        user.id,
-        user.email,
-        await passwordHash(input.password),
-        user.name,
-      ]);
-    } catch (e: any) {
-      if (e.code === '23505' || e.code?.startsWith('ERR_SQLITE'))
-        throw fail(409, 'Unable to create account with this email');
-      throw e;
-    }
-    await session(user, res);
-  });
-  app.post('/api/auth/login', authLimit, async (req, res) => {
-    const input = credentials.parse(req.body);
-    const [user] = await db.query('SELECT * FROM users WHERE email=$1', [input.email]);
-    const stored = user?.password || `${'0'.repeat(32)}:${'0'.repeat(128)}`;
-    const actual = await passwordHash(input.password, stored.split(':')[0]);
-    if (!timingSafeEqual(Buffer.from(actual), Buffer.from(stored)) || !user)
-      throw fail(401, 'Email or password is incorrect');
-    await session(user, res);
-  });
-  app.post('/api/auth/logout', async (req, res) => {
-    await db.query('DELETE FROM sessions WHERE token=$1', [hashToken(req.cookies.session || '')]);
-    res.clearCookie('session', { path: '/' }).json({ ok: true });
-  });
   const auth: express.RequestHandler = async (req, res, next) => {
-    if (supabaseAuthEnabled()) {
-      res.locals.user = await authenticateSupabase(db, req.get('authorization'));
-      next();
-      return;
-    }
-    const [user] = await db.query(
-      'SELECT users.id, users.name, users.email FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.token=$1 AND sessions.expires>$2',
-      [hashToken(req.cookies.session || ''), Date.now()],
-    );
-    if (!user) return next(fail(401, 'Sign in to save your games'));
-    res.locals.user = user;
+    res.locals.user = options.authenticate
+      ? await options.authenticate(req.get('authorization'))
+      : await authenticateSupabase(db, req.get('authorization'));
     next();
   };
   mountPayments(app, db, auth);
@@ -251,40 +145,16 @@ export function createApp(db: DB) {
     const { id, name, email } = res.locals.user;
     res.json({ user: { id, name, email } });
   });
-  async function verifyPassword(userId: string, password: string, q = db.query) {
-    const [user] = await q('SELECT password FROM users WHERE id=$1', [userId]);
-    if (!user) throw fail(401, 'Sign in again');
-    const actual = await passwordHash(password, user.password.split(':')[0]);
-    if (!timingSafeEqual(Buffer.from(actual), Buffer.from(user.password)))
-      throw fail(401, 'Current password is incorrect');
-  }
-  const passwordInput = z.string().min(10).max(128);
-  app.post('/api/auth/password', authLimit, auth, async (req, res) => {
-    const input = z
-      .object({ currentPassword: passwordInput, password: passwordInput })
-      .parse(req.body);
-    const hashed = await passwordHash(input.password);
-    await db.transaction(async (q) => {
-      await q('UPDATE users SET name=name WHERE id=$1', [res.locals.user.id]);
-      await verifyPassword(res.locals.user.id, input.currentPassword, q);
-      await q('UPDATE users SET password=$1 WHERE id=$2', [hashed, res.locals.user.id]);
-      await q('DELETE FROM sessions WHERE user_id=$1', [res.locals.user.id]);
-    });
-    await session(res.locals.user, res);
-  });
   app.delete('/api/auth/account', authLimit, auth, async (req, res) => {
-    const password = supabaseAuthEnabled()
-      ? ''
-      : z.object({ password: passwordInput }).parse(req.body).password;
+    if (req.get('x-confirm-account-deletion') !== 'delete')
+      throw fail(400, 'Confirm account deletion');
     await db.transaction(async (q) => {
       const id = res.locals.user.id;
       await q('UPDATE users SET name=name WHERE id=$1', [id]);
-      if (supabaseAuthEnabled())
-        await q(
-          'INSERT INTO deleted_accounts(id,auth_subject,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
-          [id, res.locals.user.authSubject, new Date().toISOString()],
-        );
-      else await verifyPassword(id, password, q);
+      await q(
+        'INSERT INTO deleted_accounts(id,auth_subject,created_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
+        [id, res.locals.user.authSubject || id, new Date().toISOString()],
+      );
       await q('INSERT INTO deleted_files(filename) SELECT filename FROM assets WHERE owner_id=$1', [
         id,
       ]);
@@ -292,9 +162,18 @@ export function createApp(db: DB) {
       await q('DELETE FROM assets WHERE owner_id=$1', [id]);
       await q('DELETE FROM users WHERE id=$1', [id]);
     });
-    res.clearCookie('session', { path: '/' }).json({ ok: true });
+    res.json({ ok: true });
   });
 
+  app.get('/api/play/:ownerId/:publishedId', async (req, res) => {
+    const [p] = await db.query(
+      "SELECT published_game FROM projects WHERE owner_id=$1 AND published_id=$2 AND publication_status='active'",
+      [req.params.ownerId, req.params.publishedId],
+    );
+    if (!p?.published_game) throw fail(404, 'This game is not published');
+    res.json({ game: JSON.parse(p.published_game) });
+  });
+  // Keep already-shared links working; all new links use the owner/public-ID namespace above.
   app.get('/api/play/:id', async (req, res) => {
     const [p] = await db.query(
       "SELECT published_game FROM projects WHERE (published_id=$1 OR slug=$2) AND publication_status='active'",
@@ -311,15 +190,13 @@ export function createApp(db: DB) {
       "SELECT projects.id FROM published_assets JOIN projects ON projects.id=published_assets.project_id WHERE published_assets.asset_id=$1 AND projects.published_id IS NOT NULL AND projects.publication_status='active'",
       [asset.id],
     );
-    const [legacyOwner] = await db.query(
-      'SELECT user_id FROM sessions WHERE token=$1 AND expires>$2',
-      [hashToken(req.cookies.session || ''), Date.now()],
-    );
-    const owner = supabaseAuthEnabled()
-      ? req.get('authorization')
-        ? { user_id: (await authenticateSupabase(db, req.get('authorization'))).id }
-        : null
-      : legacyOwner;
+    const owner = req.get('authorization')
+      ? {
+          user_id: options.authenticate
+            ? (await options.authenticate(req.get('authorization'))).id
+            : (await authenticateSupabase(db, req.get('authorization'))).id,
+        }
+      : null;
     if (!publicUse && owner?.user_id !== asset.owner_id) throw fail(404, 'Asset not found');
     res
       .type(asset.mime)
@@ -394,6 +271,15 @@ export function createApp(db: DB) {
   app.get('/api/projects/:id', async (req, res) =>
     res.json(present(await owned(req.params.id, res.locals.user.id))),
   );
+  app.get('/api/projects/:id/export', async (req, res) => {
+    const p = await owned(req.params.id, res.locals.user.id);
+    const game = gameSchema.parse(JSON.parse(p.game));
+    const filename = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.game-gift.json`;
+    res
+      .set('Content-Disposition', `attachment; filename="${filename}"`)
+      .type('application/json')
+      .send(`${JSON.stringify(game, null, 2)}\n`);
+  });
   app.put('/api/projects/:id', async (req, res) => {
     const input = z
       .object({ game: gameSchema, revision: z.number().int().positive() })
@@ -489,13 +375,17 @@ export function createApp(db: DB) {
         [
           `published-${p.id}-${revision}`,
           res.locals.user.id,
-          JSON.stringify({ slug }),
+          JSON.stringify({ ownerId: p.owner_id, publishedId }),
           new Date().toISOString(),
         ],
       );
-      return { publishedId, slug };
+      return {
+        publishedId,
+        slug,
+        url: `/play/${encodeURIComponent(p.owner_id)}/${encodeURIComponent(publishedId)}`,
+      };
     });
-    res.json({ ...publishedId, url: `/g/${publishedId.slug}` });
+    res.json(publishedId);
   });
   app.delete('/api/projects/:id/publish', async (req, res) => {
     await db.transaction(async (q) => {

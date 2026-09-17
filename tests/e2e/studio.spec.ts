@@ -11,24 +11,19 @@ test('landing page enters the live studio', async ({ page }) => {
 test('create, edit, save, reopen, publish, play, unpublish and delete account', async ({
   page,
   browser,
-}) => {
+}, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  const token = `browser-${testInfo.project.name}-token`;
+  await page.route('**/api/**', (route) =>
+    route.continue({
+      headers: { ...route.request().headers(), authorization: `Bearer ${token}` },
+    }),
+  );
+  const sessionReady = page.waitForResponse((response) => response.url().endsWith('/api/auth/me'));
   await page.goto('/studio');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
-  await expect(page.locator('.google-icon')).toBeVisible();
-  await page.getByRole('button', { name: 'Close dialog' }).click();
-  const registration = await page.request.post('/api/auth/register', {
-    headers: { 'X-Game-Gift-Request': 'studio' },
-    data: {
-      name: 'Browser Creator',
-      email: `browser-${Date.now()}@example.com`,
-      password: 'browser-long-password',
-    },
-  });
-  expect(registration.ok()).toBe(true);
-  await page.reload();
+  expect((await sessionReady).ok()).toBe(true);
+  await expect(page.locator('.save-status')).toContainText('Not saved yet');
   await expect(page.locator('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Game settings', exact: true }).click();
   await page.getByLabel('Game title').fill('A browser-tested adventure');
@@ -55,11 +50,9 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await page.getByRole('button', { name: 'My games', exact: true }).click();
   await page.getByRole('button', { name: 'Account settings' }).click();
-  await page.getByLabel('Current password', { exact: true }).fill('browser-long-password');
-  await page.getByLabel('New password', { exact: true }).fill('changed-browser-password');
-  await page.getByRole('button', { name: 'Change password', exact: true }).click();
-  await expect(page.getByLabel('New password', { exact: true })).toHaveValue('');
-  await page.getByLabel('Confirm password to delete account').fill('changed-browser-password');
+  await expect(
+    page.getByText('Authentication is managed securely by your Google account.'),
+  ).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete account permanently' }).click();
   await expect(page.locator('dialog')).toHaveCount(0);
@@ -70,7 +63,7 @@ test('guided builder preserves movement settings and walks through each step', a
   await page.goto('/studio');
   await expect(page.getByText('STEP 1 OF 7')).toBeVisible();
   await page.getByLabel('Game title').fill('My new world');
-  await page.getByRole('button', { name: 'Fast', exact: true }).click();
+  await page.getByRole('button', { name: /^Fast/ }).click();
   await page.getByLabel('Extra jumps in the air').selectOption('1');
   for (let step = 2; step <= 7; step++) {
     await page.getByRole('button', { name: 'Next step', exact: false }).click();
@@ -155,5 +148,5 @@ test('a creator-authored story can be completed using real game controls', async
   await right.dispatchEvent('pointerup', { pointerId: 1 });
   await expect(playable.locator('.story-scene-copy')).toContainText(game.story.ending);
   await playable.getByRole('button', { name: 'Finish adventure' }).click();
-  await expect(playable.getByRole('heading', { name: 'Experience complete' })).toBeVisible();
+  await expect(playable.getByRole('dialog', { name: 'Experience complete' })).toBeVisible();
 });

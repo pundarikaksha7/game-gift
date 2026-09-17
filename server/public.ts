@@ -10,14 +10,25 @@ const escape = (s: string) =>
   );
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 export function mountPublic(app: express.Express, db: DB, auth: express.RequestHandler) {
-  const published = async (slug: string) => {
+  const published = async (reference: string, publishedId?: string) => {
     const [p] = await db.query(
-      "SELECT * FROM projects WHERE slug=$1 AND published_game IS NOT NULL AND published_id IS NOT NULL AND publication_status='active'",
-      [slug],
+      publishedId
+        ? "SELECT * FROM projects WHERE owner_id=$1 AND published_id=$2 AND published_game IS NOT NULL AND publication_status='active'"
+        : "SELECT * FROM projects WHERE slug=$1 AND published_game IS NOT NULL AND published_id IS NOT NULL AND publication_status='active'",
+      publishedId ? [reference, publishedId] : [reference],
     );
     if (!p) throw fail(404, 'This game is not published');
     return p;
   };
+  app.get('/api/public-games/:ownerId/:publishedId', async (req, res) => {
+    const p = await published(String(req.params.ownerId), String(req.params.publishedId));
+    res.json({
+      game: JSON.parse(p.published_game),
+      ownerId: p.owner_id,
+      publishedId: p.published_id,
+      publishedAt: p.published_at,
+    });
+  });
   app.get('/api/public-games/:slug', async (req, res) => {
     const p = await published(String(req.params.slug));
     res.json({ game: JSON.parse(p.published_game), slug: p.slug, publishedAt: p.published_at });
@@ -26,13 +37,27 @@ export function mountPublic(app: express.Express, db: DB, auth: express.RequestH
   app.get('/g/:slug', async (req, res) => {
     const p = await published(String(req.params.slug));
     const game = JSON.parse(p.published_game);
-    const origin = process.env.APP_URL || process.env.APP_ORIGIN || 'http://localhost:5173';
+    const origin = process.env.APP_ORIGIN || 'http://localhost:5173';
     const url = `${origin}/g/${encodeURIComponent(p.slug)}`;
     const metadata = `<title>${escape(game.title)} · Gamegift</title><meta property="og:title" content="${escape(game.title)}"><meta property="og:description" content="${escape(game.description || 'A personalized playable gift, made just for you.')}"><meta property="og:url" content="${escape(url)}"><meta property="og:type" content="website"><meta property="og:image" content="${escape(origin)}/social-card.png"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${escape(url)}">`;
     const html = (await readFile('dist/index.html', 'utf8'))
       .replace(/<title>.*?<\/title>/s, '')
       .replace('</head>', `${metadata}</head>`);
     res.type('html').set('Cache-Control', 'no-store').send(html);
+  });
+  app.post('/api/public-games/:ownerId/:publishedId/report', async (req, res) => {
+    const input = z
+      .object({
+        reason: z.enum(['inappropriate_content', 'harassment', 'copyright', 'privacy', 'other']),
+        details: z.string().max(2000).default(''),
+      })
+      .parse(req.body);
+    const p = await published(String(req.params.ownerId), String(req.params.publishedId));
+    await db.query(
+      'INSERT INTO reports(id,project_id,reason,details,created_at) VALUES ($1,$2,$3,$4,$5)',
+      [randomUUID(), p.id, input.reason, input.details, new Date().toISOString()],
+    );
+    res.status(201).json({ ok: true });
   });
   app.post('/api/public-games/:slug/report', async (req, res) => {
     const input = z

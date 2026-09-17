@@ -38,7 +38,7 @@ import {
   type Proposal,
 } from '../shared/schema';
 import { createTemplate, createStarter, starters, type StarterId } from '../shared/template';
-import { api, setUploadProject } from './api';
+import { api, downloadProject, setUploadProject } from './api';
 import { authenticateWithGoogle, completeAuthRedirect, supabase } from './auth';
 import { hasLocalAssets, persistLocalAssets, stripLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
@@ -126,7 +126,9 @@ export default function App() {
   }
   const [publicGame, setPublicGame] = useState<Game | null>(null),
     [publicError, setPublicError] = useState('');
-  const publicId = location.pathname.startsWith('/play/') ? location.pathname.split('/')[2] : null;
+  const publicPath = location.pathname.startsWith('/play/')
+    ? location.pathname.split('/').slice(2).filter(Boolean).map(encodeURIComponent).join('/')
+    : null;
   const draftEpoch = useRef(0);
   const hydratedUser = useRef<string | null>(null);
   const gameRef = useRef(game);
@@ -143,8 +145,8 @@ export default function App() {
   const dirty = JSON.stringify(game) !== saved;
   const notify = (text: string) => setToast(text);
   useEffect(() => {
-    if (publicId) {
-      api(`/play/${publicId}`)
+    if (publicPath) {
+      api(`/play/${publicPath}`)
         .then((d) => setPublicGame(gameSchema.parse(d.game)))
         .catch((e) => setPublicError(e.message));
       return;
@@ -209,7 +211,7 @@ export default function App() {
       active = false;
       authSubscription?.unsubscribe();
     };
-  }, [publicId]);
+  }, [publicPath]);
   useEffect(() => {
     setUploadProject(project?.id ?? null);
   }, [project?.id]);
@@ -219,14 +221,14 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    if (publicId || project || user) return;
+    if (publicPath || project || user) return;
     if (gameSchema.safeParse(game).success)
       try {
         localStorage.setItem('game-gift-draft-v2', JSON.stringify(stripLocalAssets(game)));
       } catch {
         notify('Browser storage is full. Export your game to keep a copy.');
       }
-  }, [game, project, user, publicId]);
+  }, [game, project, user, publicPath]);
   useEffect(() => {
     const listener = (e: BeforeUnloadEvent) => {
       if (user && dirty) {
@@ -291,11 +293,12 @@ export default function App() {
         body: JSON.stringify({ game: payload, revision: current?.revision }),
       });
       if (epoch !== draftEpoch.current) return;
+      setGame(p.game);
       setProject(p);
       try {
         localStorage.setItem(`game-gift-last-${user.id}`, p.id);
       } catch {}
-      setSaved(JSON.stringify(payload));
+      setSaved(JSON.stringify(p.game));
       notify('Your adventure is saved');
       return p;
     } catch (e) {
@@ -337,15 +340,26 @@ export default function App() {
     const p = await save();
     if (p) setModal('publish');
   }
-  function exportGame() {
-    const blob = new Blob([JSON.stringify(game, null, 2)], { type: 'application/json' }),
-      url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.game-gift.json`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    notify('Game data exported. Uploaded media remains on this server.');
+  async function exportGame() {
+    try {
+      let blob: Blob;
+      let filename: string;
+      if (project) {
+        ({ blob, filename } = await downloadProject(project.id));
+      } else {
+        blob = new Blob([`${JSON.stringify(game, null, 2)}\n`], { type: 'application/json' });
+        filename = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.game-gift.json`;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      notify('Game data exported. Uploaded media remains on this server.');
+    } catch (error) {
+      notify((error as Error).message);
+    }
   }
   function startProject(id: StarterId) {
     switchSafely(() => {
@@ -362,7 +376,7 @@ export default function App() {
     });
   }
   const props = { game, change, notify, authed: !!user };
-  if (publicId)
+  if (publicPath)
     return (
       <div className="public-page game-page">
         <header className="game-page-header">
@@ -1048,51 +1062,7 @@ export default function App() {
       {modal === 'account' && user && (
         <Modal title="Account settings" onClose={() => setModal(null)}>
           <p className="modal-copy">Signed in as {user.email}.</p>
-          {!supabase && (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                setBusy(true);
-                try {
-                  await api('/auth/password', {
-                    method: 'POST',
-                    body: JSON.stringify(Object.fromEntries(new FormData(form))),
-                  });
-                  form.reset();
-                  notify('Password changed. Other sessions have been signed out.');
-                } catch (error) {
-                  notify((error as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <Field label="Current password">
-                <input
-                  type="password"
-                  name="currentPassword"
-                  autoComplete="current-password"
-                  minLength={10}
-                  maxLength={128}
-                  required
-                />
-              </Field>
-              <Field label="New password">
-                <input
-                  type="password"
-                  name="password"
-                  autoComplete="new-password"
-                  minLength={10}
-                  maxLength={128}
-                  required
-                />
-              </Field>
-              <button className="primary" disabled={busy}>
-                Change password
-              </button>
-            </form>
-          )}
+          <p className="modal-copy">Authentication is managed securely by your Google account.</p>
           <hr />
           <form
             onSubmit={async (e) => {
@@ -1107,7 +1077,7 @@ export default function App() {
               try {
                 await api('/auth/account', {
                   method: 'DELETE',
-                  body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))),
+                  headers: { 'X-Confirm-Account-Deletion': 'delete' },
                 });
                 try {
                   localStorage.removeItem(`game-gift-last-${user.id}`);
@@ -1131,18 +1101,6 @@ export default function App() {
               }
             }}
           >
-            {!supabase && (
-              <Field label="Confirm password to delete account">
-                <input
-                  type="password"
-                  name="password"
-                  autoComplete="current-password"
-                  required
-                  minLength={10}
-                  maxLength={128}
-                />
-              </Field>
-            )}
             <button className="text-button" disabled={busy}>
               Delete account permanently
             </button>
@@ -1170,7 +1128,7 @@ export default function App() {
                   method: 'POST',
                   body: JSON.stringify({ revision: project.revision }),
                 });
-                setProject({ ...project, publishedId: d.publishedId });
+                setProject({ ...project, publishedId: d.publishedId, publishedUrl: d.url });
                 notify('Your game is published. The adventure is ready to share.');
               } catch (e) {
                 notify((e as Error).message);
@@ -1188,14 +1146,14 @@ export default function App() {
                 <input
                   readOnly
                   aria-label="Published game link"
-                  value={`${location.origin}/play/${project.publishedId}`}
+                  value={`${location.origin}${project.publishedUrl}`}
                 />
                 <button
                   className="icon-btn"
                   aria-label="Copy game link"
                   onClick={() =>
                     navigator.clipboard
-                      .writeText(`${location.origin}/play/${project.publishedId}`)
+                      .writeText(`${location.origin}${project.publishedUrl}`)
                       .then(() => notify('Link copied'))
                       .catch(() => notify('Select and copy the link above.'))
                   }
@@ -1203,7 +1161,7 @@ export default function App() {
                   <Link size={16} />
                 </button>
                 <a
-                  href={`/play/${project.publishedId}`}
+                  href={project.publishedUrl || undefined}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Open published game"
@@ -1216,7 +1174,7 @@ export default function App() {
                 onClick={async () => {
                   try {
                     await api(`/projects/${project.id}/publish`, { method: 'DELETE' });
-                    setProject({ ...project, publishedId: null });
+                    setProject({ ...project, publishedId: null, publishedUrl: null });
                     notify('Game unpublished');
                   } catch (e) {
                     notify((e as Error).message);
@@ -1268,7 +1226,8 @@ export default function App() {
           </p>
           {!aiEnabled && (
             <div className="ai-notice">
-              AI coming to Gamegift soon. In the meantime, you can still build your world and playtest it.
+              AI coming to Gamegift soon. In the meantime, you can still build your world and
+              playtest it.
             </div>
           )}
           <Field label="Describe a change you want to see in your world">

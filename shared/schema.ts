@@ -212,6 +212,7 @@ export type Project = {
   revision: number;
   updatedAt: string;
   publishedId: string | null;
+  publishedUrl?: string | null;
   slug?: string | null;
 };
 export const proposalSchema = z
