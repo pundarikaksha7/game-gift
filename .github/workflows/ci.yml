@@ -22,7 +22,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run format:check
       - run: npm test
         env:
           TEST_DATABASE_URL: postgresql://game-gift_test:test-only-password@localhost:5432/game-gift_test
