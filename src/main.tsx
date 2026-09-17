@@ -30,6 +30,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
 }
 async function boot() {
   const landing = location.pathname === '/';
+  if (location.pathname === '/studio') {
+    document.title = 'Gamegift Studio – Build Your Personalized Game';
+    document.querySelector('meta[name="robots"]')?.setAttribute('content', 'noindex, nofollow');
+  }
   if (!landing) {
     const { configureSupabase } = await import('./auth');
     try {

@@ -1,58 +1,127 @@
 import { useState } from 'react';
-import { ArrowUpRight, Check, Menu, Play, Sparkles, X } from 'lucide-react';
+import {
+  ArrowUpRight,
+  BookOpen,
+  Gamepad2,
+  Layers3,
+  Menu,
+  Music2,
+  Play,
+  Share2,
+  Users,
+  X,
+} from 'lucide-react';
 
-const steps = [
+const modes = [
   {
-    number: '01',
-    title: 'Gather the good stuff',
-    text: 'Add photos, voice notes, inside jokes, keepsakes and the little details only you know.',
+    label: 'World explorer',
+    title: 'Build a platform adventure',
+    text: 'Shape open levels with moving platforms, rivals, power-ups and a finish portal.',
+    image: '/screenshots/world-explorer.webp',
+    alt: 'Gamegift World Explorer live preview with a hero, rival and platform level',
+    color: 'clay',
   },
   {
-    number: '02',
-    title: 'Shape the adventure',
-    text: 'Turn your memories into a playable world with puzzles, quests and surprise reveals.',
-  },
-  {
-    number: '03',
-    title: 'Send them somewhere',
-    text: 'Share a one-of-a-kind game they can keep, replay and pass around forever.',
-  },
-];
-
-const featureCards = [
-  { label: 'Memory map', title: 'Every detail has a place.', color: 'clay', art: 'map' },
-  {
-    label: 'Playable stories',
-    title: 'Not just a message. A whole world.',
+    label: 'Story journey',
+    title: 'Turn a message into a journey',
+    text: 'Create a relaxed, combat-free game where each chapter reveals another part of your story.',
+    image: '/screenshots/story-journey.webp',
+    alt: 'Gamegift Story Journey live preview in a sunset level',
     color: 'blue',
-    art: 'story',
   },
-  { label: 'Made together', title: 'The gift is in the making.', color: 'butter', art: 'together' },
+  {
+    label: 'Arcade challenge',
+    title: 'Make the challenge theirs',
+    text: 'Tune movement and difficulty, add enemies and finish with a custom boss battle.',
+    image: '/screenshots/arcade-challenge.webp',
+    alt: 'Gamegift Arcade Challenge live preview in a midnight level',
+    color: 'butter',
+  },
 ];
+
+const builderTools = [
+  {
+    icon: Users,
+    title: 'Characters',
+    text: 'Pick a cast, customize each look and choose their role.',
+  },
+  {
+    icon: Layers3,
+    title: 'Levels',
+    text: 'Build chapters with themes, platforms, hazards and encounters.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Story',
+    text: 'Write the opening, chapter moments and final reveal in your voice.',
+  },
+  {
+    icon: Music2,
+    title: 'Sound & motion',
+    text: 'Add music, effects and animation that fit the person you made it for.',
+  },
+];
+
+const faqs = [
+  {
+    question: 'Do I need to know how to code?',
+    answer:
+      'No. Gamegift is a visual game builder. Start from a game mode, edit the story and world, then playtest as you build.',
+  },
+  {
+    question: 'What can I personalize?',
+    answer:
+      'You can customize the title, recipient, characters, chapter themes, platforms, enemies, story, movement, sounds and animations.',
+  },
+  {
+    question: 'How does someone play the finished gift?',
+    answer:
+      'Publish your game and send the link. It opens in a browser with keyboard and touch controls, so there is nothing to install.',
+  },
+];
+
+function Wordmark() {
+  return (
+    <span className="wordmark-lockup">
+      <span className="wordmark-star" aria-hidden="true">
+        ✦
+      </span>
+      <span>gamegift</span>
+    </span>
+  );
+}
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
 
   return (
     <div className="site-shell">
       <header className="site-header">
         <a className="wordmark" href="#top" aria-label="Gamegift home">
-          <span className="wordmark-star">✦</span> gamegift
+          <Wordmark />
         </a>
         <nav className={menuOpen ? 'main-nav open' : 'main-nav'} aria-label="Main navigation">
-          <a href="#how">How it works</a>
-          <a href="#why">Why gamegift</a>
-          <a href="#stories">Stories</a>
-          <a href="#faq">FAQ</a>
+          <a href="#examples" onClick={() => setMenuOpen(false)}>
+            Game examples
+          </a>
+          <a href="#builder" onClick={() => setMenuOpen(false)}>
+            What you can build
+          </a>
+          <a href="#how" onClick={() => setMenuOpen(false)}>
+            How it works
+          </a>
+          <a href="#faq" onClick={() => setMenuOpen(false)}>
+            FAQ
+          </a>
           <a className="nav-cta" href="/studio">
-            Make a game <ArrowUpRight size={15} />
+            Open the builder <ArrowUpRight size={16} />
           </a>
         </nav>
         <button
           className="mobile-menu"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
         >
           {menuOpen ? <X /> : <Menu />}
         </button>
@@ -62,239 +131,237 @@ function App() {
         <section className="hero-section">
           <div className="hero-copy">
             <p className="kicker">
-              <span className="kicker-dot" /> A new kind of keepsake
+              <span className="kicker-dot" /> Personalized game maker
             </p>
             <h1>
-              Give them a<br />
-              <em>world</em> of your own.
+              Build a game from
+              <br />
+              <em>your memories.</em>
             </h1>
             <p className="hero-sub">
-              Gamegift turns your memories into a playable adventure — made for one person, and no
-              one else.
+              Gamegift is a no-code game builder for birthdays, anniversaries and every person who
+              deserves more than another card. Create the characters, levels and story, then share a
+              playable link.
             </p>
-            <div className="hero-actions" id="start">
+            <div className="hero-actions">
               <a className="button button-dark" href="/studio">
-                Make your first game <ArrowUpRight size={17} />
+                Make a game gift <ArrowUpRight size={17} />
               </a>
-              <button className="watch-button" onClick={() => setDemoOpen(true)}>
+              <a className="watch-button" href="#examples">
                 <span className="play-icon">
                   <Play size={12} fill="currentColor" />
-                </span>{' '}
-                See how it works
-              </button>
+                </span>
+                See real game previews
+              </a>
             </div>
-            <div className="trust-row">
-              <div className="avatars">
-                <span>J</span>
-                <span>M</span>
-                <span>A</span>
-                <span>+</span>
-              </div>
-              <span>Loved by 2,400+ thoughtful people</span>
+            <div className="hero-proof" aria-label="Gamegift highlights">
+              <span>No coding</span>
+              <span>Live playtesting</span>
+              <span>Shareable game link</span>
             </div>
           </div>
-          <div className="hero-art" aria-label="A collage of personal memories and game pieces">
-            <div className="art-sun" />
-            <div className="art-note note-one">
-              <span>
-                for the
-                <br />
-                adventurer
-              </span>
-              <b>♥</b>
+
+          <div className="hero-preview" id="preview">
+            <div className="preview-window">
+              <div className="preview-bar">
+                <span className="preview-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span>LIVE GAME PREVIEW</span>
+                <Gamepad2 size={16} />
+              </div>
+              <div className="preview-media">
+                <img
+                  className="preview-gif"
+                  src="/screenshots/gameplay-preview.gif"
+                  alt="Super Ananya, a personalized platform game with named characters and a custom IIT Guwahati level"
+                  width="480"
+                  height="270"
+                  fetchPriority="high"
+                />
+                <img
+                  className="preview-static"
+                  src="/screenshots/gameplay-preview.webp"
+                  alt=""
+                  width="1280"
+                  height="720"
+                  aria-hidden="true"
+                />
+              </div>
             </div>
-            <div className="art-note note-two">
-              press
+            <div className="preview-note note-story">Your story</div>
+            <div className="preview-note note-cast">Your cast</div>
+            <div className="preview-stamp">
+              Made for
               <br />
-              <strong>start</strong>
+              <strong>one person</strong>
             </div>
-            <div className="photo-card">
-              <img
-                src="/hero-memory-collage.webp"
-                alt="A tactile collection of photographs and game keepsakes"
-              />
-            </div>
-            <div className="art-sticker">
-              made
-              <br />
-              <strong>with love</strong>
-            </div>
-            <div className="art-star">✦</div>
-            <p className="art-caption">
-              A little world,
-              <br />
-              <i>made for them.</i>
-            </p>
           </div>
         </section>
 
-        <section className="marquee" aria-label="Gamegift features">
+        <section className="product-strip" aria-label="Gamegift builder features">
           <div>
-            memories <span>✦</span> inside jokes <span>✦</span> wild adventures <span>✦</span>{' '}
-            little things <span>✦</span> memories <span>✦</span> inside jokes
+            characters <span>✦</span> levels <span>✦</span> story <span>✦</span> sounds{' '}
+            <span>✦</span> animations <span>✦</span> playtesting <span>✦</span> characters
           </div>
         </section>
 
-        <section className="intro-section" id="why">
-          <div className="section-label">01 / WHY GAMEGIFT</div>
-          <div className="intro-content">
-            <h2>
-              The best gifts
-              <br />
-              <em>feel like you.</em>
-            </h2>
+        <section className="examples-section" id="examples">
+          <div className="section-heading">
             <div>
-              <p>
-                Some things are too personal for a card. Gamegift is a playful way to say{' '}
-                <strong>“I know you.”</strong>
-              </p>
-              <p>
-                Build an experience from the places, people, moments and wonderfully weird details
-                that make your relationship yours.
-              </p>
-              <a className="text-link" href="#how">
-                Discover the magic <ArrowUpRight size={16} />
-              </a>
+              <p className="section-label">01 / REAL GAME PREVIEWS</p>
+              <h2>
+                Start with a mode.
+                <br />
+                <em>Make every part yours.</em>
+              </h2>
             </div>
-          </div>
-        </section>
-
-        <section className="feature-grid" id="stories">
-          {featureCards.map((card, index) => (
-            <article className={`feature-card ${card.color}`} key={card.title}>
-              <div className={`feature-art ${card.art}`}>
-                <span className="art-shape shape-one" />
-                <span className="art-shape shape-two" />
-                {index === 0 && (
-                  <>
-                    <span className="map-path" />
-                    <span className="map-pin">♥</span>
-                  </>
-                )}
-                {index === 1 && (
-                  <>
-                    <span className="story-window">✦</span>
-                    <span className="story-character">⌁</span>
-                  </>
-                )}
-                {index === 2 && (
-                  <>
-                    <span className="together-flower">✿</span>
-                    <span className="together-note">you + me</span>
-                  </>
-                )}
-              </div>
-              <p>{card.label}</p>
-              <h3>{card.title}</h3>
-              <a href="#how" aria-label={`Learn about ${card.title}`}>
-                <ArrowUpRight size={18} />
-              </a>
-            </article>
-          ))}
-        </section>
-
-        <section className="process-section" id="how">
-          <div className="section-label">02 / HOW IT WORKS</div>
-          <div className="process-heading">
-            <h2>
-              Make something
-              <br />
-              <em>only you could make.</em>
-            </h2>
             <p>
-              No templates. No generic greetings. Just your memories, turned into a tiny universe.
+              These are live previews captured from Gamegift—not stock art or concept mockups. Each
+              mode is fully editable in the same visual builder.
             </p>
           </div>
-          <div className="steps">
-            {steps.map((step) => (
-              <div className="step" key={step.number}>
-                <span>{step.number}</span>
-                <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
+
+          <div className="feature-grid">
+            {modes.map((mode) => (
+              <article className={`feature-card ${mode.color}`} key={mode.title}>
+                <div className="feature-image">
+                  <div className="feature-media">
+                    <img src={mode.image} alt={mode.alt} width="609" height="343" loading="lazy" />
+                  </div>
+                  <span>{mode.label}</span>
                 </div>
-              </div>
+                <h3>{mode.title}</h3>
+                <p>{mode.text}</p>
+                <a href="/studio" aria-label={`Build a ${mode.label} game`}>
+                  Try this mode <ArrowUpRight size={17} />
+                </a>
+              </article>
             ))}
           </div>
         </section>
 
-        <section className="quote-section">
-          <div className="quote-mark">“</div>
-          <blockquote>
-            It felt like giving them
-            <br />
-            <em>our whole story</em> back.
-          </blockquote>
-          <p>— Maya, made a birthday game for Sam</p>
-          <div className="quote-doodle">✦</div>
+        <section className="builder-section" id="builder">
+          <div className="builder-heading">
+            <p className="section-label">02 / THE GAMEGIFT BUILDER</p>
+            <h2>
+              The details make it
+              <br />
+              <em>their game.</em>
+            </h2>
+            <p>
+              Build in the browser and watch every change appear in the live game preview beside
+              your editor.
+            </p>
+          </div>
+          <div className="tool-grid">
+            {builderTools.map((tool) => (
+              <article className="tool-card" key={tool.title}>
+                <tool.icon size={22} aria-hidden="true" />
+                <h3>{tool.title}</h3>
+                <p>{tool.text}</p>
+              </article>
+            ))}
+          </div>
         </section>
 
-        <section className="final-section" id="faq">
+        <section className="process-section" id="how">
+          <div className="section-heading process-heading">
+            <div>
+              <p className="section-label">03 / HOW IT WORKS</p>
+              <h2>
+                From idea to
+                <br />
+                <em>playable gift.</em>
+              </h2>
+            </div>
+            <p>No downloads and no code. Build, test and send the finished experience online.</p>
+          </div>
+          <ol className="steps">
+            <li>
+              <span>01</span>
+              <div>
+                <h3>Choose a game mode</h3>
+                <p>Begin with an adventure, a story-led journey or an arcade challenge.</p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <h3>Personalize the world</h3>
+                <p>Add your recipient, characters, chapters, memories, music and game rules.</p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <h3>Playtest and share</h3>
+                <p>Try the full game, refine the details and publish a link they can play.</p>
+              </div>
+            </li>
+          </ol>
+        </section>
+
+        <section className="faq-section" id="faq">
+          <div>
+            <p className="section-label">04 / QUESTIONS</p>
+            <h2>
+              Before you press
+              <br />
+              <em>start.</em>
+            </h2>
+          </div>
+          <div className="faq-list">
+            {faqs.map((faq) => (
+              <details key={faq.question}>
+                <summary>{faq.question}</summary>
+                <p>{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className="final-section">
           <div className="final-card">
             <div>
               <p className="kicker">
-                <span className="kicker-dot" /> Your next gift is here
+                <span className="kicker-dot" /> Ready when you are
               </p>
               <h2>
-                Make it
+                Make their next gift
                 <br />
-                <em>unforgettable.</em>
+                <em>playable.</em>
               </h2>
             </div>
             <div>
               <p>
-                Start with a memory. We’ll help you turn it into an adventure they’ll never see
-                coming.
+                Open the Gamegift builder, choose a mode and create a little world that could only
+                have come from you.
               </p>
               <a className="button button-light" href="/studio">
-                Start making <ArrowUpRight size={17} />
+                Open the builder <ArrowUpRight size={17} />
               </a>
             </div>
-            <Sparkles className="final-sparkle" size={42} />
           </div>
         </section>
       </main>
 
       <footer>
-        <a className="wordmark" href="#top">
-          <span className="wordmark-star">✦</span> gamegift
+        <a className="wordmark" href="#top" aria-label="Gamegift home">
+          <Wordmark />
         </a>
-        <p>Made for the people who mean everything.</p>
+        <p>Create personalized game gifts in your browser.</p>
         <div>
-          <a href="#how">How it works</a>
-          <a href="#why">About</a>
-          <a href="#faq">Help</a>
+          <a href="#examples">Examples</a>
+          <a href="#builder">Builder</a>
+          <a href="#faq">FAQ</a>
+          <a href="/studio">
+            <Share2 size={13} /> Make a game
+          </a>
         </div>
       </footer>
-      {demoOpen && (
-        <div className="modal-backdrop" role="presentation" onClick={() => setDemoOpen(false)}>
-          <div
-            className="demo-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="demo-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button className="modal-close" onClick={() => setDemoOpen(false)} aria-label="Close">
-              <X />
-            </button>
-            <div className="demo-screen">
-              <Sparkles size={34} />
-              <p>
-                Every great game
-                <br />
-                <em>starts with a memory.</em>
-              </p>
-              <span>✦</span>
-            </div>
-            <h2 id="demo-title">A tiny preview of the magic.</h2>
-            <p>Gather a moment, add a little imagination, and make it playable.</p>
-            <button className="button button-dark" onClick={() => setDemoOpen(false)}>
-              Got it <Check size={16} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

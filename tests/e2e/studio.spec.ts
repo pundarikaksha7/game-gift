@@ -2,8 +2,10 @@ import { test, expect } from '@playwright/test';
 
 test('landing page enters the live studio', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Give them a world/ })).toBeVisible();
-  await page.getByRole('link', { name: /Make your first game/ }).click();
+  await expect(
+    page.getByRole('heading', { name: /Build a game from your memories/ }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: /Make a game gift/ }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
 });

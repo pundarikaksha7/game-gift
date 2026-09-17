@@ -17,3 +17,7 @@ certs/*
 asset_library/
 
 certs/
+
+package-lock.json
+
+.env.example
