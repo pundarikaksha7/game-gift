@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { DB, Query } from './db';
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 export const paymentsRequired = () =>
-  process.env.NODE_ENV === 'production' || process.env.PAYMENTS_ENABLED === 'true';
+  process.env.NODE_ENV === 'production' && process.env.PAYMENTS_ENABLED === 'true';
 export function validSignature(
   body: string | Buffer,
   signature: string,
