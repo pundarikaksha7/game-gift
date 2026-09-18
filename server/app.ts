@@ -13,6 +13,7 @@ import { z, ZodError } from 'zod';
 import type { DB } from './db';
 import { gameSchema, assetReferences, type Game } from '../shared/schema';
 import { createTemplate } from '../shared/template';
+import { createGameExport, type GameExportAsset } from '../shared/export';
 import { propose } from './ai';
 import { validateEnvironment, trustedOrigin } from './config';
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
@@ -121,6 +122,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
         ? `${process.env.APP_ORIGIN || req.get('origin') || 'http://localhost:5173'}/auth/callback`
         : undefined,
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
+      paymentsEnabled: paymentsRequired(),
     }),
   );
   const authLimit = rateLimit({
@@ -274,11 +276,27 @@ export function createApp(db: DB, options: AppOptions = {}) {
   app.get('/api/projects/:id/export', async (req, res) => {
     const p = await owned(req.params.id, res.locals.user.id);
     const game = gameSchema.parse(JSON.parse(p.game));
+    const assets: Record<string, GameExportAsset> = {};
+    for (const url of new Set(
+      assetReferences(game)
+        .map(({ url }) => url)
+        .filter((url) => url.startsWith('/api/assets/')),
+    )) {
+      const [asset] = await db.query('SELECT * FROM assets WHERE id=$1 AND owner_id=$2', [
+        url.split('/').at(-1),
+        res.locals.user.id,
+      ]);
+      if (!asset) throw fail(409, 'A custom asset used by this game is no longer available');
+      assets[url] = {
+        mime: asset.mime,
+        data: (await readAsset(asset.filename)).toString('base64'),
+      };
+    }
     const filename = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.game-gift.json`;
     res
       .set('Content-Disposition', `attachment; filename="${filename}"`)
-      .type('application/json')
-      .send(`${JSON.stringify(game, null, 2)}\n`);
+      .type('application/vnd.gamegift+json')
+      .send(`${JSON.stringify(createGameExport(game, assets), null, 2)}\n`);
   });
   app.put('/api/projects/:id', async (req, res) => {
     const input = z

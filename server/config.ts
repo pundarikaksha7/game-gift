@@ -23,6 +23,8 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
       Number(env.PUBLISH_PRICE_AMOUNT) > 10000000)
   )
     throw new Error('Invalid PUBLISH_PRICE_AMOUNT');
+  if (env.PAYMENTS_ENABLED && !['true', 'false'].includes(env.PAYMENTS_ENABLED))
+    throw new Error('PAYMENTS_ENABLED must be true or false');
   if (env.NODE_ENV !== 'production') return;
   if (env.AUTH_PROVIDER !== 'supabase')
     throw new Error('Production requires Supabase Auth and private Storage');
@@ -32,7 +34,6 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const origin = new URL(env.APP_ORIGIN || '');
   if (origin.protocol !== 'https:' || origin.origin !== env.APP_ORIGIN)
     throw new Error('APP_ORIGIN must be an exact HTTPS origin without a trailing slash');
-  if (env.PAYMENTS_ENABLED === 'false') throw new Error('Production publishing requires payments');
   for (const origin of (env.CORS_ORIGINS || env.APP_ORIGIN || '').split(',')) {
     const parsed = new URL(origin.trim());
     if (parsed.protocol !== 'https:' || parsed.origin !== origin.trim())

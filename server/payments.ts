@@ -176,6 +176,7 @@ export function mountPayments(app: express.Express, db: DB, auth: express.Reques
     });
   });
   app.post('/api/payments/order', auth, async (req, res) => {
+    if (!paymentsRequired()) throw fail(404, 'Payments are currently disabled');
     const { projectId } = z.object({ projectId: z.string().uuid() }).parse(req.body);
     const userId = res.locals.user.id;
     // Serialize simultaneous clicks; reuse an existing provider order.
@@ -236,6 +237,7 @@ export function mountPayments(app: express.Express, db: DB, auth: express.Reques
     res.json(checkout);
   });
   app.post('/api/payments/verify', auth, async (req, res) => {
+    if (!paymentsRequired()) throw fail(404, 'Payments are currently disabled');
     const input = z
       .object({
         razorpay_order_id: z.string().regex(/^order_[A-Za-z0-9]+$/),

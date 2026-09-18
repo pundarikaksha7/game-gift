@@ -1978,7 +1978,53 @@ async function run(mode) {
     if (!powerupDefinitions[kind]) return;
     powerupTimers[kind] = powerupDefinitions[kind].duration;
     if (kind === 'companion' && companions.length === 0) {
-      companions = cfg.helpers.map((h, i) => ({ ...h, x: player.x - 42 - i * 44, y: player.y }));
+      const viewLeft = cameraX + 48;
+      const viewRight = cameraX + viewportWidth() - 102;
+      const helperCount = cfg.helpers.length;
+      const spawnSpacing = Math.min(92, (viewRight - viewLeft) / Math.max(1, helperCount - 1));
+      const spawnSpan = spawnSpacing * Math.max(0, helperCount - 1);
+      const desiredStart = player.x + player.w / 2 - 27 - spawnSpan / 2;
+      const spawnStart = Math.max(viewLeft, Math.min(viewRight - spawnSpan, desiredStart));
+      const spawnPlatforms = getPlatforms();
+      companions = cfg.helpers.map((helper, index) => {
+        // Lay the full party out on-screen immediately. Center the formation
+        // around the hero where possible and slide it inward near screen edges.
+        const desiredX = spawnStart + index * spawnSpacing;
+        const surface = spawnPlatforms
+          .filter(
+            (platform) =>
+              desiredX + 54 > platform.x + 4 && desiredX < platform.x + platform.w - 4,
+          )
+          .sort(
+            (a, b) =>
+              Math.abs(a.y - (player.y + player.h + 16)) -
+              Math.abs(b.y - (player.y + player.h + 16)),
+          )[0];
+        const spawnX = surface
+          ? Math.max(surface.x + 6, Math.min(surface.x + surface.w - 60, desiredX))
+          : findSafeRespawnX(desiredX, 54);
+        return {
+          ...helper,
+          x: spawnX,
+          y: (surface?.y ?? Number(getLevelConfig().groundY ?? 1080)) - 112,
+          vx: 0,
+          vy: 0,
+          w: 54,
+          h: 112,
+          onGround: true,
+          support: surface?.id ? { id: surface.id, x: surface.x, y: surface.y } : null,
+          jumpVelocity: undefined,
+          jumpCooldown: 0,
+          lastSafeX: spawnX,
+          facingRight: spawnX < player.x + player.w / 2,
+          attackTimer: index * 0.12,
+          retargetTimer: index * 0.05,
+          targetEnemyId: null,
+          target: null,
+          flash: 0,
+          state: 'regroup',
+        };
+      });
     } else if (kind === 'beam') player.beamActive = true;
     else if (kind === 'boost') player.blueBoost = true;
     const info = powerupDefinitions[kind];
@@ -2004,24 +2050,275 @@ async function run(mode) {
       }
     }
     powerups = powerups.filter((item) => !item.collected);
-    for (const ally of companions) {
-      ally.x +=
-        (player.x - (player.facingRight ? 1 : -1) * (ally.size === 'small' ? 76 : 140) - ally.x) *
-        Math.min(1, dt * 5);
-      ally.y += (player.y - ally.y) * Math.min(1, dt * 6);
+    updateCompanions(dt);
+  }
+
+  function updateCompanions(dt) {
+    if (!companions.length) return;
+
+    const huntLeft = cameraX - 100;
+    const huntRight = cameraX + viewportWidth() + 100;
+    const gravity = Number(cfg.physics.gravity ?? 1800);
+    const platforms = getPlatforms();
+    const heroCenter = player.x + player.w / 2;
+    const heroFeet = player.y + player.h + 16;
+    const availableEnemies = enemies.filter(
+      (enemy) =>
+        enemy.health > 0 &&
+        enemy.defeatTimer <= 0 &&
+        (!enemy.boss || enemy.awakened) &&
+        enemy.x + enemy.w >= huntLeft &&
+        enemy.x <= huntRight &&
+        Math.abs(enemy.x + enemy.w / 2 - heroCenter) <= 460 &&
+        Math.abs(enemy.y + enemy.h + 16 - heroFeet) <= 420,
+    );
+
+    for (let index = 0; index < companions.length; index++) {
+      const ally = companions[index];
       ally.flash = Math.max(0, (ally.flash || 0) - dt);
       ally.attackTimer = Math.max(0, (ally.attackTimer || 0) - dt);
-      const target = enemies.find(
-        (enemy) =>
-          enemy.health > 0 &&
-          Math.abs(enemy.x - ally.x) < ally.range &&
-          Math.abs(enemy.y - ally.y) < 90,
+      ally.retargetTimer = Math.max(0, (ally.retargetTimer || 0) - dt);
+      ally.jumpCooldown = Math.max(0, (ally.jumpCooldown || 0) - dt);
+
+      if (ally.support && ally.onGround) {
+        const movingSupport = platforms.find((platform) => platform.id === ally.support.id);
+        if (movingSupport) {
+          ally.x += movingSupport.x - ally.support.x;
+          ally.y += movingSupport.y - ally.support.y;
+        }
+      }
+
+      const distanceFromHero = Math.hypot(ally.x + ally.w / 2 - heroCenter, ally.y + ally.h - heroFeet);
+      const mustRegroup = distanceFromHero > 520;
+      let target = mustRegroup
+        ? undefined
+        : availableEnemies.find((enemy) => enemy.id === ally.targetEnemyId);
+      if (mustRegroup) ally.targetEnemyId = null;
+      if (!target || ally.retargetTimer <= 0) {
+        // Prefer nearby enemies, retain a useful current target, and spread the
+        // party across the encounter rather than dog-piling one actor.
+        const scored = (mustRegroup ? [] : availableEnemies)
+          .map((enemy) => {
+            const assigned = companions.filter(
+              (other) => other !== ally && other.targetEnemyId === enemy.id,
+            ).length;
+            const dx = enemy.x + enemy.w / 2 - (ally.x + 27);
+            const dy = enemy.y + enemy.h / 2 - (ally.y + 50);
+            const stickyBonus = enemy.id === ally.targetEnemyId ? -220 : 0;
+            const bossPriority = enemy.boss ? -80 : 0;
+            return {
+              enemy,
+              score:
+                Math.abs(dx) + Math.abs(dy) * 0.55 + assigned * 260 + stickyBonus + bossPriority,
+            };
+          })
+          .sort((a, b) => a.score - b.score);
+        target = scored[0]?.enemy;
+        ally.targetEnemyId = target?.id || null;
+        ally.retargetTimer = 0.22 + index * 0.025;
+      }
+
+      let destinationX;
+      let destinationFeetY;
+      if (target) {
+        ally.state = 'hunt';
+        const targetCenter = target.x + target.w / 2;
+        const allyCenter = ally.x + 27;
+        const approachDirection = targetCenter >= allyCenter ? 1 : -1;
+        const standoff = ally.size === 'big' ? 62 : Math.min(250, Math.max(105, ally.range * 0.64));
+        const sideOffset = ((index % 3) - 1) * 68;
+        destinationX =
+          targetCenter - approachDirection * (target.w / 2 + standoff) - 27 + sideOffset;
+        destinationFeetY = target.y + target.h + 16;
+        ally.facingRight = targetCenter > allyCenter;
+      } else {
+        ally.state = 'regroup';
+        ally.targetEnemyId = null;
+        const side = index % 2 === 0 ? -1 : 1;
+        const rank = Math.floor(index / 2) + 1;
+        destinationX = player.x + player.w / 2 + side * (78 + rank * 82) - 27;
+        destinationFeetY = player.y + player.h + 16;
+        if (Math.abs(destinationX - ally.x) > 12) ally.facingRight = destinationX > ally.x;
+      }
+
+      destinationX = Math.max(0, Math.min(getLevelLength() - ally.w, destinationX));
+      const dx = destinationX - ally.x;
+      const direction = dx === 0 ? (ally.facingRight ? 1 : -1) : Math.sign(dx);
+      const walkSpeed = ally.state === 'hunt' ? (ally.size === 'big' ? 335 : 410) : 440;
+      ally.vx = Math.abs(dx) > 18 ? direction * walkSpeed : 0;
+
+      const allyBottom = ally.y + ally.h;
+      const support = platforms.find(
+        (platform) =>
+          ally.x + ally.w > platform.x + 4 &&
+          ally.x < platform.x + platform.w - 4 &&
+          Math.abs(allyBottom - platform.y) < 12,
       );
-      if (target && ally.attackTimer <= 0) {
-        ally.target = { x: target.x + target.w / 2, y: target.y + 40 };
-        ally.flash = 0.18;
-        damageEnemy(target, ally.damage);
-        ally.attackTimer = ally.cooldown;
+      const approachingPit =
+        ally.onGround && ally.vx
+          ? holeAhead(ally.x, ally.w, direction, 75 + walkSpeed * 0.3)
+          : null;
+      if (approachingPit) {
+        const canJumpPit = approachingPit.w <= 330 && ally.jumpCooldown <= 0;
+        ally.vx = 0;
+        if (canJumpPit) {
+          ally.vy = -880;
+          ally.vx = direction * Math.max(330, walkSpeed);
+          ally.jumpVelocity = ally.vx;
+          ally.onGround = false;
+          ally.jumpCooldown = 1.2;
+        }
+      }
+
+      if (ally.onGround && support) {
+        const front = direction > 0 ? ally.x + ally.w : ally.x;
+        const edge = direction > 0 ? support.x + support.w : support.x;
+        const nearEdge = Math.abs(edge - front) < 34 + walkSpeed * dt;
+        const needsRouteDecision = nearEdge || Math.abs(destinationFeetY - support.y) > 60;
+        if (needsRouteDecision) {
+          const launch = 900;
+          const candidates = platforms
+            .filter(
+              (platform) =>
+                platform !== support &&
+                platform.y >= support.y - 210 &&
+                platform.y <= support.y + 560,
+            )
+            .map((platform) => {
+              const discriminant = launch * launch + 2 * gravity * (platform.y - support.y);
+              const flight = (launch + Math.sqrt(Math.max(0, discriminant))) / gravity;
+              const landing = platform.moving
+                ? getPlatforms(worldTime + flight).find((next) => next.id === platform.id)
+                : platform;
+              const landingX = Math.max(
+                landing.x + 22,
+                Math.min(landing.x + landing.w - ally.w - 22, destinationX),
+              );
+              const velocity = (landingX - ally.x) / flight;
+              const score =
+                Math.abs(landingX - destinationX) +
+                Math.abs(platform.y - destinationFeetY) * 1.2;
+              return { platform, velocity, score };
+            })
+            .filter(
+              (candidate) =>
+                candidate.platform.w > ally.w + 28 && Math.abs(candidate.velocity) <= 430,
+            )
+            .sort((a, b) => a.score - b.score);
+          const currentScore = Math.abs(dx) + Math.abs(support.y - destinationFeetY) * 1.2;
+          const route = candidates.find((candidate) => candidate.score < currentScore - 35);
+          if (nearEdge) ally.vx = 0;
+          if (route && ally.jumpCooldown <= 0) {
+            ally.vy = -launch;
+            ally.vx = route.velocity;
+            ally.jumpVelocity = ally.vx;
+            ally.onGround = false;
+            ally.jumpCooldown = 0.8;
+          }
+        }
+        ally.support = support.id ? { id: support.id, x: support.x, y: support.y } : null;
+      }
+
+      // Follow the hero vertically as well as horizontally. This makes the
+      // party jump with the hero instead of waiting below an elevated route.
+      const heroIsAbove = player.y + player.h < ally.y + ally.h - 34;
+      const followJumpPit = ally.vx
+        ? holeAhead(ally.x, ally.w, direction, 90 + Math.abs(ally.vx) * 0.25)
+        : null;
+      if (
+        ally.onGround &&
+        ally.jumpCooldown <= 0 &&
+        heroIsAbove &&
+        (!followJumpPit || followJumpPit.w <= 330)
+      ) {
+        ally.vy = -900;
+        ally.vx = direction * Math.max(330, walkSpeed);
+        ally.jumpVelocity = ally.vx;
+        ally.onGround = false;
+        ally.jumpCooldown = 0.85;
+      }
+
+      if (!ally.onGround && ally.jumpVelocity !== undefined) ally.vx = ally.jumpVelocity;
+
+      if (ally.onGround && ally.vx) {
+        const crowded = companions.some(
+          (other) =>
+            other !== ally &&
+            other.onGround &&
+            Math.abs(other.y - ally.y) < 40 &&
+            (other.x - ally.x) * direction > 0 &&
+            (other.x - ally.x) * direction < ally.w + 22,
+        );
+        if (crowded && Math.abs(dx) > 90) ally.vx *= 0.35;
+      }
+
+      if (target) {
+        const horizontalRange = Math.abs(target.x + target.w / 2 - (ally.x + 27));
+        const verticalRange = Math.abs(target.y + target.h / 2 - (ally.y + 50));
+        if (
+          horizontalRange <= ally.range &&
+          verticalRange <= 145 &&
+          ally.attackTimer <= 0 &&
+          target.hurtTimer <= 0
+        ) {
+          ally.target = { x: target.x + target.w / 2, y: target.y + target.h * 0.42 };
+          ally.flash = 0.18;
+          damageEnemy(target, ally.damage);
+          ally.attackTimer = ally.cooldown;
+        }
+      }
+
+      ally.vy += gravity * dt;
+      ally.x = Math.max(0, Math.min(getLevelLength() - ally.w, ally.x + ally.vx * dt));
+      ally.y += ally.vy * dt;
+      ally.onGround = false;
+      ally.support = null;
+      for (const platform of platforms) {
+        if (ally.x + ally.w <= platform.x || ally.x >= platform.x + platform.w) continue;
+        const bottom = ally.y + ally.h;
+        if (
+          ally.vy >= 0 &&
+          bottom >= platform.y &&
+          bottom <= platform.y + platform.h + ally.vy * dt + 8
+        ) {
+          ally.y = platform.y - ally.h;
+          ally.vy = 0;
+          ally.onGround = true;
+          ally.jumpVelocity = undefined;
+          ally.support = platform.id
+            ? { id: platform.id, x: platform.x, y: platform.y }
+            : null;
+          break;
+        }
+      }
+
+      const groundY = Number(getLevelConfig().groundY ?? 1080);
+      const missedGap =
+        !ally.onGround &&
+        ally.vy > 0 &&
+        isOverGroundHole(ally.x, ally.w) &&
+        ally.y + ally.h >= groundY - 6;
+      if (missedGap) {
+        ally.x = findSafeRespawnX(ally.lastSafeX ?? player.x, ally.w);
+        ally.y = groundY - ally.h;
+        ally.vx = 0;
+        ally.vy = 0;
+        ally.onGround = true;
+        ally.jumpVelocity = undefined;
+        ally.jumpCooldown = 0.25;
+        ally.support = null;
+      } else if (ally.onGround && !isOverGroundHole(ally.x, ally.w)) {
+        ally.lastSafeX = ally.x;
+      }
+
+      if (ally.y > groundY + 160) {
+        ally.x = findSafeRespawnX(player.x + (index + 1) * 70, ally.w);
+        ally.y = groundY - ally.h;
+        ally.vx = 0;
+        ally.vy = 0;
+        ally.onGround = true;
+        ally.jumpVelocity = undefined;
+        ally.support = null;
       }
     }
   }
@@ -2116,19 +2413,17 @@ async function run(mode) {
       const sx = ally.x - cameraX,
         sy = ally.y + 10;
       const color = ally.size === 'big' ? '#a598ff' : '#56e5d3';
-      const stride = Math.sin(worldTime * 13) * Math.min(6, Math.abs(player.vx) / 50);
-      const art = animatedArt(
-        ally.id,
-        helperImages[ally.id],
-        Math.abs(player.vx) > 5 ? 'run' : 'idle',
-      );
+      const moving = Math.abs(ally.vx || 0) > 8;
+      const stride = Math.sin(worldTime * 13) * Math.min(6, Math.abs(ally.vx || 0) / 50);
+      const motion = !ally.onGround ? 'jump' : moving ? 'run' : 'idle';
+      const art = animatedArt(ally.id, helperImages[ally.id], motion);
       if (art.ready) {
         const h = (ally.size === 'big' ? 90 : 82) * ally.scale,
           w = (h * art.image.naturalWidth) / art.image.naturalHeight;
         ctx.save();
         ctx.translate(sx + 27, sy + 102);
-        ctx.scale(player.facingRight ? 1 : -1, 1);
-        ctx.rotate(Math.sin(worldTime * 12) * (Math.abs(player.vx) > 5 ? 0.035 : 0.008));
+        ctx.scale(ally.facingRight ? 1 : -1, 1);
+        ctx.rotate(Math.sin(worldTime * 12) * (moving ? 0.035 : 0.008));
         ctx.drawImage(art.image, -w / 2, -h, w, h);
         ctx.restore();
         drawCharacterName(ally.name, sx + 27, sy - 27, color);

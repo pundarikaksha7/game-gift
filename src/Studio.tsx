@@ -38,9 +38,10 @@ import {
   type Proposal,
 } from '../shared/schema';
 import { createTemplate, createStarter, starters, type StarterId } from '../shared/template';
+import { exportLocalGame, importGameExport, stripLocalAssets } from '../shared/export';
 import { api, downloadProject, setUploadProject } from './api';
 import { authenticateWithGoogle, completeAuthRedirect, supabase } from './auth';
-import { hasLocalAssets, persistLocalAssets, stripLocalAssets } from './media';
+import { hasLocalAssets, persistLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
 import { Modal, Field, UploadButton } from './components/UI';
@@ -345,9 +346,11 @@ export default function App() {
       let blob: Blob;
       let filename: string;
       if (project) {
-        ({ blob, filename } = await downloadProject(project.id));
+        const current = await save();
+        if (!current) return;
+        ({ blob, filename } = await downloadProject(current.id));
       } else {
-        blob = new Blob([`${JSON.stringify(game, null, 2)}\n`], { type: 'application/json' });
+        blob = await exportLocalGame(game);
         filename = `${game.title.replace(/[^a-z0-9-]/gi, '-').slice(0, 60) || 'experience'}.game-gift.json`;
       }
       const url = URL.createObjectURL(blob);
@@ -356,7 +359,7 @@ export default function App() {
       link.download = filename;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      notify('Game data exported. Uploaded media remains on this server.');
+      notify('Game and custom media exported.');
     } catch (error) {
       notify((error as Error).message);
     }
@@ -1024,8 +1027,9 @@ export default function App() {
               accept="application/json,.json"
               onFile={async (f) => {
                 try {
-                  if (f.size > 1024 * 1024) throw new Error('Game data must be under 1 MB');
-                  const imported = gameSchema.parse(JSON.parse(await f.text()));
+                  if (f.size > 150 * 1024 * 1024)
+                    throw new Error('Game export must be under 150 MB');
+                  const imported = importGameExport(JSON.parse(await f.text()));
                   change((g) => Object.assign(g, imported));
                   setLevel(0);
                   setModal(null);

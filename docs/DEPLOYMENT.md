@@ -18,6 +18,7 @@ Create a Supabase project and a **private** `game-gift-media` bucket, allowing J
 | DATABASE_SSL_CA           | Optional mounted CA path; bundled certificate is the fallback |
 | DATABASE_SSL_CA_PEM       | Optional full PEM value; escaped `\\n` is supported           |
 | APP_ORIGIN                | Exact canonical frontend HTTPS origin; no trailing slash      |
+| PAYMENTS_ENABLED          | `false` for free publishing; `true` to require checkout       |
 | TRUST_PROXY               | 1 for direct Render; verify forwarding when adding Vercel     |
 | SUPABASE_URL              | Exact project HTTPS origin                                    |
 | SUPABASE_ANON_KEY         | Public anon/publishable key used by browser auth              |

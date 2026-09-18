@@ -1,10 +1,23 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import sharp from 'sharp';
 
 test('landing page enters the live studio', async ({ page }) => {
   await page.goto('/');
   await expect(
     page.getByRole('heading', { name: /Build a game from your memories/ }),
   ).toBeVisible();
+  const mediaStyles = await page
+    .locator('.preview-media img, .feature-media img')
+    .evaluateAll((images) =>
+      images.map((image) => ({
+        fit: getComputedStyle(image).objectFit,
+        position: getComputedStyle(image).position,
+      })),
+    );
+  expect(
+    mediaStyles.every(({ fit, position }) => fit === 'contain' && position === 'absolute'),
+  ).toBe(true);
   await page.getByRole('link', { name: /Make a game gift/ }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
@@ -45,7 +58,11 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   await expect(publicGame.locator('canvas')).toBeVisible();
   await publicGame.getByRole('button', { name: 'Begin chapter' }).click();
   await publicPage.keyboard.press('ArrowRight');
+  const unpublished = page.waitForResponse(
+    (response) => response.request().method() === 'DELETE' && response.url().includes('/publish'),
+  );
   await page.getByRole('button', { name: 'Unpublish game' }).click();
+  expect((await unpublished).ok()).toBe(true);
   await publicPage.reload();
   await expect(publicPage.getByText('This game is not published')).toBeVisible();
   await visitor.close();
@@ -77,6 +94,48 @@ test('guided builder preserves movement settings and walks through each step', a
   await expect(page.getByLabel('Extra jumps in the air')).toHaveValue('1');
   await page.reload();
   await expect(page.getByLabel('Game title')).toHaveValue('My new world');
+});
+
+test('custom UI assets save and export inside a portable game bundle', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop',
+    'The upload/export pipeline only needs one browser',
+  );
+  // The desktop lifecycle test intentionally deletes its own fixture account earlier in the file.
+  const token = 'browser-mobile-token';
+  await page.route('**/api/**', (route) =>
+    route.continue({
+      headers: { ...route.request().headers(), authorization: `Bearer ${token}` },
+    }),
+  );
+  await page.goto('/studio');
+  await page.getByRole('button', { name: /^Levels/ }).click();
+  await page.getByLabel('Upload background').setInputFiles({
+    name: 'custom-background.png',
+    mimeType: 'image/png',
+    buffer: await sharp({
+      create: { width: 16, height: 9, channels: 4, background: '#779966' },
+    })
+      .png()
+      .toBuffer(),
+  });
+  await expect(page.getByRole('button', { name: 'Use atmosphere background' })).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('All changes saved')).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export game data' }).click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  const bundle = JSON.parse(await readFile(path!, 'utf8'));
+  expect(bundle.format).toBe('gamegift-bundle-v1');
+  const background = bundle.game.levels[0].background;
+  expect(background).toMatch(/^\/api\/assets\//);
+  expect(bundle.assets[background].mime).toBe('image/webp');
+  expect(Buffer.from(bundle.assets[background].data, 'base64').length).toBeGreaterThan(0);
 });
 
 test('templates create independent projects and viewport updates keep runtime alive', async ({

@@ -13,6 +13,7 @@ test('production fails closed on missing auth storage and invalid origin/proxy c
     SUPABASE_SERVICE_ROLE_KEY: 'service',
   };
   assert.doesNotThrow(() => validateEnvironment(valid));
+  assert.doesNotThrow(() => validateEnvironment({ ...valid, PAYMENTS_ENABLED: 'false' }));
   for (const change of [
     { AUTH_PROVIDER: 'legacy' },
     { SUPABASE_URL: '' },
@@ -21,6 +22,7 @@ test('production fails closed on missing auth storage and invalid origin/proxy c
     { APP_ORIGIN: 'https://games.example.com/path' },
     { TRUST_PROXY: 'true' },
     { DATABASE_URL: '' },
+    { PAYMENTS_ENABLED: 'yes' },
   ])
     assert.throws(() => validateEnvironment({ ...valid, ...change }));
 });

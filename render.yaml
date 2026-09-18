@@ -18,6 +18,8 @@ services:
         value: '1'
       - key: APP_ORIGIN
         value: https://game-gift.shop
+      - key: PAYMENTS_ENABLED
+        value: 'false'
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL

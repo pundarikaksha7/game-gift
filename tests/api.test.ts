@@ -107,7 +107,9 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     });
     assert.equal(exported.status, 200);
     assert.match(exported.headers.get('content-disposition') || '', /\.game-gift\.json/);
-    assert.equal((await exported.json()).title, 'Version two');
+    const exportedBundle = (await exported.json()) as any;
+    assert.equal(exportedBundle.format, 'gamegift-bundle-v1');
+    assert.equal(exportedBundle.game.title, 'Version two');
     game.title = 'Private draft';
     await request(`/projects/${id}`, 'PUT', { game, revision: 3 }, alice);
     assert.equal((await request(`/play/alice/${publishedId}`)).data.game.title, 'Version two');
@@ -176,6 +178,13 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     assert.equal((await request('/projects', 'POST', { game: stolen }, bob)).status, 400);
     game.characters[0].sprite = asset.url;
     await request(`/projects/${id}`, 'PUT', { game, revision: 4 }, alice);
+    const exportWithAsset = await fetch(`${base}/projects/${id}/export`, {
+      headers: { Authorization: `Bearer ${alice}` },
+    });
+    const assetBundle = (await exportWithAsset.json()) as any;
+    assert.equal(assetBundle.game.characters[0].sprite, asset.url);
+    assert.equal(assetBundle.assets[asset.url].mime, 'image/webp');
+    assert.ok(Buffer.from(assetBundle.assets[asset.url].data, 'base64').length > 0);
     await request(`/projects/${id}/publish`, 'POST', { revision: 5 }, alice);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 200);
     await request(`/projects/${id}/publish`, 'DELETE', undefined, alice);

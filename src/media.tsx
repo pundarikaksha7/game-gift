@@ -14,11 +14,6 @@ function rewriteAssets(game: Game, mapped: Record<string, string>) {
     typeof value === 'string' && mapped[value] ? mapped[value] : value,
   ) as Game;
 }
-export function stripLocalAssets(game: Game): Game {
-  return JSON.parse(JSON.stringify(game), (_key, value) =>
-    typeof value === 'string' && isLocalAsset(value) ? '' : value,
-  ) as Game;
-}
 export function hasLocalAssets(game: Game) {
   return assetReferences(game).some((a) => isLocalAsset(a.url));
 }
@@ -35,6 +30,7 @@ export async function persistLocalAssets(game: Game): Promise<Game> {
   }
   return rewriteAssets(game, mapped);
 }
+
 // Stored schemas retain stable asset IDs; credentials never appear in media URLs.
 export function useMedia(url: string) {
   const [resolved, setResolved] = useState('');
