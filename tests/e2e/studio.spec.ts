@@ -5,10 +5,10 @@ import sharp from 'sharp';
 test('landing page enters the live studio', async ({ page }) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: /Build a game from your memories/ }),
+    page.getByRole('heading', { name: /Your favorite memories, turned into a game/ }),
   ).toBeVisible();
   const mediaStyles = await page
-    .locator('.preview-media img, .feature-media img')
+    .locator('.game-image img, .mode-image img')
     .evaluateAll((images) =>
       images.map((image) => ({
         fit: getComputedStyle(image).objectFit,
