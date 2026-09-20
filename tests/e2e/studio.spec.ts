@@ -7,14 +7,12 @@ test('landing page enters the live studio', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: /Your favorite memories, turned into a game/ }),
   ).toBeVisible();
-  const mediaStyles = await page
-    .locator('.game-image img, .mode-image img')
-    .evaluateAll((images) =>
-      images.map((image) => ({
-        fit: getComputedStyle(image).objectFit,
-        position: getComputedStyle(image).position,
-      })),
-    );
+  const mediaStyles = await page.locator('.game-image img, .mode-image img').evaluateAll((images) =>
+    images.map((image) => ({
+      fit: getComputedStyle(image).objectFit,
+      position: getComputedStyle(image).position,
+    })),
+  );
   expect(
     mediaStyles.every(({ fit, position }) => fit === 'contain' && position === 'absolute'),
   ).toBe(true);

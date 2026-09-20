@@ -33,7 +33,10 @@ async function storageRequest(id: string, method: string, payload?: Buffer, mime
     signal: AbortSignal.timeout(30000),
   });
   if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
-    const providerBody = await response.clone().text().catch(() => '');
+    const providerBody = await response
+      .clone()
+      .text()
+      .catch(() => '');
     let providerMessage = providerBody;
     try {
       const body = JSON.parse(providerBody);

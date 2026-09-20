@@ -122,6 +122,22 @@ test('motorcycle power-ups validate and expose built-in or custom rider art', as
   );
 });
 
+test('uploaded character art takes precedence over a configured avatar', async () => {
+  const { runtimeConfig } = await import('../shared/runtime');
+  const game = createTemplate();
+  const hero = game.characters.find((character) => character.role === 'hero')!;
+  const sprite = '/api/assets/12345678-1234-1234-1234-123456789abc';
+  hero.sprite = sprite;
+
+  const runtime = runtimeConfig(gameSchema.parse(game));
+  assert.equal(runtime.assets[hero.id], sprite);
+  assert.equal(runtime.assets.player_character, sprite);
+  assert.equal(
+    runtime.characters.find((character) => character.id === hero.id)?.sheetFrames,
+    undefined,
+  );
+});
+
 test('every reusable starter validates and maps movement into runtime coordinates', async () => {
   const { starters, createStarter } = await import('../shared/template');
   const { runtimeConfig, WORLD_UNIT } = await import('../shared/runtime');

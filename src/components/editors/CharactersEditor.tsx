@@ -1,14 +1,16 @@
 import { MediaImage } from '../../media';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, User, Check } from 'lucide-react';
+import { Plus, Trash2, User, Check, Image } from 'lucide-react';
 import type { Game, Character } from '../../../shared/schema';
-import { Field } from '../UI';
+import { attachAsset } from '../../api';
+import { Field, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 import { AvatarRenderer } from '../../avatar/components/AvatarRenderer';
 import { AvatarCreator } from '../../avatar/components/AvatarCreator';
 import { defaultAvatar } from '../../../shared/avatar';
 export function CharactersEditor({ game, change, notify }: EditorProps) {
   const [selectedId, setSelectedId] = useState(game.characters[0].id);
+  const [uploading, setUploading] = useState(false);
   const c = game.characters.find((character) => character.id === selectedId) || game.characters[0];
   useEffect(() => {
     if (!game.characters.some((character) => character.id === selectedId)) {
@@ -118,6 +120,48 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
             notify(`${c.name}'s character is ready — save the adventure to keep it`);
           }}
         />
+        <div className="upload-row">
+          <div>
+            <Image size={19} />
+            <div>
+              <strong>
+                {c.sprite ? 'Custom character art in use' : 'Upload your own character art'}
+              </strong>
+              <small>
+                Transparent PNG or WebP works best. JPEG is also supported, up to 10 MB.
+              </small>
+            </div>
+          </div>
+          <UploadButton
+            label={uploading ? 'Uploading…' : c.sprite ? 'Replace art' : 'Upload art'}
+            disabled={uploading}
+            accept="image/png,image/jpeg,image/webp"
+            onFile={async (file) => {
+              setUploading(true);
+              try {
+                const id = c.id;
+                const sprite = await attachAsset(file, 'image');
+                change((g) => {
+                  const character = g.characters.find((x) => x.id === id);
+                  if (character) {
+                    character.sprite = sprite;
+                    delete character.avatar;
+                  }
+                });
+                notify('Custom character art uploaded');
+              } catch (error) {
+                notify((error as Error).message);
+              } finally {
+                setUploading(false);
+              }
+            }}
+          />
+        </div>
+        {c.sprite && (
+          <small className="muted">
+            Choose any built-in character above to switch back from your uploaded art.
+          </small>
+        )}
         <div className="form-grid">
           <Field label="Character name">
             <input
@@ -217,9 +261,6 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
             ))}
           </div>
         )}
-        <small className="muted">
-          All character art and movement comes from the built-in sprite collection.
-        </small>
       </div>
     </>
   );
