@@ -42,6 +42,7 @@ import { createTemplate, createStarter, starters, type StarterId } from '../shar
 import { exportLocalGame, importGameExport, stripLocalAssets } from '../shared/export';
 import { api, downloadProject, setUploadProject } from './api';
 import { authenticateWithGoogle, completeAuthRedirect, supabase } from './auth';
+import { track } from './analytics';
 import { hasLocalAssets, persistLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
@@ -367,6 +368,7 @@ export default function App() {
     }
   }
   function startProject(id: StarterId) {
+    track('game_creation_started', { starter: id });
     switchSafely(() => {
       draftEpoch.current++;
       setGame(createStarter(id));
@@ -387,7 +389,9 @@ export default function App() {
         <header className="game-page-header">
           <a className="brand" href="/" aria-label="Gamegift home">
             <span className="brand-mark">✦</span>
-            gamegift
+            <span className="brand-word">
+              game<span>gift</span>
+            </span>
           </a>
           <span className="game-page-keepsake">A playable keepsake</span>
         </header>
@@ -430,7 +434,9 @@ export default function App() {
       <aside className="sidebar">
         <a className="brand" href="/">
           <span className="brand-mark">✦</span>
-          gamegift
+          <span className="brand-word">
+            game<span>gift</span>
+          </span>
         </a>
         <button className="workspace-picker" onClick={showProjects}>
           <span className="workspace-icon">{user?.name[0].toUpperCase() || 'P'}</span>

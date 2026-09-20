@@ -2213,15 +2213,22 @@ input[type='color'] {
   flex-wrap: wrap;
 }
 .brand-mark {
-  background: transparent;
-  color: #df5e44;
-  border-radius: 0;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px 10px 10px 4px;
+  background: linear-gradient(145deg, #ef765d, #bd402d);
+  box-shadow: 0 5px 14px rgba(189, 64, 45, 0.2);
+  color: #fff;
   display: grid;
   place-items: center;
-  font-size: 30px;
-  transform: none;
+  font-size: 18px;
+  transform: rotate(-4deg);
+}
+.brand-word {
+  color: #202020;
+}
+.brand-word > span {
+  color: #bd402d;
 }
 .brand-dot {
   font:

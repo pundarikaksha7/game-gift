@@ -1628,7 +1628,11 @@ canvas {
 }
 .story-character figcaption span {
   color: #8b857c;
-  font: 700 9px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font:
+    700 9px/1.2 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   letter-spacing: 1.45px;
   text-transform: uppercase;
 }
@@ -1638,16 +1642,137 @@ canvas {
   margin-top: 4px;
   overflow: hidden;
   color: #292825;
-  font: 650 14px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font:
+    650 14px/1.2 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   letter-spacing: -0.15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.story-narrator figcaption strong { color: var(--gift-coral-dark); }
-.story-listener figcaption strong { color: #514cb8; }
+.story-narrator figcaption strong {
+  color: var(--gift-coral-dark);
+}
+.story-listener figcaption strong {
+  color: #514cb8;
+}
 
 @media (max-width: 760px), (max-height: 620px) {
-  .story-character figcaption { margin-top: 7px; padding: 0; }
-  .story-character figcaption span { font-size: 7px; }
-  .story-character figcaption strong { margin-top: 2px; font-size: 10px; }
+  .story-character figcaption {
+    margin-top: 7px;
+    padding: 0;
+  }
+  .story-character figcaption span {
+    font-size: 7px;
+  }
+  .story-character figcaption strong {
+    margin-top: 2px;
+    font-size: 10px;
+  }
+}
+
+/* Minimal play HUD: keep the world visible and the essentials glanceable. */
+.hud {
+  top: 20px;
+  left: 22px;
+  display: flex;
+  min-width: 0;
+  max-width: min(440px, calc(100vw - 44px));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  transform: none;
+  animation: giftHudIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  align-items: center;
+  gap: 13px;
+}
+.level-name {
+  display: block;
+  max-width: 280px;
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font:
+    750 15px/1.2 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  letter-spacing: -0.15px;
+  text-overflow: ellipsis;
+  text-shadow:
+    0 2px 9px rgba(9, 12, 20, 0.86),
+    0 1px 2px rgba(9, 12, 20, 0.8);
+  text-transform: none;
+  white-space: nowrap;
+}
+.level-name::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin-left: 13px;
+  background: rgba(255, 255, 255, 0.46);
+  vertical-align: -2px;
+}
+.health-row {
+  display: flex;
+  margin: 0;
+  font:
+    700 20px/1 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  letter-spacing: 2px;
+  filter: drop-shadow(0 2px 5px rgba(9, 12, 20, 0.72));
+  text-shadow: none;
+}
+.heart-full {
+  color: #ff766d;
+}
+.heart-empty {
+  color: rgba(255, 255, 255, 0.38);
+}
+.hud-label,
+.enemy-count,
+.combat-help,
+.attack-state,
+.hud .powerup-status {
+  display: none !important;
+}
+
+@media (max-width: 600px), (max-height: 500px) {
+  .hud,
+  body.mobile-landscape .hud {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    max-width: calc(100vw - 24px);
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    transform: none;
+    gap: 10px;
+  }
+  .level-name,
+  body.mobile-landscape .level-name {
+    max-width: 42vw;
+    margin: 0;
+    font-size: 12px;
+  }
+  .level-name::after {
+    height: 11px;
+    margin-left: 10px;
+  }
+  .health-row,
+  body.mobile-landscape .health-row {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1;
+    letter-spacing: 1px;
+  }
 }

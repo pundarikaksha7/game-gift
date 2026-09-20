@@ -2,6 +2,16 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.game-gift.shop" }],
+      "destination": "https://game-gift.shop/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -9,19 +19,19 @@
     },
     {
       "source": "/play/:path*",
-      "destination": "/index.html"
+      "destination": "/private.html"
     },
     {
       "source": "/studio",
-      "destination": "/index.html"
+      "destination": "/private.html"
     },
     {
       "source": "/my-games",
-      "destination": "/index.html"
+      "destination": "/private.html"
     },
     {
       "source": "/auth/callback",
-      "destination": "/index.html"
+      "destination": "/private.html"
     }
   ],
   "headers": [

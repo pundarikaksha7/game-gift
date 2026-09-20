@@ -240,8 +240,7 @@ async function run(mode) {
 
       const launch = intelligence >= 0.9 ? 940 : 820;
       const flightTime = (launch * 2) / this.gravity;
-      const landingX =
-        direction > 0 ? pit.x + pit.w + 30 : pit.x - actor.w - 30;
+      const landingX = direction > 0 ? pit.x + pit.w + 30 : pit.x - actor.w - 30;
       const velocity = (landingX - actor.x) / flightTime;
       const maximumVelocity = Math.max(430, Math.abs(moveSpeed) * 1.2);
       if (Math.abs(velocity) > maximumVelocity) return true;
@@ -437,11 +436,13 @@ async function run(mode) {
           : null,
         facingRight: false,
         health:
-          Number(enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88)) *
-          healthMultiplier,
+          Number(
+            enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88),
+          ) * healthMultiplier,
         maxHealth:
-          Number(enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88)) *
-          healthMultiplier,
+          Number(
+            enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88),
+          ) * healthMultiplier,
         attackTimer: 0.35 + i * 0.12,
         attackPulse: 0,
         hurtTimer: 0,
@@ -843,9 +844,17 @@ async function run(mode) {
   // continuously when a key is held down.
   window.addEventListener('keydown', (e) => {
     if (
-      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyJ', 'KeyK'].includes(
-        e.code,
-      )
+      [
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'Space',
+        'KeyA',
+        'KeyD',
+        'KeyW',
+        'KeyJ',
+        'KeyK',
+      ].includes(e.code)
     )
       enableSound();
     if (gameOver && !e.repeat && (e.code === 'KeyR' || e.code === 'Enter')) {
@@ -1004,28 +1013,16 @@ async function run(mode) {
   const hud = document.createElement('div');
   hud.className = 'hud';
   hud.innerHTML = `
-            <span class="hud-label">Adventure</span>
             <span class="level-name"></span>
             <span class="health-row"></span>
-            <span class="enemy-count"></span>
-            <span class="combat-help">A D / ← → Move · Space Jump / Stomp · J Punch · K Kick · P Pause</span>
-            <span class="attack-state"></span>
         `;
-  hud.querySelector('.hud-label').textContent = cfg.title;
   gameWorld.appendChild(hud);
   const powerupNotice = document.createElement('div');
   powerupNotice.className = 'powerup-notice';
   powerupNotice.setAttribute('role', 'status');
   gameWorld.appendChild(powerupNotice);
-  const powerupStatus = document.createElement('div');
-  powerupStatus.className = 'powerup-status';
-  hud.appendChild(powerupStatus);
-  const scoreStatus = document.createElement('div');
-  scoreStatus.className = 'powerup-status';
-  hud.appendChild(scoreStatus);
   const levelNameEl = hud.querySelector('.level-name');
   const healthRowEl = hud.querySelector('.health-row');
-  const enemyCountEl = hud.querySelector('.enemy-count');
   const attackStateEl = hud.querySelector('.attack-state');
 
   const levelTransitionOverlay = document.createElement('div');
@@ -1203,13 +1200,8 @@ async function run(mode) {
     if (now - hudUpdatedAt < 100) return;
     hudUpdatedAt = now;
     powerupNotice.style.opacity = powerupMessageTimer > 0 ? '1' : '0';
-    powerupStatus.textContent = Object.keys(powerupTimers)
-      .filter((k) => powerupTimers[k] > 0)
-      .map((k) => `${powerupDefinitions[k].name}: ${Math.ceil(powerupTimers[k])}s`)
-      .join(' · ');
-    scoreStatus.textContent = `Stage score ${stageScore} · ${styleChain > 1 ? `${styleChain} HIT MIX` : 'Mix J / K / stomps for combos'}`;
     const level = getLevelConfig();
-    levelNameEl.textContent = `Level ${currentLevelIndex + 1} · ${level.name}`;
+    levelNameEl.textContent = level.name;
     const maxHealth = Math.max(1, Math.round(Number(cfg.player.maxHealth ?? 5)));
     const full = Math.max(0, Math.min(maxHealth, player.health));
     healthRowEl.innerHTML = '';
@@ -1219,13 +1211,6 @@ async function run(mode) {
       heart.textContent = '♥';
       healthRowEl.appendChild(heart);
     }
-    const remaining = enemies.filter((enemy) => enemy.defeatTimer <= 0).length;
-    enemyCountEl.textContent =
-      boss && boss.awakened && boss.health > 0
-        ? `FINAL BOSS · ${getLevelConfig().boss.name} ${Math.ceil(boss.health)}/${boss.maxHealth} · Jump to dodge`
-        : exitUnlocked
-          ? `Route clear — reach the EXIT →  ·  ${currentLevelIndex + 1}/${cfg.levels.length}`
-          : `Reach the exit →  ·  ${remaining} rivals  ·  ${Math.min(100, Math.round((player.x / (getLevelLength() - 180)) * 100))}%`;
   }
 
   if (mode === 'edit') {
@@ -1895,9 +1880,7 @@ async function run(mode) {
         ctx.lineWidth = 5;
         ctx.strokeStyle = 'rgba(10, 14, 24, .66)';
         ctx.fillStyle = '#fff';
-        const enemyLabel = enemy.boss
-          ? getLevelConfig().boss.name + ' · FINAL BOSS'
-          : spec.name;
+        const enemyLabel = enemy.boss ? getLevelConfig().boss.name + ' · FINAL BOSS' : spec.name;
         ctx.strokeText(enemyLabel, sx + enemy.w / 2, sy - 23);
         ctx.fillText(enemyLabel, sx + enemy.w / 2, sy - 23);
         const barW = Math.max(48, enemy.w + 12);
@@ -2042,8 +2025,7 @@ async function run(mode) {
         const desiredX = spawnStart + index * spawnSpacing;
         const surface = spawnPlatforms
           .filter(
-            (platform) =>
-              desiredX + 54 > platform.x + 4 && desiredX < platform.x + platform.w - 4,
+            (platform) => desiredX + 54 > platform.x + 4 && desiredX < platform.x + platform.w - 4,
           )
           .sort(
             (a, b) =>
@@ -2138,7 +2120,10 @@ async function run(mode) {
         }
       }
 
-      const distanceFromHero = Math.hypot(ally.x + ally.w / 2 - heroCenter, ally.y + ally.h - heroFeet);
+      const distanceFromHero = Math.hypot(
+        ally.x + ally.w / 2 - heroCenter,
+        ally.y + ally.h - heroFeet,
+      );
       const mustRegroup = distanceFromHero > 520;
       let target = mustRegroup
         ? undefined
@@ -2232,8 +2217,7 @@ async function run(mode) {
               );
               const velocity = (landingX - ally.x) / flight;
               const score =
-                Math.abs(landingX - destinationX) +
-                Math.abs(platform.y - destinationFeetY) * 1.2;
+                Math.abs(landingX - destinationX) + Math.abs(platform.y - destinationFeetY) * 1.2;
               return { platform, velocity, score };
             })
             .filter(
@@ -2321,9 +2305,7 @@ async function run(mode) {
           ally.vy = 0;
           ally.onGround = true;
           ally.jumpVelocity = undefined;
-          ally.support = platform.id
-            ? { id: platform.id, x: platform.x, y: platform.y }
-            : null;
+          ally.support = platform.id ? { id: platform.id, x: platform.x, y: platform.y } : null;
           break;
         }
       }
@@ -2340,7 +2322,7 @@ async function run(mode) {
           ? pit.direction > 0
             ? pit.x + pit.w + 34
             : pit.x - ally.w - 34
-          : ally.lastSafeX ?? player.x;
+          : (ally.lastSafeX ?? player.x);
         ally.x = findSafeRespawnX(recoveryX, ally.w);
         ally.y = groundY - ally.h;
         ally.vx = 0;
@@ -3311,8 +3293,9 @@ async function run(mode) {
           })
         ) {
           const damage =
-            Number(enemyCfg[enemyTypes[enemy.type].damageKey] ?? enemyTypes[enemy.type].attackDamage) *
-            Math.max(0.1, Number(getLevelConfig().enemyDamageMultiplier ?? 1));
+            Number(
+              enemyCfg[enemyTypes[enemy.type].damageKey] ?? enemyTypes[enemy.type].attackDamage,
+            ) * Math.max(0.1, Number(getLevelConfig().enemyDamageMultiplier ?? 1));
           hurtPlayer(damage, enemy.x + enemy.w / 2);
           enemy.attackHitDone = true;
         }
@@ -3399,11 +3382,7 @@ async function run(mode) {
     }
     // The exit is a hard progress checkpoint. Reaching it must never be
     // blocked by an AI actor stranded behind a pit or on a lift.
-    if (
-      touchingExit &&
-      exitUnlocked &&
-      (!getLevelConfig().boss?.enabled || bossDefeated)
-    ) {
+    if (touchingExit && exitUnlocked && (!getLevelConfig().boss?.enabled || bossDefeated)) {
       startLevelTransition();
       return;
     }

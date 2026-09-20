@@ -16,6 +16,8 @@ import {
   Surface,
   VStack,
 } from '@flowstack-ui/brick';
+import '@flowstack-ui/brick/reset.css';
+import '@flowstack-ui/brick/styles.css';
 import {
   ArrowRight,
   BookOpen,
@@ -110,7 +112,9 @@ function Wordmark() {
       <span className="brand-gem" aria-hidden="true">
         ✦
       </span>
-      <span>gamegift</span>
+      <span className="brand-word">
+        game<span>gift</span>
+      </span>
     </span>
   );
 }
@@ -132,7 +136,7 @@ export default function Landing() {
                 className={menuOpen ? 'landing-nav is-open' : 'landing-nav'}
                 aria-label="Main navigation"
               >
-                <a href="#examples" onClick={() => setMenuOpen(false)}>
+                <a href="/examples" onClick={() => setMenuOpen(false)}>
                   Examples
                 </a>
                 <a href="#personalize" onClick={() => setMenuOpen(false)}>
@@ -150,6 +154,7 @@ export default function Landing() {
               <Button
                 className="desktop-cta"
                 href="/studio"
+                data-analytics="create_game_clicked"
                 tone="accent"
                 size="md"
                 endIcon={<ArrowRight size={16} />}
@@ -183,7 +188,7 @@ export default function Landing() {
                   variant={{ initial: 'display-sm', md: 'display-lg' }}
                   wrap="balance"
                 >
-                  Your favorite memories, <span className="serif-accent">turned into a game.</span>
+                  Create a Personalized Game <span className="serif-accent">as a Gift.</span>
                 </Heading>
                 <Paragraph variant="body-lg" tone="secondary" className="hero-lede">
                   Build a one-of-one adventure for someone you love. Personalize the cast, world and
@@ -194,11 +199,11 @@ export default function Landing() {
                   gap={3}
                   align={{ initial: 'stretch', sm: 'center' }}
                 >
-                  <Button href="/studio" tone="accent" size="lg" endIcon={<ArrowRight size={18} />}>
+                  <Button href="/studio" data-analytics="create_game_clicked" tone="accent" size="lg" endIcon={<ArrowRight size={18} />}>
                     Make a game gift
                   </Button>
                   <Button
-                    href="#examples"
+                    href="/examples"
                     variant="outline"
                     size="lg"
                     startIcon={<Play size={16} />}
@@ -234,7 +239,7 @@ export default function Landing() {
                   </HStack>
                   <Image.Root
                     className="game-image"
-                    src="/screenshots/gameplay-preview.gif"
+                    src="/screenshots/gameplay-preview.webp"
                     ratio={16 / 9}
                     frame="subtle"
                     radius="none"
@@ -518,8 +523,11 @@ export default function Landing() {
             </a>
             <Paragraph tone="muted">A little world, made for one very important person.</Paragraph>
             <HStack gap={5}>
-              <a href="#examples">Examples</a>
+              <a href="/examples">Examples</a>
               <a href="#faq">FAQ</a>
+              <a href="/personalized-game-gift">Gift ideas</a>
+              <a href="/about">About</a>
+              <a href="/privacy">Privacy</a>
               <a href="/studio">Start creating</a>
             </HStack>
           </Stack>

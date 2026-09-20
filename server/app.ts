@@ -538,6 +538,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
   app.use('/api', (_req, _res, next) => next(fail(404, 'Endpoint not found')));
   app.use(
     express.static(path.resolve('dist'), {
+      redirect: false,
       setHeaders(res, file) {
         res.setHeader(
           'Cache-Control',
@@ -552,9 +553,30 @@ export function createApp(db: DB, options: AppOptions = {}) {
       },
     }),
   );
-  app.get('/{*path}', (_req, res) =>
-    res.set('Cache-Control', 'no-cache').sendFile(path.resolve('dist/index.html')),
-  );
+  const marketingRoutes = new Set([
+    '/personalized-game-gift',
+    '/birthday-game-gift',
+    '/game-for-girlfriend',
+    '/game-for-boyfriend',
+    '/anniversary-game-gift',
+    '/personalized-digital-gift',
+    '/examples',
+    '/about',
+    '/contact',
+    '/privacy',
+    '/terms',
+  ]);
+  app.get('/{*path}', (req, res) => {
+    const route = req.path.replace(/\/$/, '') || '/';
+    if (marketingRoutes.has(route))
+      return res
+        .set('Cache-Control', 'no-cache')
+        .sendFile(path.resolve('dist', route.slice(1), 'index.html'));
+    if (['/studio', '/my-games', '/auth/callback'].includes(route) || route.startsWith('/play/'))
+      return res.set('Cache-Control', 'no-cache').sendFile(path.resolve('dist/private.html'));
+    if (route !== '/') return res.status(404).type('text').send('Page not found');
+    return res.set('Cache-Control', 'no-cache').sendFile(path.resolve('dist/index.html'));
+  });
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status =
       err instanceof ZodError

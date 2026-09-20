@@ -39,7 +39,7 @@ export function mountPublic(app: express.Express, db: DB, auth: express.RequestH
     const game = JSON.parse(p.published_game);
     const origin = process.env.APP_ORIGIN || 'http://localhost:5173';
     const url = `${origin}/g/${encodeURIComponent(p.slug)}`;
-    const metadata = `<title>${escape(game.title)} · Gamegift</title><meta property="og:title" content="${escape(game.title)}"><meta property="og:description" content="${escape(game.description || 'A personalized playable gift, made just for you.')}"><meta property="og:url" content="${escape(url)}"><meta property="og:type" content="website"><meta property="og:image" content="${escape(origin)}/social-card.png"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${escape(url)}">`;
+    const metadata = `<title>${escape(game.title)} · Game Gift</title><meta name="robots" content="noindex, nofollow, noarchive"><meta property="og:title" content="${escape(game.title)}"><meta property="og:description" content="${escape(game.description || 'A personalized playable gift, made just for you.')} "><meta property="og:url" content="${escape(url)}"><meta property="og:type" content="website"><meta property="og:image" content="${escape(origin)}/screenshots/gameplay-preview.webp"><meta name="twitter:card" content="summary_large_image">`;
     const html = (await readFile('dist/index.html', 'utf8'))
       .replace(/<title>.*?<\/title>/s, '')
       .replace('</head>', `${metadata}</head>`);

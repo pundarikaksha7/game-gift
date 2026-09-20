@@ -1,3 +1,10 @@
 User-agent: *
 Allow: /
 Disallow: /studio
+Disallow: /my-games
+Disallow: /auth/
+Disallow: /play/
+Disallow: /g/
+Disallow: /api/
+
+Sitemap: https://game-gift.shop/sitemap.xml

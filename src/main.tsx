@@ -1,9 +1,8 @@
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/manrope';
-import '@flowstack-ui/brick/reset.css';
-import '@flowstack-ui/brick/styles.css';
 import { Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { initializeAnalytics, track } from './analytics';
 import './landing.css';
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false };
@@ -31,7 +30,31 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
   }
 }
 async function boot() {
-  const landing = location.pathname === '/';
+  const marketingPaths = new Set([
+    '/',
+    '/personalized-game-gift',
+    '/birthday-game-gift',
+    '/game-for-girlfriend',
+    '/game-for-boyfriend',
+    '/anniversary-game-gift',
+    '/personalized-digital-gift',
+    '/examples',
+    '/about',
+    '/contact',
+    '/privacy',
+    '/terms',
+  ]);
+  const normalizedPath = location.pathname.replace(/\/$/, '') || '/';
+  const landing = marketingPaths.has(normalizedPath);
+  void initializeAnalytics().then(() => {
+    if (landing) track('seo_landing_view', { path: normalizedPath });
+  });
+  document.addEventListener('click', (event) => {
+    const link = (event.target as Element).closest<HTMLElement>('[data-analytics]');
+    const name = link?.dataset.analytics;
+    if (name === 'create_game_clicked') track(name, { path: normalizedPath });
+    if (name === 'example_viewed') track(name, { path: normalizedPath });
+  });
   if (location.pathname === '/studio') {
     document.title = 'Gamegift Studio – Build Your Personalized Game';
     document.querySelector('meta[name="robots"]')?.setAttribute('content', 'noindex, nofollow');
@@ -51,7 +74,11 @@ async function boot() {
     }
   }
   const [{ default: App }] = await Promise.all([
-    landing ? import('./Landing') : import('./Studio'),
+    normalizedPath === '/'
+      ? import('./Landing')
+      : landing
+        ? import('./MarketingPage').then(({ MarketingRoute }) => ({ default: MarketingRoute }))
+        : import('./Studio'),
     landing ? Promise.resolve() : import('./studio.css'),
   ]);
   createRoot(document.getElementById('root')!).render(

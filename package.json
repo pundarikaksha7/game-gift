@@ -10,7 +10,7 @@
     "dev": "concurrently -k \"node --env-file-if-exists=.env --import tsx --watch server/index.ts\" \"vite --host 0.0.0.0\"",
     "pretest": "node scripts/require-node.mjs",
     "pretest:e2e": "node scripts/require-node.mjs && npm run build",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node --import tsx scripts/prerender-seo.ts",
     "prebuild": "node scripts/require-node.mjs",
     "start": "node --env-file-if-exists=.env --import tsx server/index.ts",
     "test": "node --import tsx --test tests/*.test.ts",

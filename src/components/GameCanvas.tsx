@@ -187,15 +187,17 @@ function ClassicGameCanvas({
         ctx.stroke();
       }
       if (playing) {
-        ctx.fillStyle = '#263c32dc';
-        ctx.beginPath();
-        ctx.roundRect(22, 20, 210, 67, 12);
-        ctx.fill();
-        ctx.font = '600 14px system-ui';
+        ctx.save();
+        ctx.shadowColor = 'rgba(10, 14, 24, 0.72)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.font = '700 15px system-ui';
         ctx.fillStyle = '#fff';
-        ctx.fillText(level.name, 38, 44);
-        ctx.fillStyle = '#f2b6aa';
-        ctx.fillText('♥ '.repeat(Math.max(0, health)), 38, 68);
+        ctx.fillText(level.name, 28, 39);
+        ctx.font = '700 22px system-ui';
+        ctx.fillStyle = '#ff766d';
+        ctx.fillText('♥ '.repeat(Math.max(0, health)), 28, 67);
+        ctx.restore();
       }
       frame = requestAnimationFrame(draw);
     }

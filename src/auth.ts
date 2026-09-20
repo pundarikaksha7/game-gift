@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { track } from './analytics';
 type SupabaseClient = ReturnType<typeof createClient>;
 export let supabase: SupabaseClient | null = null;
 let authRedirectUrl: string | undefined;
@@ -44,6 +45,7 @@ export async function accessToken() {
 }
 export async function authenticateWithGoogle() {
   if (!supabase) throw new Error('Supabase Auth is not configured.');
+  track('signup_started', { provider: 'google' });
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: redirectTo() },
