@@ -1,5 +1,7 @@
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/manrope';
+import '@flowstack-ui/brick/reset.css';
+import '@flowstack-ui/brick/styles.css';
 import { Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './landing.css';

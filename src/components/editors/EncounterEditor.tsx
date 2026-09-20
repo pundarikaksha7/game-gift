@@ -133,13 +133,46 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
               ['companion', 'Summon companions'],
               ['beam', 'Energy beam'],
               ['boost', 'Damage boost'],
-              ['mixed', 'Cycle through all three'],
+              ['motorcycle', 'Hidden phone · motorcycle sweep'],
+              ['mixed', 'Cycle through all four'],
             ].map(([v, label]) => (
               <option key={v} value={v}>
                 {label}
               </option>
             ))}
           </select>
+        </Field>
+        <Field
+          label="Motorcycle power-up art"
+          hint="Replace the built-in rider artwork used for the hidden-phone motorcycle power-up."
+        >
+          <div className="inline-actions">
+            <UploadButton
+              label={l.motorcycleArt ? 'Replace motorcycle art' : 'Upload motorcycle art'}
+              accept="image/png,image/jpeg,image/webp"
+              onFile={async (file) => {
+                const levelId = l.id;
+                try {
+                  const url = await attachAsset(file, 'image');
+                  change((g) => {
+                    const chapter = g.levels.find((item) => item.id === levelId);
+                    if (chapter) chapter.motorcycleArt = url;
+                  });
+                } catch (error) {
+                  notify((error as Error).message);
+                }
+              }}
+            />
+            {l.motorcycleArt && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => change((g) => delete g.levels[level].motorcycleArt)}
+              >
+                Use built-in rider
+              </button>
+            )}
+          </div>
         </Field>
         <Field
           label="Custom power-up art"

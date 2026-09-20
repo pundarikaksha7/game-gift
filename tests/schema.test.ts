@@ -104,6 +104,24 @@ test('background uploads participate in asset authorization and movement options
   assert.equal(gameSchema.safeParse(game).success, true);
 });
 
+test('motorcycle power-ups validate and expose built-in or custom rider art', async () => {
+  const { assetReferences } = await import('../shared/schema');
+  const { runtimeConfig } = await import('../shared/runtime');
+  const game = createTemplate();
+  const rider = '/api/assets/12345678-1234-1234-1234-123456789abc';
+  game.levels[0].powerup = 'motorcycle';
+  game.levels[0].motorcycleArt = rider;
+  const parsed = gameSchema.parse(game);
+  assert.ok(assetReferences(parsed).some((asset) => asset.url === rider));
+  assert.equal(runtimeConfig(parsed).assets[`motorcycle-${parsed.levels[0].id}`], rider);
+
+  delete game.levels[0].motorcycleArt;
+  assert.equal(
+    runtimeConfig(gameSchema.parse(game)).assets[`motorcycle-${game.levels[0].id}`],
+    '/assets/powerups/motorcycle.webp',
+  );
+});
+
 test('every reusable starter validates and maps movement into runtime coordinates', async () => {
   const { starters, createStarter } = await import('../shared/template');
   const { runtimeConfig, WORLD_UNIT } = await import('../shared/runtime');

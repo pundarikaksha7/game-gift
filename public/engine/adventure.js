@@ -221,6 +221,42 @@ async function run(mode) {
     );
   }
 
+  // Shared movement intelligence for every autonomous actor. Companions and
+  // villains use the same ballistic pit read instead of maintaining subtly
+  // different edge behavior that can strand one group in a respawn loop.
+  class ActorNavigator {
+    constructor(gravity) {
+      this.gravity = gravity;
+    }
+
+    crossPit(actor, direction, moveSpeed, intelligence = 1) {
+      if (!actor.onGround || !direction || actor.jumpCooldown > 0) return false;
+      const pit = holeAhead(actor.x, actor.w, direction, 90 + Math.abs(moveSpeed) * 0.35);
+      if (!pit) return false;
+
+      actor.vx = 0;
+      const maximumSpan = intelligence >= 0.9 ? 500 : 250;
+      if (pit.w > maximumSpan) return true;
+
+      const launch = intelligence >= 0.9 ? 940 : 820;
+      const flightTime = (launch * 2) / this.gravity;
+      const landingX =
+        direction > 0 ? pit.x + pit.w + 30 : pit.x - actor.w - 30;
+      const velocity = (landingX - actor.x) / flightTime;
+      const maximumVelocity = Math.max(430, Math.abs(moveSpeed) * 1.2);
+      if (Math.abs(velocity) > maximumVelocity) return true;
+
+      actor.vy = -launch;
+      actor.vx = velocity;
+      actor.jumpVelocity = velocity;
+      actor.onGround = false;
+      actor.jumpCooldown = intelligence >= 0.9 ? 0.8 : 1.15;
+      actor.pendingPit = { ...pit, direction };
+      return true;
+    }
+  }
+  const actorNavigator = new ActorNavigator(Number(cfg.physics.gravity ?? 1800));
+
   function handlePlayerFall() {
     if (fallRespawnTimer > 0 || gameOver || levelTransition || allLevelsComplete) return;
     const level = getLevelConfig();
@@ -285,6 +321,12 @@ async function run(mode) {
       duration: cfg.mechanics.boostDuration,
       color: '#37ffb4',
       description: 'Punch + kick damage ×1.8',
+    },
+    motorcycle: {
+      name: 'Motorcycle call',
+      duration: 0,
+      color: '#ff9b35',
+      description: 'A rider sweeps through every villain',
     },
   };
   const powerupTimers = { companion: 0, beam: 0, boost: 0 };
@@ -496,7 +538,7 @@ async function run(mode) {
       ) {
         const kind =
           getLevelConfig().powerup === 'mixed'
-            ? ['companion', 'beam', 'boost'][levelDropCount % 3]
+            ? ['companion', 'beam', 'boost', 'motorcycle'][levelDropCount % 4]
             : getLevelConfig().powerup;
         dropPowerup(kind, enemy);
         levelDropCount++;
@@ -656,10 +698,7 @@ async function run(mode) {
   const enemyImageStates = Object.fromEntries(
     Object.keys(enemyTypes).map((id) => [id, loadImageAsset(id)]),
   );
-  const specialImageStates = {
-    phone: loadImageAsset('hidden_phone_icon'),
-    motorcycle: loadImageAsset('biker_motorcycle'),
-  };
+  const specialImageStates = { phone: loadImageAsset('hidden_phone_icon') };
 
   const frameCache = new Map();
   for (const c of cfg.characters)
@@ -1976,6 +2015,12 @@ async function run(mode) {
   }
   function activatePowerup(kind) {
     if (!powerupDefinitions[kind]) return;
+    if (kind === 'motorcycle') {
+      startMotorcycleSweep();
+      const info = powerupDefinitions[kind];
+      announcePowerup(`${info.name} · ${info.description}`);
+      return;
+    }
     powerupTimers[kind] = powerupDefinitions[kind].duration;
     if (kind === 'companion' && companions.length === 0) {
       const viewLeft = cameraX + 48;
@@ -2154,21 +2199,7 @@ async function run(mode) {
           ally.x < platform.x + platform.w - 4 &&
           Math.abs(allyBottom - platform.y) < 12,
       );
-      const approachingPit =
-        ally.onGround && ally.vx
-          ? holeAhead(ally.x, ally.w, direction, 75 + walkSpeed * 0.3)
-          : null;
-      if (approachingPit) {
-        const canJumpPit = approachingPit.w <= 330 && ally.jumpCooldown <= 0;
-        ally.vx = 0;
-        if (canJumpPit) {
-          ally.vy = -880;
-          ally.vx = direction * Math.max(330, walkSpeed);
-          ally.jumpVelocity = ally.vx;
-          ally.onGround = false;
-          ally.jumpCooldown = 1.2;
-        }
-      }
+      actorNavigator.crossPit(ally, direction, walkSpeed, 1);
 
       if (ally.onGround && support) {
         const front = direction > 0 ? ally.x + ally.w : ally.x;
@@ -2299,13 +2330,20 @@ async function run(mode) {
         isOverGroundHole(ally.x, ally.w) &&
         ally.y + ally.h >= groundY - 6;
       if (missedGap) {
-        ally.x = findSafeRespawnX(ally.lastSafeX ?? player.x, ally.w);
+        const pit = ally.pendingPit;
+        const recoveryX = pit
+          ? pit.direction > 0
+            ? pit.x + pit.w + 34
+            : pit.x - ally.w - 34
+          : ally.lastSafeX ?? player.x;
+        ally.x = findSafeRespawnX(recoveryX, ally.w);
         ally.y = groundY - ally.h;
         ally.vx = 0;
         ally.vy = 0;
         ally.onGround = true;
         ally.jumpVelocity = undefined;
         ally.jumpCooldown = 0.25;
+        ally.pendingPit = null;
         ally.support = null;
       } else if (ally.onGround && !isOverGroundHole(ally.x, ally.w)) {
         ally.lastSafeX = ally.x;
@@ -2343,7 +2381,11 @@ async function run(mode) {
       ctx.arc(0, 0, 49, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, item.time));
       ctx.stroke();
       ctx.shadowBlur = 0;
-      const customArt = loadImageAsset(`powerup-${getLevelConfig().id}`);
+      const customArt = loadImageAsset(
+        item.kind === 'motorcycle'
+          ? `motorcycle-${getLevelConfig().id}`
+          : `powerup-${getLevelConfig().id}`,
+      );
       if (customArt?.ready && customArt.image) {
         ctx.save();
         ctx.beginPath();
@@ -2366,7 +2408,7 @@ async function run(mode) {
         ctx.fillText('CORE', 0, 2);
         ctx.font = '8px Inter';
         ctx.fillText('ENERGY', 0, 18);
-      } else {
+      } else if (item.kind === 'boost') {
         // A tapered glass with blue-green liquid, a thick base and lime garnish.
         ctx.fillStyle = 'rgba(205,249,255,.28)';
         ctx.strokeStyle = '#e5ffff';
@@ -2400,13 +2442,24 @@ async function run(mode) {
         ctx.strokeStyle = '#59a62d';
         ctx.lineWidth = 3;
         ctx.stroke();
+      } else {
+        ctx.font = '56px system-ui';
+        ctx.fillText('🏍️', 0, 20);
       }
       ctx.font = '800 20px ui-rounded, "Arial Rounded MT Bold", sans-serif';
       ctx.fillStyle = '#fff';
       ctx.fillText(info.name, 0, -61);
       ctx.font = '700 13px Inter';
       ctx.fillStyle = info.color;
-      ctx.fillText(ready ? `PICK UP · ${info.duration}s` : 'CHARGING…', 0, 69);
+      ctx.fillText(
+        ready
+          ? item.kind === 'motorcycle'
+            ? 'PICK UP · INSTANT SWEEP'
+            : `PICK UP · ${info.duration}s`
+          : 'CHARGING…',
+        0,
+        69,
+      );
       ctx.restore();
     }
     for (const ally of companions) {
@@ -2550,7 +2603,7 @@ async function run(mode) {
     if (!motorcycleEvent) return;
     const event = motorcycleEvent,
       sx = event.x - cameraX,
-      bike = specialImageStates.motorcycle;
+      bike = loadImageAsset(`motorcycle-${getLevelConfig().id}`);
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.fillStyle = '#ff9b35';
@@ -3167,21 +3220,7 @@ async function run(mode) {
       );
       const walkSpeed = speedBase * enemyTypes[enemy.type].speedScale;
       enemy.vx = distance > desiredGap ? direction * walkSpeed : 0;
-      const approachingPit =
-        enemy.onGround && enemy.vx
-          ? holeAhead(enemy.x, enemy.w, direction, 75 + walkSpeed * 0.3)
-          : null;
-      if (approachingPit && enemy.iq >= 0.9) {
-        const canJumpPit = approachingPit.w <= 330 && enemy.jumpCooldown <= 0;
-        enemy.vx = 0;
-        if (canJumpPit) {
-          enemy.vy = -760;
-          enemy.vx = direction * Math.max(210, walkSpeed);
-          enemy.jumpVelocity = enemy.vx;
-          enemy.onGround = false;
-          enemy.jumpCooldown = 1.2;
-        }
-      }
+      actorNavigator.crossPit(enemy, direction, walkSpeed, enemy.iq);
       if (enemy.onGround && support) {
         const front = direction > 0 ? enemy.x + enemy.w : enemy.x;
         const edge = direction > 0 ? support.x + support.w : support.x;
@@ -3320,9 +3359,11 @@ async function run(mode) {
     enemies = enemies.filter((enemy) => enemy.defeatTimer > 0 || enemy.health > 0);
     // `every` correctly treats an emptied roster as cleared. The previous
     // `enemies.length > 0` guard stranded the game after the last KO faded.
+    const levelBossRequired = !!getLevelConfig().boss?.enabled;
     if (
       mode === 'play' &&
       enemySpawned &&
+      (!levelBossRequired || bossDefeated) &&
       (!getLevelConfig().requireDefeatAll || enemies.every((enemy) => enemy.health <= 0))
     ) {
       exitUnlocked = true;
@@ -3338,10 +3379,18 @@ async function run(mode) {
       return;
     }
     if (!enemySpawned) spawnEnemies();
+    const touchingExit = player.x + player.w >= getLevelLength() - 190;
+    if (touchingExit && getLevelConfig().boss?.enabled && boss && boss.health > 0) {
+      boss.awakened = true;
+      exitUnlocked = false;
+      player.x = Math.min(player.x, getLevelLength() - 250);
+      player.vx = Math.min(0, player.vx);
+      if (powerupMessageTimer <= 0) announcePowerup('Defeat the final boss to unlock the exit');
+    }
     // The exit is a hard progress checkpoint. Reaching it must never be
     // blocked by an AI actor stranded behind a pit or on a lift.
     if (
-      player.x + player.w >= getLevelLength() - 180 &&
+      touchingExit &&
       exitUnlocked &&
       (!getLevelConfig().boss?.enabled || bossDefeated)
     ) {

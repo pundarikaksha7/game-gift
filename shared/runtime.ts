@@ -24,6 +24,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
   game.levels.forEach((l) => {
     assets[l.id] = l.background || '';
     assets[`powerup-${l.id}`] = l.powerupArt || '';
+    assets[`motorcycle-${l.id}`] = l.motorcycleArt || '/assets/powerups/motorcycle.webp';
   });
   const enemyTypes = Object.fromEntries(
     enemies.map((c) => {

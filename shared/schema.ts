@@ -76,8 +76,9 @@ export const levelSchema = z
       .optional(),
     crossingPlatforms: z.boolean().optional(),
     requireDefeatAll: z.boolean().optional(),
-    powerup: z.enum(['none', 'companion', 'beam', 'boost', 'mixed']).optional(),
+    powerup: z.enum(['none', 'companion', 'beam', 'boost', 'motorcycle', 'mixed']).optional(),
     powerupArt: assetUrl.optional(),
+    motorcycleArt: assetUrl.optional(),
   })
   .strict();
 export const animationSchema = z
@@ -260,6 +261,7 @@ export function assetReferences(game: Game): { url: string; kind: 'image' | 'aud
     ),
     ...game.levels.map((l) => ({ url: l.background || '', kind: 'image' as const })),
     ...game.levels.map((l) => ({ url: l.powerupArt || '', kind: 'image' as const })),
+    ...game.levels.map((l) => ({ url: l.motorcycleArt || '', kind: 'image' as const })),
     ...game.animation.frames.map((url) => ({ url, kind: 'image' as const })),
     ...(
       ['music', 'jump', 'hit', 'win', 'punch', 'kick', 'heroAttack', 'villainAttack'] as const
