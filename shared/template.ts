@@ -3,12 +3,48 @@ import { avatarPresets, defaultAvatar } from './avatar';
 
 export type DifficultyMode = 'easy' | 'difficult' | 'hard';
 export const difficultyPresets = {
-  easy: { enemyCount: 3, enemyIq: 'low', pitCount: 1, boss: false },
-  difficult: { enemyCount: 7, enemyIq: 'high', pitCount: 3, boss: false },
-  hard: { enemyCount: 12, enemyIq: 'high', pitCount: 5, boss: true },
+  easy: {
+    enemyCount: 3,
+    enemyIq: 'low',
+    pitCount: 1,
+    boss: false,
+    enemyHealth: 1,
+    enemyDamage: 1,
+    enemySpeed: 1,
+    enemyAttackRate: 1,
+  },
+  difficult: {
+    enemyCount: 7,
+    enemyIq: 'high',
+    pitCount: 3,
+    boss: false,
+    enemyHealth: 1.3,
+    enemyDamage: 1.25,
+    enemySpeed: 1.18,
+    enemyAttackRate: 1.2,
+  },
+  hard: {
+    enemyCount: 12,
+    enemyIq: 'high',
+    pitCount: 5,
+    boss: true,
+    enemyHealth: 1.65,
+    enemyDamage: 1.5,
+    enemySpeed: 1.3,
+    enemyAttackRate: 1.4,
+  },
 } as const satisfies Record<
   DifficultyMode,
-  { enemyCount: number; enemyIq: 'low' | 'high'; pitCount: number; boss: boolean }
+  {
+    enemyCount: number;
+    enemyIq: 'low' | 'high';
+    pitCount: number;
+    boss: boolean;
+    enemyHealth: number;
+    enemyDamage: number;
+    enemySpeed: number;
+    enemyAttackRate: number;
+  }
 >;
 
 export function applyDifficultyPreset(level: Level, mode: DifficultyMode, enemyId?: string) {

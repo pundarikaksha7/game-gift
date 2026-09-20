@@ -1,5 +1,6 @@
 import { mechanicsSchema, type Game } from './schema';
 import { resolveAvatarAsset, resolveAvatarFrames, roleSprite } from './avatar';
+import { difficultyPresets, type DifficultyMode } from './template';
 export const WORLD_UNIT = 460 / 1080;
 export const defaultBoss = {
   enabled: false,
@@ -109,37 +110,50 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
         cooldown: c.attackCooldown || (c.archetype === 'large' ? 1.1 : 0.85),
         scale: c.scale,
       })),
-    levels: game.levels.map((l) => ({
-      ...l,
-      width: l.width / WORLD_UNIT,
-      groundY: 1080,
-      startY: 968,
-      skyColor: l.theme === 'midnight' ? '#241b42' : l.theme === 'sunset' ? '#e5bbaa' : '#87CEEB',
-      groundColor:
-        l.theme === 'midnight' ? '#35374e' : l.theme === 'sunset' ? '#8c8589' : '#618b7a',
-      boss: {
-        ...defaultBoss,
-        ...l.boss,
-        name:
-          enemies.find((enemy) => enemy.id === l.boss?.characterId)?.name || enemies[0]?.name || '',
-        enabled: !!l.boss?.enabled && enemies.length > 0,
-      },
-      requireDefeatAll: l.requireDefeatAll ?? false,
-      enemyIq: l.enemyIq || 'low',
-      powerup: l.powerup || 'none',
-      holes: (l.holes || []).map((h) => ({ x: h.x / WORLD_UNIT, w: h.width / WORLD_UNIT })),
-      platforms: l.platforms.map((p) => ({
-        x: p.x / WORLD_UNIT,
-        y: p.y / WORLD_UNIT,
-        w: p.width / WORLD_UNIT,
-        h: 24,
-        motion: {
-          axis: p.motion,
-          amplitude: (p.amplitude ?? 24) / WORLD_UNIT,
-          period: p.period || 3.5,
+    levels: game.levels.map((l) => {
+      const difficulty =
+        l.difficulty && l.difficulty !== 'custom'
+          ? difficultyPresets[l.difficulty as DifficultyMode]
+          : difficultyPresets.easy;
+      return {
+        ...l,
+        enemyHealthMultiplier: difficulty.enemyHealth,
+        enemyDamageMultiplier: difficulty.enemyDamage,
+        enemySpeedMultiplier: difficulty.enemySpeed,
+        enemyAttackRateMultiplier: difficulty.enemyAttackRate,
+        width: l.width / WORLD_UNIT,
+        groundY: 1080,
+        startY: 968,
+        skyColor:
+          l.theme === 'midnight' ? '#241b42' : l.theme === 'sunset' ? '#e5bbaa' : '#87CEEB',
+        groundColor:
+          l.theme === 'midnight' ? '#35374e' : l.theme === 'sunset' ? '#8c8589' : '#618b7a',
+        boss: {
+          ...defaultBoss,
+          ...l.boss,
+          name:
+            enemies.find((enemy) => enemy.id === l.boss?.characterId)?.name ||
+            enemies[0]?.name ||
+            '',
+          enabled: !!l.boss?.enabled && enemies.length > 0,
         },
-      })),
-    })),
+        requireDefeatAll: l.requireDefeatAll ?? false,
+        enemyIq: l.enemyIq || 'low',
+        powerup: l.powerup || 'none',
+        holes: (l.holes || []).map((h) => ({ x: h.x / WORLD_UNIT, w: h.width / WORLD_UNIT })),
+        platforms: l.platforms.map((p) => ({
+          x: p.x / WORLD_UNIT,
+          y: p.y / WORLD_UNIT,
+          w: p.width / WORLD_UNIT,
+          h: 24,
+          motion: {
+            axis: p.motion,
+            amplitude: (p.amplitude ?? 24) / WORLD_UNIT,
+            period: p.period || 3.5,
+          },
+        })),
+      };
+    }),
     sounds: {
       punch: game.sounds.punch || game.sounds.hit,
       kick: game.sounds.kick || game.sounds.hit,

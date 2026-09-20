@@ -386,6 +386,7 @@ async function run(mode) {
     const enemyCfg = cfg.enemies || {};
     const count = Object.keys(enemyTypes).length ? getEnemyCount() : 0;
     const level = getLevelConfig();
+    const healthMultiplier = Math.max(0.1, Number(level.enemyHealthMultiplier ?? 1));
     const levelLength = getLevelLength();
     const startX = Math.max(360, Number(level.startX ?? cfg.player.startX ?? 120) + 240);
     const routePlatforms = getPlatforms().filter((platform) => !platform.isGround);
@@ -435,12 +436,12 @@ async function run(mode) {
           ? { id: routePlatform.id, x: routePlatform.x, y: routePlatform.y }
           : null,
         facingRight: false,
-        health: Number(
-          enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88),
-        ),
-        maxHealth: Number(
-          enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88),
-        ),
+        health:
+          Number(enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88)) *
+          healthMultiplier,
+        maxHealth:
+          Number(enemyCfg[spec.healthKey] ?? (type === 'small' ? 28 : type === 'medium' ? 52 : 88)) *
+          healthMultiplier,
         attackTimer: 0.35 + i * 0.12,
         attackPulse: 0,
         hurtTimer: 0,
@@ -472,8 +473,8 @@ async function run(mode) {
         y: Number(level.groundY) - 236,
         w: 140,
         h: 220,
-        health: level.boss.health,
-        maxHealth: level.boss.health,
+        health: level.boss.health * healthMultiplier,
+        maxHealth: level.boss.health * healthMultiplier,
         awakened: false,
         onGround: true,
         phase: 'approach',
@@ -585,6 +586,9 @@ async function run(mode) {
       player.vy = 0;
       pendingAttack = null;
       gameOver = true;
+      paused = false;
+      gameOverOverlay.classList.remove('is-hidden');
+      restartButton.focus({ preventScroll: true });
       parent.postMessage({ type: 'game-gift:end', result: 'lose' }, location.origin);
     }
   }
@@ -1234,6 +1238,7 @@ async function run(mode) {
   // ── Helper: get platforms ──
   function restartLevel() {
     gameOver = false;
+    paused = false;
     boss = null;
     bossDefeated = false;
     styleChain = 0;
@@ -3218,7 +3223,10 @@ async function run(mode) {
           enemy.x < p.x + p.w - 4 &&
           Math.abs(enemyBottom - p.y) < 12,
       );
-      const walkSpeed = speedBase * enemyTypes[enemy.type].speedScale;
+      const walkSpeed =
+        speedBase *
+        enemyTypes[enemy.type].speedScale *
+        Math.max(0.1, Number(getLevelConfig().enemySpeedMultiplier ?? 1));
       enemy.vx = distance > desiredGap ? direction * walkSpeed : 0;
       actorNavigator.crossPit(enemy, direction, walkSpeed, enemy.iq);
       if (enemy.onGround && support) {
@@ -3280,7 +3288,9 @@ async function run(mode) {
       // not drain health every animation frame.
       if (distance <= Math.max(aggressionRange, desiredGap + 8) && enemy.attackTimer <= 0) {
         const spec = enemyTypes[enemy.type];
-        enemy.attackTimer = spec.attackCooldown;
+        enemy.attackTimer =
+          spec.attackCooldown /
+          Math.max(0.1, Number(getLevelConfig().enemyAttackRateMultiplier ?? 1));
         enemy.attackPulse = 0.52 - enemy.iq * 0.16;
         enemy.attackHitDone = false;
         playSound('villainAttack', 0.38);
@@ -3300,9 +3310,9 @@ async function run(mode) {
             h: player.h + 8,
           })
         ) {
-          const damage = Number(
-            enemyCfg[enemyTypes[enemy.type].damageKey] ?? enemyTypes[enemy.type].attackDamage,
-          );
+          const damage =
+            Number(enemyCfg[enemyTypes[enemy.type].damageKey] ?? enemyTypes[enemy.type].attackDamage) *
+            Math.max(0.1, Number(getLevelConfig().enemyDamageMultiplier ?? 1));
           hurtPlayer(damage, enemy.x + enemy.w / 2);
           enemy.attackHitDone = true;
         }

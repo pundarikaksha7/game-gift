@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTemplate } from '../shared/template';
+import { createTemplate, difficultyPresets } from '../shared/template';
+import { runtimeConfig } from '../shared/runtime';
 import { gameSchema, applyProposal } from '../shared/schema';
 import { stepBody } from '../src/engine/physics';
 test('template validates and supports variable chapter counts', () => {
@@ -17,6 +18,11 @@ test('difficulty presets configure enemy count, pit awareness, hazards and bosse
   assert.equal(game.levels[0].enemyIq, 'high');
   assert.equal(game.levels[0].holes?.length, 5);
   assert.equal(game.levels[0].boss?.enabled, true);
+  const hardRuntime = runtimeConfig(game).levels[0];
+  assert.equal(hardRuntime.enemyHealthMultiplier, difficultyPresets.hard.enemyHealth);
+  assert.equal(hardRuntime.enemyDamageMultiplier, difficultyPresets.hard.enemyDamage);
+  assert.equal(hardRuntime.enemySpeedMultiplier, difficultyPresets.hard.enemySpeed);
+  assert.equal(hardRuntime.enemyAttackRateMultiplier, difficultyPresets.hard.enemyAttackRate);
   assert.ok(gameSchema.safeParse(game).success);
 });
 test('rejects executable assets, unbounded physics and duplicate heroes', () => {
