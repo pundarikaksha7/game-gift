@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   LoaderCircle,
   Heart,
+  X,
 } from 'lucide-react';
 import {
   gameSchema,
@@ -119,6 +120,7 @@ export default function App() {
     [aiEnabled, setAiEnabled] = useState(false),
     [undo, setUndo] = useState<Game[]>([]),
     [redo, setRedo] = useState<Game[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [cloudUnavailable, setCloudUnavailable] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<(() => void) | null>(null);
   function switchSafely(action: () => void) {
@@ -563,7 +565,7 @@ export default function App() {
                 setModal('play');
               }}
             >
-              Open playtest <ArrowUpRight size={16} />
+              Preview game <Monitor size={16} />
             </button>
           </div>
           <div className="project-strip">
@@ -578,6 +580,10 @@ export default function App() {
               </span>
             </div>
             <div className="project-tools">
+              <button className="preview-trigger" onClick={() => setPreviewOpen(true)}>
+                <Monitor size={16} />
+                Preview game
+              </button>
               <button
                 aria-label="Undo"
                 className="icon-btn"
@@ -638,7 +644,10 @@ export default function App() {
                       setCamera(0);
                     }}
                     placing={placing}
-                    setPlacing={setPlacing}
+                    setPlacing={(next) => {
+                      setPlacing(next);
+                      if (next) setPreviewOpen(true);
+                    }}
                   />
                 ) : tab === 'story' ? (
                   <StoryEditor {...props} />
@@ -700,103 +709,214 @@ export default function App() {
                 </button>
               </div>
             </section>
-            <aside className="preview-column">
-              <div className="preview-panel">
-                <div className="preview-heading">
-                  <div>
-                    <span className="live-dot" />
-                    Live preview
+            {false && (
+              <aside className="preview-column">
+                <div className="preview-panel">
+                  <div className="preview-heading">
+                    <div>
+                      <span className="live-dot" />
+                      Live preview
+                    </div>
+                    <span>YOUR WORLD, COMING TO LIFE</span>
                   </div>
-                  <span>YOUR WORLD, COMING TO LIFE</span>
-                </div>
-                <div className={`preview-canvas ${placing ? 'placing' : ''}`}>
-                  <GameCanvas
-                    game={previewGame}
-                    levelIndex={level}
-                    camera={camera}
-                    grid={grid}
-                    onPlatform={
-                      placing
-                        ? (x, y) => {
-                            change((g) => {
-                              const l = g.levels[level] || g.levels[0];
-                              l.platforms.push({
-                                id: crypto.randomUUID(),
-                                x: Math.max(0, Math.min(l.width - 180, Math.round(x / 10) * 10)),
-                                y: Math.max(160, Math.min(440, Math.round(y / 10) * 10)),
-                                width: 180,
-                                motion: 'none',
+                  <div className={`preview-canvas ${placing ? 'placing' : ''}`}>
+                    <GameCanvas
+                      game={previewGame}
+                      levelIndex={level}
+                      camera={camera}
+                      grid={grid}
+                      onPlatform={
+                        placing
+                          ? (x, y) => {
+                              change((g) => {
+                                const l = g.levels[level] || g.levels[0];
+                                l.platforms.push({
+                                  id: crypto.randomUUID(),
+                                  x: Math.max(0, Math.min(l.width - 180, Math.round(x / 10) * 10)),
+                                  y: Math.max(160, Math.min(440, Math.round(y / 10) * 10)),
+                                  width: 180,
+                                  motion: 'none',
+                                });
                               });
-                            });
-                            setPlacing(false);
-                          }
-                        : undefined
-                    }
-                  />
-                  <span className="preview-level">
-                    CHAPTER {String(level + 1).padStart(2, '0')}{' '}
-                    <span>{game.levels[level]?.name}</span>
-                  </span>
-                </div>
-                <div className="preview-toolbar">
-                  <span>
-                    <Monitor size={14} /> Desktop <ChevronDown size={12} />
-                  </span>
-                  <div>
+                              setPlacing(false);
+                            }
+                          : undefined
+                      }
+                    />
+                    <span className="preview-level">
+                      CHAPTER {String(level + 1).padStart(2, '0')}{' '}
+                      <span>{game.levels[level]?.name}</span>
+                    </span>
+                  </div>
+                  <div className="preview-toolbar">
+                    <span>
+                      <Monitor size={14} /> Desktop <ChevronDown size={12} />
+                    </span>
+                    <div>
+                      <button
+                        className={`icon-btn ${grid ? 'toggled' : ''}`}
+                        aria-label="Toggle grid"
+                        onClick={() => setGrid(!grid)}
+                      >
+                        <Grid2X2 size={15} />
+                      </button>
+                      <button
+                        className="icon-btn"
+                        aria-label="Expand playtest"
+                        onClick={() => setModal('play')}
+                      >
+                        <Maximize2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="preview-assets" aria-label="Character asset preview">
+                    {game.characters.map((c) => (
+                      <button key={c.id} onClick={() => setTab('characters')}>
+                        <span className="asset-avatar" style={{ color: c.color }}>
+                          {c.sprite ? <img src={c.sprite} alt={c.name} /> : <Users size={26} />}
+                        </span>
+                        <span>{c.name}</span>
+                        <small>{c.role}</small>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="preview-bottom">
                     <button
-                      className={`icon-btn ${grid ? 'toggled' : ''}`}
-                      aria-label="Toggle grid"
-                      onClick={() => setGrid(!grid)}
-                    >
-                      <Grid2X2 size={15} />
-                    </button>
-                    <button
-                      className="icon-btn"
-                      aria-label="Expand playtest"
+                      className="play-button"
                       onClick={() => setModal('play')}
+                      disabled={!validation.success}
                     >
-                      <Maximize2 size={15} />
+                      <Play size={16} fill="currentColor" />
+                      Playtest your game
                     </button>
+                    <span>Keyboard and touch controls supported.</span>
+                  </div>
+                  {
+                    <div className="world-scroll">
+                      <Field label="Explore the world">
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.max(0, (game.levels[level] || game.levels[0]).width - 960)}
+                          value={camera}
+                          onChange={(e) => setCamera(Number(e.target.value))}
+                        />
+                      </Field>
+                    </div>
+                  }
+                </div>
+                <div className="chapter-switch">
+                  <span>JUMP TO CHAPTER</span>
+                  <div>
+                    {game.levels.map((l, i) => (
+                      <button
+                        key={l.id}
+                        title={l.name}
+                        className={level === i ? 'active' : ''}
+                        onClick={() => {
+                          setLevel(i);
+                          setCamera(0);
+                        }}
+                      >
+                        {String(i + 1).padStart(2, '0')}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div className="preview-assets" aria-label="Character asset preview">
-                  {game.characters.map((c) => (
-                    <button key={c.id} onClick={() => setTab('characters')}>
-                      <span className="asset-avatar" style={{ color: c.color }}>
-                        {c.sprite ? <img src={c.sprite} alt={c.name} /> : <Users size={26} />}
-                      </span>
-                      <span>{c.name}</span>
-                      <small>{c.role}</small>
-                    </button>
-                  ))}
-                </div>
-                <div className="preview-bottom">
-                  <button
-                    className="play-button"
-                    onClick={() => setModal('play')}
-                    disabled={!validation.success}
-                  >
-                    <Play size={16} fill="currentColor" />
-                    Playtest your game
-                  </button>
-                  <span>Keyboard and touch controls supported.</span>
-                </div>
-                {
-                  <div className="world-scroll">
-                    <Field label="Explore the world">
-                      <input
-                        type="range"
-                        min={0}
-                        max={Math.max(0, (game.levels[level] || game.levels[0]).width - 960)}
-                        value={camera}
-                        onChange={(e) => setCamera(Number(e.target.value))}
-                      />
-                    </Field>
+                <div className="tip-card">
+                  <span>✧</span>
+                  <div>
+                    <h3>Build. Play. Refine.</h3>
+                    <p>
+                      Start with a template, customize every chapter, and test the full journey
+                      before publishing.
+                    </p>
                   </div>
-                }
+                </div>
+                <div className="safety-note">
+                  <ShieldCheck size={15} />
+                  <span>Your latest 100 saved versions are available in history.</span>
+                </div>
+                {!validation.success && (
+                  <div className="validation-error" role="alert">
+                    <strong>A few things need a tweak</strong>
+                    {validation.error!.issues.map((i, n) => (
+                      <p key={n}>
+                        {i.path.join(' → ')}: {i.message}
+                      </p>
+                    ))}
+                    <small>The preview shows your last valid changes.</small>
+                  </div>
+                )}
+              </aside>
+            )}
+          </div>
+          <footer className="studio-footer">
+            <span>
+              <Heart size={12} /> Gamegift
+            </span>
+            <span>Create something worth playing.</span>
+          </footer>
+        </main>
+      </div>
+      {previewOpen && (
+        <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="Game preview">
+          <button
+            className="preview-backdrop"
+            aria-label="Close preview"
+            onClick={() => setPreviewOpen(false)}
+          />
+          <section className="preview-drawer">
+            <header className="preview-drawer-header">
+              <div>
+                <span className="live-dot" />
+                <span>
+                  <small>LIVE PREVIEW</small>
+                  <strong>{game.levels[level]?.name}</strong>
+                </span>
               </div>
+              <button
+                className="icon-btn"
+                aria-label="Close preview"
+                onClick={() => setPreviewOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </header>
+            <div className={`preview-canvas preview-canvas-popover ${placing ? 'placing' : ''}`}>
+              <GameCanvas
+                game={previewGame}
+                levelIndex={level}
+                camera={camera}
+                grid={grid}
+                onPlatform={
+                  placing
+                    ? (x, y) => {
+                        change((g) => {
+                          const l = g.levels[level] || g.levels[0];
+                          l.platforms.push({
+                            id: crypto.randomUUID(),
+                            x: Math.max(0, Math.min(l.width - 180, Math.round(x / 10) * 10)),
+                            y: Math.max(160, Math.min(440, Math.round(y / 10) * 10)),
+                            width: 180,
+                            motion: 'none',
+                          });
+                        });
+                        setPlacing(false);
+                      }
+                    : undefined
+                }
+              />
+              <span className="preview-level">
+                CHAPTER {String(level + 1).padStart(2, '0')} <span>{game.levels[level]?.name}</span>
+              </span>
+            </div>
+            {placing && (
+              <p className="placement-hint">Click inside the world to place the platform.</p>
+            )}
+            <div className="preview-drawer-controls">
               <div className="chapter-switch">
-                <span>JUMP TO CHAPTER</span>
+                <span>CHAPTER</span>
                 <div>
                   {game.levels.map((l, i) => (
                     <button
@@ -813,41 +933,45 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <div className="tip-card">
-                <span>✧</span>
-                <div>
-                  <h3>Build. Play. Refine.</h3>
-                  <p>
-                    Start with a template, customize every chapter, and test the full journey before
-                    publishing.
-                  </p>
-                </div>
+              <div className="preview-control-actions">
+                <button
+                  className={`secondary ${grid ? 'toggled' : ''}`}
+                  onClick={() => setGrid(!grid)}
+                >
+                  <Grid2X2 size={15} /> Grid
+                </button>
+                <button
+                  className="primary"
+                  disabled={!validation.success}
+                  onClick={() => {
+                    setPreviewOpen(false);
+                    setModal('play');
+                  }}
+                >
+                  <Play size={15} fill="currentColor" /> Playtest
+                </button>
               </div>
-              <div className="safety-note">
-                <ShieldCheck size={15} />
-                <span>Your latest 100 saved versions are available in history.</span>
+            </div>
+            <div className="world-scroll preview-world-scroll">
+              <Field label="Explore the world">
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(0, (game.levels[level] || game.levels[0]).width - 960)}
+                  value={camera}
+                  onChange={(e) => setCamera(Number(e.target.value))}
+                />
+              </Field>
+            </div>
+            {!validation.success && (
+              <div className="validation-error" role="alert">
+                <strong>Previewing your last valid changes</strong>
+                <small>Close preview to fix the highlighted configuration.</small>
               </div>
-              {!validation.success && (
-                <div className="validation-error" role="alert">
-                  <strong>A few things need a tweak</strong>
-                  {validation.error.issues.map((i, n) => (
-                    <p key={n}>
-                      {i.path.join(' → ')}: {i.message}
-                    </p>
-                  ))}
-                  <small>The preview shows your last valid changes.</small>
-                </div>
-              )}
-            </aside>
-          </div>
-          <footer className="studio-footer">
-            <span>
-              <Heart size={12} /> Gamegift
-            </span>
-            <span>Create something worth playing.</span>
-          </footer>
-        </main>
-      </div>
+            )}
+          </section>
+        </div>
+      )}
       {modal === 'templates' && (
         <Modal title="Create an experience" onClose={() => setModal(null)} wide>
           <p className="modal-copy">

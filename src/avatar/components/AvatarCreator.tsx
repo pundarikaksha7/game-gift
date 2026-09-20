@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dice5, RotateCcw, Sparkles } from 'lucide-react';
+import { Check, Dice5, RotateCcw, Sparkles } from 'lucide-react';
 import {
   avatarPresets,
   defaultAvatar,
@@ -32,51 +32,60 @@ export function AvatarCreator({
   const config = safeAvatar(value);
   return (
     <section className="avatar-creator" aria-label="Character creator">
-      <div className="avatar-creator-stage">
-        <div>
-          <span className="avatar-eyebrow">
-            <Sparkles size={13} /> Character library
-          </span>
-          <h3>Pick your character</h3>
-          <p className="muted">
-            Every design comes directly from the same illustrated sprite sheet.
-          </p>
-        </div>
-        <div className="avatar-stage-preview">
-          <AvatarRenderer config={config} label="Selected character preview" />
-        </div>
-      </div>
-      <div className="avatar-option-grid" aria-label="Available characters">
-        {avatarPresets.map((option, index) => {
-          const selected = config.appearance === option.appearance;
-          return (
+      <div className="avatar-creator-layout">
+        <div className="avatar-creator-stage">
+          <div className="avatar-stage-copy">
+            <span className="avatar-eyebrow">
+              <Sparkles size={13} /> Character library
+            </span>
+            <h3>Current look</h3>
+          </div>
+          <div className="avatar-stage-preview">
+            <AvatarRenderer config={config} label="Selected character preview" />
+          </div>
+          <div className="avatar-actions">
+            <button type="button" className="secondary" onClick={() => onChange(randomizeAvatar())}>
+              <Dice5 size={16} /> Surprise me
+            </button>
             <button
               type="button"
-              className={selected ? 'selected' : ''}
-              aria-pressed={selected}
-              key={option.appearance}
-              onClick={() => onChange(option)}
+              className="text-button"
+              onClick={() => onChange(structuredClone(defaultAvatar))}
             >
-              <OptionThumbnail src={resolveAvatarAsset(option)} />
-              <span>Character {String(index + 1).padStart(2, '0')}</span>
+              <RotateCcw size={15} /> Reset
             </button>
-          );
-        })}
-      </div>
-      <div className="avatar-actions">
-        <button type="button" className="secondary" onClick={() => onChange(randomizeAvatar())}>
-          <Dice5 size={16} /> Randomize
-        </button>
-        <button
-          type="button"
-          className="text-button"
-          onClick={() => onChange(structuredClone(defaultAvatar))}
-        >
-          <RotateCcw size={15} /> Reset
-        </button>
-        <button type="button" className="primary" onClick={() => onSave(config)}>
-          Save character
-        </button>
+          </div>
+        </div>
+        <div className="avatar-library">
+          <div className="avatar-library-heading">
+            <div>
+              <strong>Choose a style</strong>
+              <small>{avatarPresets.length} game-ready characters</small>
+            </div>
+            <button type="button" className="avatar-done" onClick={() => onSave(config)}>
+              <Check size={15} /> Use selection
+            </button>
+          </div>
+          <div className="avatar-option-grid" aria-label="Available characters" tabIndex={0}>
+            {avatarPresets.map((option, index) => {
+              const selected = config.appearance === option.appearance;
+              return (
+                <button
+                  type="button"
+                  className={selected ? 'selected' : ''}
+                  aria-pressed={selected}
+                  aria-label={`Character ${String(index + 1).padStart(2, '0')}`}
+                  key={option.appearance}
+                  onClick={() => onChange(option)}
+                >
+                  <OptionThumbnail src={resolveAvatarAsset(option)} />
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  {selected && <Check className="avatar-option-check" size={14} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -158,10 +158,18 @@ export function drawCharacter(
   const img = images.get(url);
   ctx.save();
   ctx.translate(body.x - camera + body.w / 2, body.y + body.h + offset);
+  // A restrained contact shadow keeps light or transparent sprites readable on custom scenery.
+  ctx.fillStyle = 'rgba(24, 28, 38, 0.2)';
+  ctx.beginPath();
+  ctx.ellipse(0, 2, Math.max(15, body.w * c.scale * 0.58), 5, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.scale(facing * (1 + squash) * c.scale, (1 - squash) * c.scale);
   if (img?.complete && img.naturalWidth) {
     const h = body.h + 18,
       w = (h * img.naturalWidth) / img.naturalHeight;
+    ctx.shadowColor = 'rgba(22, 25, 35, 0.32)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
     ctx.drawImage(img, -w / 2, -h, w, h);
   } else {
     ctx.fillStyle = c.color;
