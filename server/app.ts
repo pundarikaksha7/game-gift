@@ -565,7 +565,13 @@ export function createApp(db: DB, options: AppOptions = {}) {
             ? 400
             : err.status || 500;
     if (status >= 500)
-      console.error(JSON.stringify({ event: 'request_error', message: err.message }));
+      console.error(
+        JSON.stringify({
+          event: 'request_error',
+          message: err.message,
+          ...(err.detail ? { detail: err.detail } : {}),
+        }),
+      );
     res.status(status).json({
       error:
         err instanceof ZodError

@@ -33,8 +33,16 @@ test('private cloud media uses authenticated endpoints and fails on provider err
     );
     await assert.rejects(() => readAsset('../outside'));
     globalThis.fetch = (async () => new Response('denied', { status: 403 })) as typeof fetch;
-    await assert.rejects(() => readAsset(id), /403/);
-    await assert.rejects(() => putAsset(id, Buffer.from('x'), 'image/webp'), /403/);
+    for (const operation of [
+      () => readAsset(id),
+      () => putAsset(id, Buffer.from('x'), 'image/webp'),
+    ])
+      await assert.rejects(operation, (error: any) => {
+        assert.equal(error.status, 503);
+        assert.match(error.message, /storage is unavailable/i);
+        assert.match(error.detail, /failed \(403\): denied/);
+        return true;
+      });
     globalThis.fetch = (async () => new Response('', { status: 404 })) as typeof fetch;
     await deleteAsset(id);
   } finally {

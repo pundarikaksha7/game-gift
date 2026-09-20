@@ -32,8 +32,20 @@ async function storageRequest(id: string, method: string, payload?: Buffer, mime
     body: payload ? new Uint8Array(payload) : undefined,
     signal: AbortSignal.timeout(30000),
   });
-  if (!response.ok && !(method === 'DELETE' && response.status === 404))
-    throw new Error(`Media storage request failed (${response.status})`);
+  if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
+    const providerBody = await response.clone().text().catch(() => '');
+    let providerMessage = providerBody;
+    try {
+      const body = JSON.parse(providerBody);
+      providerMessage = body.message || body.error || body.code || '';
+    } catch {
+      // Some provider and proxy errors are plain text.
+    }
+    throw Object.assign(new Error('Media storage is unavailable. Try again shortly.'), {
+      status: 503,
+      detail: `Supabase Storage ${method} failed (${response.status})${providerMessage ? `: ${providerMessage}` : ''}`,
+    });
+  }
   return response;
 }
 export async function putAsset(id: string, payload: Buffer, mime: string) {
