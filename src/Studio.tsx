@@ -65,7 +65,13 @@ const navigation = [
   { id: 'review', label: 'Review & share', icon: Check },
 ] as const;
 type Tab = (typeof navigation)[number]['id'];
-type User = { id: string; name: string; email: string };
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  age: number | null;
+  profileComplete: boolean;
+};
 function GoogleIcon() {
   return (
     <svg className="google-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -109,11 +115,22 @@ export default function App() {
     [busy, setBusy] = useState(false),
     [toast, setToast] = useState(''),
     [modal, setModal] = useState<
-      'templates' | 'play' | 'auth' | 'projects' | 'publish' | 'ai' | 'history' | 'account' | null
+      | 'templates'
+      | 'play'
+      | 'auth'
+      | 'profile'
+      | 'projects'
+      | 'publish'
+      | 'ai'
+      | 'history'
+      | 'account'
+      | null
     >(null),
     [projects, setProjects] = useState<Project[]>([]),
     [versions, setVersions] = useState<{ revision: number; created_at: string }[]>([]),
     [authError, setAuthError] = useState(''),
+    [profileName, setProfileName] = useState(''),
+    [profileAge, setProfileAge] = useState(''),
     [proposal, setProposal] = useState<Proposal | null>(null),
     [proposalBase, setProposalBase] = useState(''),
     [prompt, setPrompt] = useState(''),
@@ -162,6 +179,10 @@ export default function App() {
         const d = await api('/auth/me');
         if (!active) return;
         setUser(d.user);
+        if (!d.user.profileComplete) {
+          setProfileName(d.user.name || '');
+          setModal('profile');
+        }
         if (hydratedUser.current === d.user.id) return;
         hydratedUser.current = d.user.id;
         try {
@@ -1089,6 +1110,72 @@ export default function App() {
               {authError}
             </p>
           )}
+        </Modal>
+      )}
+      {modal === 'profile' && user && (
+        <Modal
+          title="Finish setting up your account"
+          onClose={async () => {
+            await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
+            setUser(null);
+            setModal(null);
+          }}
+        >
+          <p className="modal-copy">
+            You’re signed in with Google. Tell us a little about you to finish creating your
+            Gamegift account.
+          </p>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setAuthError('');
+              setBusy(true);
+              try {
+                const result = await api('/auth/profile', {
+                  method: 'PATCH',
+                  body: JSON.stringify({ name: profileName.trim(), age: Number(profileAge) }),
+                });
+                setUser(result.user);
+                setModal(null);
+                notify(`Welcome, ${result.user.name}!`);
+              } catch (error) {
+                setAuthError((error as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Field label="Your name">
+              <input
+                autoFocus
+                required
+                minLength={2}
+                maxLength={60}
+                autoComplete="name"
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+              />
+            </Field>
+            <Field label="Your age">
+              <input
+                required
+                type="number"
+                min={1}
+                max={120}
+                inputMode="numeric"
+                value={profileAge}
+                onChange={(event) => setProfileAge(event.target.value)}
+              />
+            </Field>
+            {authError && (
+              <p className="error" role="alert">
+                {authError}
+              </p>
+            )}
+            <button className="primary full-width" disabled={busy}>
+              {busy ? 'Saving…' : 'Finish setup'}
+            </button>
+          </form>
         </Modal>
       )}
       {modal === 'projects' && (

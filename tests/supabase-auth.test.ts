@@ -78,6 +78,7 @@ test('a verified Supabase identity adopts its legacy profile without losing its 
       id: 'legacy-1',
       email: 'creator@example.com',
       name: 'Original Creator',
+      age: null,
       authSubject: 'supabase-1',
     });
     const [profile] = await db.query(

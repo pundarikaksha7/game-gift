@@ -28,8 +28,8 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
   }
   const db = await openDatabase();
   const identities = {
-    'Bearer alice-token': { id: 'alice', email: 'alice@example.com', name: 'Alice' },
-    'Bearer bob-token': { id: 'bob', email: 'bob@example.com', name: 'Bob' },
+    'Bearer alice-token': { id: 'alice', email: 'alice@example.com', name: 'Alice', age: 30 },
+    'Bearer bob-token': { id: 'bob', email: 'bob@example.com', name: 'Bob', age: 30 },
   } as const;
   for (const user of Object.values(identities))
     await db.query(
@@ -65,6 +65,19 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     const bob = 'bob-token';
     assert.equal((await request('/auth/register', 'POST', {}, alice)).status, 404);
     assert.equal((await request('/auth/login', 'POST', {}, alice)).status, 404);
+    const updatedProfile = await request(
+      '/auth/profile',
+      'PATCH',
+      { name: 'Alice Creator', age: 29 },
+      alice,
+    );
+    assert.equal(updatedProfile.status, 200);
+    assert.equal(updatedProfile.data.user.name, 'Alice Creator');
+    assert.equal(updatedProfile.data.user.age, 29);
+    assert.deepEqual(
+      { ...(await db.query('SELECT name,age FROM users WHERE id=$1', ['alice']))[0] },
+      { name: 'Alice Creator', age: 29 },
+    );
     const game = createTemplate();
     const created = await request('/projects', 'POST', { game }, alice);
     assert.equal(created.status, 201, JSON.stringify(created.data));

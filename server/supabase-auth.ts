@@ -43,7 +43,7 @@ export async function authenticateSupabase(db: DB, authorization: string | undef
     )
       throw denied();
     let [profile] = await q(
-      'SELECT id,email,name,auth_provider,auth_subject FROM users WHERE auth_subject=$1',
+      'SELECT id,email,name,age,auth_provider,auth_subject FROM users WHERE auth_subject=$1',
       [user.id],
     );
     if (profile)
@@ -51,6 +51,7 @@ export async function authenticateSupabase(db: DB, authorization: string | undef
         id: profile.id,
         email: profile.email,
         name: profile.name,
+        age: profile.age,
         authSubject: profile.auth_subject,
       };
     // A verified Google email can claim its matching legacy profile without changing the
@@ -65,7 +66,7 @@ export async function authenticateSupabase(db: DB, authorization: string | undef
       [user.id, user.email, user.name, user.id],
     );
     [profile] = await q(
-      'SELECT id,email,name,auth_provider,auth_subject FROM users WHERE email=$1',
+      'SELECT id,email,name,age,auth_provider,auth_subject FROM users WHERE email=$1',
       [user.email],
     );
     if (profile?.auth_provider !== 'supabase' || profile.auth_subject !== user.id) throw denied();
@@ -77,6 +78,7 @@ export async function authenticateSupabase(db: DB, authorization: string | undef
       id: profile.id,
       email: profile.email,
       name: profile.name,
+      age: profile.age,
       authSubject: profile.auth_subject,
     };
   });

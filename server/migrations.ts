@@ -57,4 +57,10 @@ export const migrations = [
       'CREATE UNIQUE INDEX deleted_accounts_auth_subject ON deleted_accounts(auth_subject)',
     ],
   },
+  {
+    version: 8,
+    statements: [
+      'ALTER TABLE users ADD COLUMN age INTEGER CHECK(age IS NULL OR (age BETWEEN 1 AND 120))',
+    ],
+  },
 ];

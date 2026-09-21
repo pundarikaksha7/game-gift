@@ -278,7 +278,7 @@ const info: Record<string, { h1: string; intro: string; sections: [string, strin
     sections: [
       [
         'Account and project data',
-        'Google sign-in supplies basic account identity. Game Gift stores projects, uploaded media, revision history and publication state so creators can save, edit and share their work.',
+        'Google sign-in supplies basic account identity. Game Gift also asks for and stores your name and age, along with projects, uploaded media, revision history and publication state, so creators can save, edit and share their work.',
       ],
       [
         'Published games',

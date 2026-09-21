@@ -35,6 +35,7 @@ type AppOptions = {
     id: string;
     email: string;
     name: string;
+    age?: number | null;
     authSubject?: string;
   }>;
 };
@@ -132,7 +133,8 @@ export function createApp(db: DB, options: AppOptions = {}) {
     legacyHeaders: false,
   });
   app.use('/api/auth', (req, _res, next) => {
-    if (!['/me', '/account'].includes(req.path)) return next(fail(404, 'Use Google sign-in'));
+    if (!['/me', '/profile', '/account'].includes(req.path))
+      return next(fail(404, 'Use Google sign-in'));
     next();
   });
   const auth: express.RequestHandler = async (req, res, next) => {
@@ -144,8 +146,30 @@ export function createApp(db: DB, options: AppOptions = {}) {
   mountPayments(app, db, auth);
   mountPublic(app, db, auth);
   app.get('/api/auth/me', auth, (_req, res) => {
-    const { id, name, email } = res.locals.user;
-    res.json({ user: { id, name, email } });
+    const { id, name, email, age } = res.locals.user;
+    res.json({ user: { id, name, email, age: age ?? null, profileComplete: age != null } });
+  });
+  app.patch('/api/auth/profile', authLimit, auth, async (req, res) => {
+    const profile = z
+      .object({
+        name: z.string().trim().min(2).max(60),
+        age: z.number().int().min(1).max(120),
+      })
+      .strict()
+      .parse(req.body);
+    await db.query('UPDATE users SET name=$1,age=$2 WHERE id=$3', [
+      profile.name,
+      profile.age,
+      res.locals.user.id,
+    ]);
+    res.json({
+      user: {
+        id: res.locals.user.id,
+        email: res.locals.user.email,
+        ...profile,
+        profileComplete: true,
+      },
+    });
   });
   app.delete('/api/auth/account', authLimit, auth, async (req, res) => {
     if (req.get('x-confirm-account-deletion') !== 'delete')

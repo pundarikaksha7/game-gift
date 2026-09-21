@@ -8,7 +8,12 @@ export function configureSupabase(url?: string, key?: string, redirectUrl?: stri
   authRedirectUrl = redirectUrl || authRedirectUrl;
   if (supabase || !url || !key) return supabase;
   supabase = createClient(url, key, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      flowType: 'pkce',
+    },
   });
   return supabase;
 }
@@ -27,7 +32,16 @@ export async function completeAuthRedirect() {
     history.replaceState(null, '', '/my-games');
     throw new Error(callbackError);
   }
-  const { data, error } = await supabase.auth.getSession();
+  let data;
+  let error;
+  const code = query.get('code');
+  if (code) ({ data, error } = await supabase.auth.exchangeCodeForSession(code));
+  else if (hash.has('access_token') && hash.has('refresh_token'))
+    ({ data, error } = await supabase.auth.setSession({
+      access_token: hash.get('access_token')!,
+      refresh_token: hash.get('refresh_token')!,
+    }));
+  else ({ data, error } = await supabase.auth.getSession());
   if (error) throw error;
   const hasAuthResponse =
     location.pathname === '/auth/callback' ||
