@@ -11,19 +11,19 @@
     },
     {
       "source": "/play/:path*",
-      "destination": "/private.html"
+      "destination": "/private"
     },
     {
       "source": "/studio",
-      "destination": "/private.html"
+      "destination": "/private"
     },
     {
       "source": "/my-games",
-      "destination": "/private.html"
+      "destination": "/private"
     },
     {
       "source": "/auth/callback",
-      "destination": "/private.html"
+      "destination": "/private"
     }
   ],
   "headers": [
