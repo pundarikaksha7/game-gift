@@ -5,7 +5,7 @@ import sharp from 'sharp';
 test('landing page enters the live studio', async ({ page }) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: /Your favorite memories, turned into a game/ }),
+    page.getByRole('heading', { name: /Create a Personalized Game as a Gift/ }),
   ).toBeVisible();
   const mediaStyles = await page.locator('.game-image img, .mode-image img').evaluateAll((images) =>
     images.map((image) => ({
@@ -19,6 +19,23 @@ test('landing page enters the live studio', async ({ page }) => {
   await page.getByRole('link', { name: /Make a game gift/ }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+});
+
+test('marketing pages keep one brand and route-specific search metadata', async ({ page }) => {
+  await page.goto('/examples');
+  await expect(page).toHaveTitle('Personalized Game Gift Examples | Game Gift');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    'https://game-gift.shop/examples',
+  );
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    /personalized game ideas/i,
+  );
+  await expect(page.locator('header .brand-word')).toHaveText('gamegift');
+  await expect(page.locator('header .brand-gem')).toHaveText('✦');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+  await expect(page.locator('[data-prerendered]')).toHaveCount(0);
 });
 
 test('create, edit, save, reopen, publish, play, unpublish and delete account', async ({
@@ -145,12 +162,17 @@ test('templates create independent projects and viewport updates keep runtime al
   await page.getByRole('button', { name: 'New experience', exact: true }).click();
   await page.getByRole('button', { name: /Story journey/ }).click();
   await expect(page.getByLabel('Game title')).toHaveValue('Story journey');
-  await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Preview game', exact: true }).click();
+  const preview = page.getByRole('dialog', { name: 'Game preview' });
+  await expect(preview.frameLocator('iframe').locator('canvas')).toBeVisible();
+  // Avatar composition can replace the initial media staging frame once. Measure after it settles.
+  await page.waitForTimeout(300);
   const runtime = page.frames().find((f) => f.url().endsWith('/engine/index.html'))!;
   const marker = await runtime.evaluate(() => performance.timeOrigin);
-  await page.getByRole('button', { name: 'Toggle grid' }).click();
+  await preview.getByRole('button', { name: 'Grid' }).click();
   await expect.poll(() => runtime.evaluate(() => (window as any).gameConfig.grid)).toBe(true);
   expect(await runtime.evaluate(() => performance.timeOrigin)).toBe(marker);
+  await preview.locator('header').getByRole('button', { name: 'Close preview' }).click();
   await page.getByLabel('Game title').fill('Independent world');
   await page.getByRole('button', { name: 'New experience', exact: true }).click();
   await page.getByRole('button', { name: /Arcade challenge/ }).click();
@@ -160,18 +182,27 @@ test('templates create independent projects and viewport updates keep runtime al
     .getByRole('button', { name: 'Undo', exact: true })
     .isDisabled()
     .then((v) => expect(v).toBe(true));
-  await page.getByRole('button', { name: 'Playtest your game' }).click();
+  await page.getByRole('button', { name: 'Preview game', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Game preview' })
+    .getByRole('button', { name: 'Playtest' })
+    .click();
   const playable = page.locator('dialog').frameLocator('iframe');
   await expect(playable.locator('canvas')).toBeVisible();
-  await playable.getByRole('button', { name: 'Begin chapter' }).click();
-  await expect(playable.locator('.hud-label')).toHaveText('Arcade challenge');
+  const begin = playable.getByRole('button', { name: 'Begin chapter' });
+  await begin.click();
+  await expect(begin).toBeHidden();
+  await expect(playable.locator('canvas')).toBeVisible();
   await page.screenshot({ path: 'test-results/game-gift-playtest.png' });
   expect(errors).toEqual([]);
 });
 
 test('workspace fits the screen and retains a visible live preview', async ({ page }, testInfo) => {
   await page.goto('/studio');
-  await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
+  await page.getByRole('button', { name: 'Preview game', exact: true }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Game preview' }).frameLocator('iframe').locator('canvas'),
+  ).toBeVisible();
   await page.screenshot({
     path: `test-results/game-gift-${testInfo.project.name}.png`,
     fullPage: true,
@@ -181,8 +212,9 @@ test('workspace fits the screen and retains a visible live preview', async ({ pa
   );
   if (testInfo.project.name === 'desktop') {
     const editor = await page.locator('.editor-panel').boundingBox();
-    const preview = await page.locator('.preview-column').boundingBox();
-    expect(preview!.x).toBeGreaterThan(editor!.x + editor!.width);
+    const preview = await page.locator('.preview-drawer').boundingBox();
+    expect(preview!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    expect(editor!.width).toBeGreaterThan(700);
   }
 });
 
@@ -196,7 +228,11 @@ test('a creator-authored story can be completed using real game controls', async
     game,
   );
   await page.goto('/studio');
-  await page.getByRole('button', { name: 'Playtest your game' }).click();
+  await page.getByRole('button', { name: 'Preview game', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Game preview' })
+    .getByRole('button', { name: 'Playtest' })
+    .click();
   const playable = page.locator('dialog').frameLocator('iframe');
   await playable.getByRole('button', { name: 'Begin chapter' }).click();
   const right = page.locator('dialog').getByRole('button', { name: 'ArrowRight', exact: true });

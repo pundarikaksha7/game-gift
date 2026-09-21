@@ -27,7 +27,7 @@ function document(meta: Meta) {
     <link rel="canonical" href="${canonical}">
     <meta property="og:type" content="website"><meta property="og:site_name" content="Game Gift">
     <meta property="og:title" content="${escape(meta.title)}"><meta property="og:description" content="${escape(meta.description)}">
-    <meta property="og:url" content="${canonical}"><meta property="og:image" content="${OG_IMAGE}"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="720">
+    <meta property="og:url" content="${canonical}"><meta property="og:image" content="${OG_IMAGE}"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="720"><meta property="og:image:alt" content="A personalized Gamegift adventure in live playtest">
     <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escape(meta.title)}"><meta name="twitter:description" content="${escape(meta.description)}"><meta name="twitter:image" content="${OG_IMAGE}">
     ${(meta.schema || []).map((item) => `<script type="application/ld+json">${json(item)}</script>`).join('\n')}`;
   return shell
@@ -39,7 +39,10 @@ function document(meta: Meta) {
     .replace(/\s*<link rel="canonical"[^>]*>/g, '')
     .replace(/\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
     .replace('</head>', `${head}</head>`)
-    .replace('<div id="root"></div>', `<div id="root">${meta.body}</div>`);
+    .replace(
+      '<div id="root"></div>',
+      `<div id="root"><div class="prerender-shell" data-prerendered>${meta.body}</div></div>`,
+    );
 }
 function breadcrumbs(page: SeoPage) {
   return {
@@ -182,7 +185,7 @@ const privateDoc = document({
   title: 'Game Gift Studio',
   description: 'Create and manage your personalized game gift.',
   robots: 'noindex, nofollow, noarchive',
-  body: '<main><h1>Game Gift Studio</h1><p>Loading the private game creator…</p></main>',
+  body: '<main aria-busy="true"><h1>Game Gift Studio</h1><p>Loading the private game creator…</p></main>',
 }).replace(`<link rel="canonical" href="${SITE_URL}/studio">`, '');
 await writeFile(path.join(dist, 'private.html'), privateDoc);
 

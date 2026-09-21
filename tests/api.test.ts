@@ -101,6 +101,29 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
       (await request(`/projects/${id}`, 'GET', undefined, alice)).data.publishedUrl,
       published.data.url,
     );
+    for (let report = 0; report < 10; report++)
+      assert.equal(
+        (
+          await request(`/public-games/alice/${publishedId}/report`, 'POST', {
+            reason: 'other',
+            details: '  Automated moderation test  ',
+          })
+        ).status,
+        201,
+      );
+    assert.equal(
+      (
+        await request(`/public-games/alice/${publishedId}/report`, 'POST', {
+          reason: 'other',
+          details: 'Rate limited report',
+        })
+      ).status,
+      429,
+    );
+    assert.equal(
+      (await db.query('SELECT details FROM reports ORDER BY created_at LIMIT 1'))[0].details,
+      'Automated moderation test',
+    );
     assert.equal((await request(`/projects/${id}/export`, 'GET', undefined, bob)).status, 404);
     const exported = await fetch(`${base}/projects/${id}/export`, {
       headers: { Authorization: `Bearer ${alice}` },

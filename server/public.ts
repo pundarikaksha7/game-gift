@@ -1,4 +1,5 @@
 import type express from 'express';
+import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
@@ -10,6 +11,13 @@ const escape = (s: string) =>
   );
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 export function mountPublic(app: express.Express, db: DB, auth: express.RequestHandler) {
+  const reportLimit = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many reports. Please try again later.' },
+  });
   const published = async (reference: string, publishedId?: string) => {
     const [p] = await db.query(
       publishedId
@@ -45,11 +53,11 @@ export function mountPublic(app: express.Express, db: DB, auth: express.RequestH
       .replace('</head>', `${metadata}</head>`);
     res.type('html').set('Cache-Control', 'no-store').send(html);
   });
-  app.post('/api/public-games/:ownerId/:publishedId/report', async (req, res) => {
+  app.post('/api/public-games/:ownerId/:publishedId/report', reportLimit, async (req, res) => {
     const input = z
       .object({
         reason: z.enum(['inappropriate_content', 'harassment', 'copyright', 'privacy', 'other']),
-        details: z.string().max(2000).default(''),
+        details: z.string().trim().max(2000).default(''),
       })
       .parse(req.body);
     const p = await published(String(req.params.ownerId), String(req.params.publishedId));
@@ -59,11 +67,11 @@ export function mountPublic(app: express.Express, db: DB, auth: express.RequestH
     );
     res.status(201).json({ ok: true });
   });
-  app.post('/api/public-games/:slug/report', async (req, res) => {
+  app.post('/api/public-games/:slug/report', reportLimit, async (req, res) => {
     const input = z
       .object({
         reason: z.enum(['inappropriate_content', 'harassment', 'copyright', 'privacy', 'other']),
-        details: z.string().max(2000).default(''),
+        details: z.string().trim().max(2000).default(''),
       })
       .parse(req.body);
     const p = await published(String(req.params.slug));
