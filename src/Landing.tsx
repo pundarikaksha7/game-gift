@@ -33,7 +33,6 @@ import {
   X,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Brand } from './components/Brand';
 
 const modes = [
   {
@@ -107,6 +106,19 @@ const faqs = [
   ],
 ];
 
+function Wordmark() {
+  return (
+    <span className="brand-lockup">
+      <span className="brand-gem" aria-hidden="true">
+        ✦
+      </span>
+      <span className="brand-word">
+        game<span>gift</span>
+      </span>
+    </span>
+  );
+}
+
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
@@ -115,8 +127,8 @@ export default function Landing() {
         <Container measure="wide" gutter="lg">
           <AppBar.Toolbar className="landing-toolbar" inset="none">
             <AppBar.Start>
-              <a className="brand-link" href="#top" aria-label="Game Gift home">
-                <Brand />
+              <a className="brand-link" href="#top" aria-label="Gamegift home">
+                <Wordmark />
               </a>
             </AppBar.Start>
             <AppBar.Center>
@@ -187,13 +199,7 @@ export default function Landing() {
                   gap={3}
                   align={{ initial: 'stretch', sm: 'center' }}
                 >
-                  <Button
-                    href="/studio"
-                    data-analytics="create_game_clicked"
-                    tone="accent"
-                    size="lg"
-                    endIcon={<ArrowRight size={18} />}
-                  >
+                  <Button href="/studio" data-analytics="create_game_clicked" tone="accent" size="lg" endIcon={<ArrowRight size={18} />}>
                     Make a game gift
                   </Button>
                   <Button
@@ -513,7 +519,7 @@ export default function Landing() {
             justify="between"
           >
             <a className="brand-link" href="#top">
-              <Brand />
+              <Wordmark />
             </a>
             <Paragraph tone="muted">A little world, made for one very important person.</Paragraph>
             <HStack gap={5}>

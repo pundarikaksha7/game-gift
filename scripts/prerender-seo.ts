@@ -27,7 +27,7 @@ function document(meta: Meta) {
     <link rel="canonical" href="${canonical}">
     <meta property="og:type" content="website"><meta property="og:site_name" content="Game Gift">
     <meta property="og:title" content="${escape(meta.title)}"><meta property="og:description" content="${escape(meta.description)}">
-    <meta property="og:url" content="${canonical}"><meta property="og:image" content="${OG_IMAGE}"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="720"><meta property="og:image:alt" content="A personalized Game Gift adventure"><meta property="og:locale" content="en_US">
+    <meta property="og:url" content="${canonical}"><meta property="og:image" content="${OG_IMAGE}"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="720">
     <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escape(meta.title)}"><meta name="twitter:description" content="${escape(meta.description)}"><meta name="twitter:image" content="${OG_IMAGE}">
     ${(meta.schema || []).map((item) => `<script type="application/ld+json">${json(item)}</script>`).join('\n')}`;
   return shell
@@ -39,7 +39,7 @@ function document(meta: Meta) {
     .replace(/\s*<link rel="canonical"[^>]*>/g, '')
     .replace(/\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
     .replace('</head>', `${head}</head>`)
-    .replace('<div id="root"></div>', `<div id="root" data-prerendered>${meta.body}</div>`);
+    .replace('<div id="root"></div>', `<div id="root">${meta.body}</div>`);
 }
 function breadcrumbs(page: SeoPage) {
   return {
@@ -65,12 +65,7 @@ const organization = {
   url: SITE_URL,
   logo: `${SITE_URL}/favicon.svg`,
 };
-const website = {
-  '@type': 'WebSite',
-  name: 'Game Gift',
-  alternateName: 'GameGift',
-  url: SITE_URL,
-};
+const website = { '@type': 'WebSite', name: 'Game Gift', url: SITE_URL };
 const app = {
   '@type': 'SoftwareApplication',
   name: 'Game Gift',

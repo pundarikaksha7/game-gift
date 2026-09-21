@@ -1,6 +1,5 @@
 import { ArrowRight, Check, Gamepad2, Gift, Music2, Sparkles } from 'lucide-react';
 import { labels, pageByPath, type SeoPage } from './seo';
-import { Brand } from './components/Brand';
 
 const featureIcons = [Gamepad2, Gift, Music2];
 
@@ -8,7 +7,7 @@ function Header() {
   return (
     <header className="seo-header">
       <a className="seo-brand" href="/" aria-label="Game Gift home">
-        <Brand />
+        <span aria-hidden="true">✦</span> gamegift
       </a>
       <nav aria-label="Main navigation">
         <a href="/examples">Examples</a>
@@ -26,7 +25,7 @@ function Footer() {
     <footer className="seo-footer">
       <div>
         <a className="seo-brand" href="/">
-          <Brand />
+          <span aria-hidden="true">✦</span> gamegift
         </a>
         <p>Personalized browser games made from the stories you share.</p>
       </div>

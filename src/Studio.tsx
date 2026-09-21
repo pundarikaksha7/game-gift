@@ -45,7 +45,6 @@ import { authenticateWithGoogle, completeAuthRedirect, supabase } from './auth';
 import { track } from './analytics';
 import { hasLocalAssets, persistLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
-import { Brand } from './components/Brand';
 import { PlayGame } from './components/PlayModal';
 import { Modal, Field, UploadButton } from './components/UI';
 import {
@@ -433,8 +432,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="/" aria-label="Game Gift home">
-          <Brand />
+        <a className="brand" href="/">
+          <span className="brand-mark">✦</span>
+          <span className="brand-word">
+            game<span>gift</span>
+          </span>
         </a>
         <button className="workspace-picker" onClick={showProjects}>
           <span className="workspace-icon">{user?.name[0].toUpperCase() || 'P'}</span>
