@@ -174,9 +174,11 @@ export default function App() {
     }
     let active = true;
     let authSubscription: { unsubscribe: () => void } | undefined;
-    async function syncSignedInUser() {
+    async function syncSignedInUser(token: string) {
       try {
-        const d = await api('/auth/me');
+        // Use the token from the auth event itself instead of re-reading storage while
+        // Supabase may still be finishing the callback transaction.
+        const d = await api('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
         if (!active) return;
         setUser(d.user);
         if (!d.user.profileComplete) {
@@ -209,7 +211,7 @@ export default function App() {
           return;
         }
         // Defer API work until after Supabase releases its internal auth callback lock.
-        setTimeout(() => void syncSignedInUser(), 0);
+        setTimeout(() => void syncSignedInUser(session.access_token), 0);
       });
       authSubscription = data.subscription;
     }
@@ -219,13 +221,12 @@ export default function App() {
       setModal('auth');
       history.replaceState(null, '', location.pathname);
     }
-    completeAuthRedirect()
-      .catch((error) => {
-        setAuthError(error.message);
-        setModal('auth');
-        return false;
-      })
-      .then(() => syncSignedInUser());
+    // A successful restore or OAuth exchange emits INITIAL_SESSION/SIGNED_IN above.
+    // Do not probe the protected profile endpoint when there is no session.
+    void completeAuthRedirect().catch((error) => {
+      setAuthError(error.message);
+      setModal('auth');
+    });
     api('/config')
       .then((d) => {
         setAiEnabled(d.aiEnabled);

@@ -1,11 +1,16 @@
 import type { DB } from './db';
 export const supabaseAuthEnabled = () => process.env.AUTH_PROVIDER === 'supabase';
 const denied = () => Object.assign(new Error('Sign in again with Google'), { status: 401 });
+function rejectIdentity(reason: string): never {
+  console.warn(JSON.stringify({ event: 'auth_identity_rejected', reason }));
+  throw denied();
+}
 /** Auth service verifies signature, expiry and user existence; never decode and trust a JWT. */
 export async function supabaseIdentity(authorization: string | undefined) {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY)
     throw Object.assign(new Error('Google sign-in is not configured'), { status: 503 });
-  if (!authorization?.startsWith('Bearer ')) throw denied();
+  if (!authorization?.startsWith('Bearer ') || authorization.length <= 'Bearer '.length)
+    throw denied();
   const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
     headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: authorization },
     signal: AbortSignal.timeout(10000),
@@ -13,21 +18,35 @@ export async function supabaseIdentity(authorization: string | undefined) {
   if (!response.ok) {
     if (response.status >= 500)
       throw Object.assign(new Error('Authentication unavailable'), { status: 503 });
-    throw denied();
+    return rejectIdentity(`supabase_user_${response.status}`);
   }
   const user = (await response.json()) as any;
-  if (
-    !user.id ||
-    !user.email ||
-    !user.email_confirmed_at ||
-    user.is_anonymous ||
-    user.app_metadata?.provider !== 'google'
-  )
-    throw denied();
+  const providers = new Set<string>([
+    user.app_metadata?.provider,
+    ...(Array.isArray(user.app_metadata?.providers) ? user.app_metadata.providers : []),
+    ...(Array.isArray(user.identities)
+      ? user.identities.map((identity: any) => identity.provider)
+      : []),
+  ]);
+  const googleIdentity = Array.isArray(user.identities)
+    ? user.identities.find((identity: any) => identity.provider === 'google')
+    : undefined;
+  const emailConfirmed = Boolean(
+    user.email_confirmed_at ||
+    user.confirmed_at ||
+    googleIdentity?.identity_data?.email_verified === true ||
+    user.user_metadata?.email_verified === true,
+  );
+  if (!user.id || !user.email) return rejectIdentity('missing_identity');
+  if (user.is_anonymous) return rejectIdentity('anonymous_user');
+  if (!providers.has('google')) return rejectIdentity('google_identity_missing');
+  if (!emailConfirmed) return rejectIdentity('email_unconfirmed');
   return {
     id: String(user.id),
     email: String(user.email).toLowerCase(),
-    name: String(user.user_metadata?.name || user.email.split('@')[0]).slice(0, 60),
+    name: String(
+      user.user_metadata?.name || user.user_metadata?.full_name || user.email.split('@')[0],
+    ).slice(0, 60),
   };
 }
 export async function authenticateSupabase(db: DB, authorization: string | undefined) {

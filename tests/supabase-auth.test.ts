@@ -33,6 +33,22 @@ test('Supabase identity is remotely verified and requires a confirmed, non-anony
 
     globalThis.fetch = (async () =>
       Response.json({
+        id: 'linked-user',
+        email: 'linked@example.com',
+        confirmed_at: '2026-09-14T00:00:00Z',
+        is_anonymous: false,
+        app_metadata: { provider: 'email', providers: ['email', 'google'] },
+        identities: [{ provider: 'google', identity_data: { email_verified: true } }],
+        user_metadata: { full_name: 'Linked Creator' },
+      })) as typeof fetch;
+    assert.deepEqual(await supabaseIdentity('Bearer linked-token'), {
+      id: 'linked-user',
+      email: 'linked@example.com',
+      name: 'Linked Creator',
+    });
+
+    globalThis.fetch = (async () =>
+      Response.json({
         id: 'anonymous',
         email: 'guest@example.com',
         is_anonymous: true,
