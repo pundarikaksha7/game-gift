@@ -5,7 +5,7 @@ import sharp from 'sharp';
 test('landing page enters the live studio', async ({ page }) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: /Your favorite memories, turned into a game/ }),
+    page.getByRole('heading', { name: /Create a Personalized Game as a Gift/ }),
   ).toBeVisible();
   const mediaStyles = await page.locator('.game-image img, .mode-image img').evaluateAll((images) =>
     images.map((image) => ({
@@ -145,12 +145,18 @@ test('templates create independent projects and viewport updates keep runtime al
   await page.getByRole('button', { name: 'New experience', exact: true }).click();
   await page.getByRole('button', { name: /Story journey/ }).click();
   await expect(page.getByLabel('Game title')).toHaveValue('Story journey');
-  await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
+  await page.locator('.preview-trigger').click();
+  const preview = page.getByRole('dialog', { name: 'Game preview' });
+  await expect(preview.frameLocator('iframe').locator('canvas')).toBeVisible();
   const runtime = page.frames().find((f) => f.url().endsWith('/engine/index.html'))!;
+  await expect
+    .poll(() => runtime.evaluate(() => (window as any).gameConfig?.title))
+    .toBe('Story journey');
   const marker = await runtime.evaluate(() => performance.timeOrigin);
-  await page.getByRole('button', { name: 'Toggle grid' }).click();
+  await preview.getByRole('button', { name: 'Grid' }).click();
   await expect.poll(() => runtime.evaluate(() => (window as any).gameConfig.grid)).toBe(true);
   expect(await runtime.evaluate(() => performance.timeOrigin)).toBe(marker);
+  await preview.getByRole('button', { name: 'Close preview' }).last().click();
   await page.getByLabel('Game title').fill('Independent world');
   await page.getByRole('button', { name: 'New experience', exact: true }).click();
   await page.getByRole('button', { name: /Arcade challenge/ }).click();
@@ -160,18 +166,31 @@ test('templates create independent projects and viewport updates keep runtime al
     .getByRole('button', { name: 'Undo', exact: true })
     .isDisabled()
     .then((v) => expect(v).toBe(true));
-  await page.getByRole('button', { name: 'Playtest your game' }).click();
+  await page.locator('.preview-trigger').click();
+  await page
+    .getByRole('dialog', { name: 'Game preview' })
+    .getByRole('button', { name: 'Playtest' })
+    .click();
   const playable = page.locator('dialog').frameLocator('iframe');
   await expect(playable.locator('canvas')).toBeVisible();
   await playable.getByRole('button', { name: 'Begin chapter' }).click();
-  await expect(playable.locator('.hud-label')).toHaveText('Arcade challenge');
+  await expect
+    .poll(() =>
+      page
+        .frames()
+        .find((frame) => frame.url().endsWith('/engine/index.html'))
+        ?.evaluate(() => (window as any).gameConfig?.title),
+    )
+    .toBe('Arcade challenge');
   await page.screenshot({ path: 'test-results/game-gift-playtest.png' });
   expect(errors).toEqual([]);
 });
 
 test('workspace fits the screen and retains a visible live preview', async ({ page }, testInfo) => {
   await page.goto('/studio');
-  await expect(page.frameLocator('iframe').locator('canvas')).toBeVisible();
+  await page.locator('.preview-trigger').click();
+  const preview = page.getByRole('dialog', { name: 'Game preview' });
+  await expect(preview.frameLocator('iframe').locator('canvas')).toBeVisible();
   await page.screenshot({
     path: `test-results/game-gift-${testInfo.project.name}.png`,
     fullPage: true,
@@ -180,9 +199,11 @@ test('workspace fits the screen and retains a visible live preview', async ({ pa
     true,
   );
   if (testInfo.project.name === 'desktop') {
-    const editor = await page.locator('.editor-panel').boundingBox();
-    const preview = await page.locator('.preview-column').boundingBox();
-    expect(preview!.x).toBeGreaterThan(editor!.x + editor!.width);
+    const drawer = await page.locator('.preview-drawer').boundingBox();
+    expect(drawer).not.toBeNull();
+    expect(drawer!.x + drawer!.width).toBeLessThanOrEqual(
+      await page.evaluate(() => innerWidth + 1),
+    );
   }
 });
 
@@ -196,7 +217,11 @@ test('a creator-authored story can be completed using real game controls', async
     game,
   );
   await page.goto('/studio');
-  await page.getByRole('button', { name: 'Playtest your game' }).click();
+  await page.locator('.preview-trigger').click();
+  await page
+    .getByRole('dialog', { name: 'Game preview' })
+    .getByRole('button', { name: 'Playtest' })
+    .click();
   const playable = page.locator('dialog').frameLocator('iframe');
   await playable.getByRole('button', { name: 'Begin chapter' }).click();
   const right = page.locator('dialog').getByRole('button', { name: 'ArrowRight', exact: true });

@@ -81,11 +81,13 @@ async function boot() {
         : import('./Studio'),
     landing ? Promise.resolve() : import('./studio.css'),
   ]);
-  createRoot(document.getElementById('root')!).render(
+  const root = document.getElementById('root')!;
+  createRoot(root).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>,
   );
+  requestAnimationFrame(() => root.removeAttribute('data-prerendered'));
 }
 
 void boot();
