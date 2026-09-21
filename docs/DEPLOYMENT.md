@@ -32,7 +32,7 @@ Without Supabase storage, use a paid Render service with a persistent disk mount
 ## Supabase Auth
 
 1. In **Authentication > Providers > Email**, disable email/password signups and sign-ins. Disable anonymous sign-ins as well. The API also rejects valid Supabase users whose primary provider is not Google.
-2. In **Authentication > URL Configuration**, set Site URL to `https://game-gift.shop`. Add exact redirect URLs `https://game-gift.shop/auth/callback` and `http://localhost:5173/auth/callback` (development only).
+2. In **Authentication > URL Configuration**, set Site URL to the domain users actually land on. Add exact redirect URLs for both `https://game-gift.shop/auth/callback` and `https://www.game-gift.shop/auth/callback`, plus `http://localhost:5173/auth/callback` for development. The app always starts and completes PKCE on the browser's active origin.
 3. In **Authentication > Providers > Google**, enable Google and add the client ID and secret from Google Cloud. In Google Cloud, use the Supabase callback shown on that provider page (normally `https://<project-ref>.supabase.co/auth/v1/callback`) as the authorized redirect URI; do not use the Gamegift callback there.
 4. Enable CAPTCHA/bot protection for public sign-in.
 5. Put `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` on Render. Never put the service-role key on Vercel or in a `VITE_` variable.

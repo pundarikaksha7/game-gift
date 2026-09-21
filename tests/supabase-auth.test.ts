@@ -73,7 +73,9 @@ test('a verified Supabase identity adopts its legacy profile without losing its 
   const directory = await mkdtemp(`${tmpdir()}/game-gift-supabase-link-`);
   const originalDataDir = process.env.DATA_DIR;
   const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   process.env.DATA_DIR = directory;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
   delete process.env.DATABASE_URL;
   const db = await openDatabase();
   try {
@@ -127,5 +129,54 @@ test('a verified Supabase identity adopts its legacy profile without losing its 
     else process.env.DATA_DIR = originalDataDir;
     if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = originalDatabaseUrl;
+    if (originalServiceRoleKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
+  }
+});
+
+test('a recreated Google identity safely reclaims a profile whose old Auth user is gone', async () => {
+  const originalFetch = globalThis.fetch;
+  const directory = await mkdtemp(`${tmpdir()}/game-gift-supabase-reclaim-`);
+  const originalDataDir = process.env.DATA_DIR;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.DATA_DIR = directory;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+  delete process.env.DATABASE_URL;
+  const db = await openDatabase();
+  try {
+    await db.query(
+      "INSERT INTO users(id,email,password,name,auth_provider,auth_subject) VALUES ('profile-1','creator@example.com','!supabase','Original Creator','supabase','deleted-auth-user')",
+    );
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      if (String(url).endsWith('/auth/v1/admin/users/deleted-auth-user'))
+        return new Response(null, { status: 404 });
+      return Response.json({
+        id: 'replacement-auth-user',
+        email: 'Creator@Example.com',
+        email_confirmed_at: '2026-09-21T00:00:00Z',
+        is_anonymous: false,
+        app_metadata: { provider: 'google' },
+        user_metadata: { name: 'Google Creator' },
+      });
+    }) as typeof fetch;
+
+    assert.deepEqual(await authenticateSupabase(db, 'Bearer verified-token'), {
+      id: 'profile-1',
+      email: 'creator@example.com',
+      name: 'Original Creator',
+      age: null,
+      authSubject: 'replacement-auth-user',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await db.close();
+    await rm(directory, { recursive: true, force: true });
+    if (originalDataDir === undefined) delete process.env.DATA_DIR;
+    else process.env.DATA_DIR = originalDataDir;
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalDatabaseUrl;
+    if (originalServiceRoleKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalServiceRoleKey;
   }
 });

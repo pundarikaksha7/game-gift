@@ -119,9 +119,9 @@ export function createApp(db: DB, options: AppOptions = {}) {
       supabaseUrl: supabaseAuthEnabled() ? process.env.SUPABASE_URL : undefined,
       // Supabase publishable/anon keys are designed for public clients; service-role stays server-only.
       supabaseAnonKey: supabaseAuthEnabled() ? process.env.SUPABASE_ANON_KEY : undefined,
-      authRedirectUrl: supabaseAuthEnabled()
-        ? `${process.env.APP_ORIGIN || req.get('origin') || 'http://localhost:5173'}/auth/callback`
-        : undefined,
+      // The browser resolves this against its active origin. This keeps PKCE storage and
+      // the callback on the same apex/www origin when a hosting provider canonicalizes it.
+      authRedirectUrl: supabaseAuthEnabled() ? '/auth/callback' : undefined,
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
       paymentsEnabled: paymentsRequired(),
     }),

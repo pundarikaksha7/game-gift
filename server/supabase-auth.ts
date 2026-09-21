@@ -1,6 +1,7 @@
 import type { DB } from './db';
 export const supabaseAuthEnabled = () => process.env.AUTH_PROVIDER === 'supabase';
 const denied = () => Object.assign(new Error('Sign in again with Google'), { status: 401 });
+const unavailable = () => Object.assign(new Error('Authentication unavailable'), { status: 503 });
 function rejectIdentity(reason: string): never {
   console.warn(JSON.stringify({ event: 'auth_identity_rejected', reason }));
   throw denied();
@@ -49,6 +50,25 @@ export async function supabaseIdentity(authorization: string | undefined) {
     ).slice(0, 60),
   };
 }
+
+/** A stale app profile may outlive an Auth user that was removed in Supabase. */
+async function supabaseUserExists(id: string) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw unavailable();
+  const response = await fetch(
+    `${process.env.SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(id)}`,
+    {
+      headers: {
+        apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      signal: AbortSignal.timeout(10000),
+    },
+  );
+  if (response.ok) return true;
+  if (response.status === 404) return false;
+  throw unavailable();
+}
+
 export async function authenticateSupabase(db: DB, authorization: string | undefined) {
   const user = await supabaseIdentity(authorization);
   return db.transaction(async (q) => {
@@ -73,17 +93,36 @@ export async function authenticateSupabase(db: DB, authorization: string | undef
         age: profile.age,
         authSubject: profile.auth_subject,
       };
+    const [emailProfile] = await q(
+      'SELECT id,email,name,age,auth_provider,auth_subject FROM users WHERE email=$1',
+      [user.email],
+    );
     // A verified Google email can claim its matching legacy profile without changing the
     // application user ID, which keeps all project, asset, and purchase foreign keys intact.
-    await q(
-      `INSERT INTO users(id,email,password,name,auth_provider,auth_subject)
-       VALUES ($1,$2,'!supabase',$3,'supabase',$4)
-       ON CONFLICT(email) DO UPDATE SET
-         password=CASE WHEN users.auth_provider='legacy' THEN '!supabase' ELSE users.password END,
-         auth_provider=CASE WHEN users.auth_provider='legacy' THEN 'supabase' ELSE users.auth_provider END,
-         auth_subject=CASE WHEN users.auth_provider='legacy' THEN EXCLUDED.auth_subject ELSE users.auth_subject END`,
-      [user.id, user.email, user.name, user.id],
-    );
+    // It may also reclaim a Supabase profile only after the Admin API proves that the old
+    // Auth identity no longer exists. This repairs delete-and-recreate accounts without
+    // allowing a second live identity to take over the profile by email.
+    if (emailProfile) {
+      const legacy = emailProfile.auth_provider === 'legacy';
+      const staleSupabaseIdentity =
+        emailProfile.auth_provider === 'supabase' &&
+        emailProfile.auth_subject &&
+        emailProfile.auth_subject !== user.id &&
+        !(await supabaseUserExists(emailProfile.auth_subject));
+      if (!legacy && !staleSupabaseIdentity) throw denied();
+      await q(
+        `UPDATE users
+         SET password='!supabase',auth_provider='supabase',auth_subject=$1
+         WHERE id=$2 AND auth_subject IS NOT DISTINCT FROM $3`,
+        [user.id, emailProfile.id, emailProfile.auth_subject],
+      );
+    } else {
+      await q(
+        `INSERT INTO users(id,email,password,name,auth_provider,auth_subject)
+         VALUES ($1,$2,'!supabase',$3,'supabase',$4)`,
+        [user.id, user.email, user.name, user.id],
+      );
+    }
     [profile] = await q(
       'SELECT id,email,name,age,auth_provider,auth_subject FROM users WHERE email=$1',
       [user.email],

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { track } from './analytics';
+import { authCallbackUrl } from './auth-url';
 type SupabaseClient = ReturnType<typeof createClient>;
 export let supabase: SupabaseClient | null = null;
 let authRedirectUrl: string | undefined;
@@ -20,7 +21,10 @@ export function configureSupabase(url?: string, key?: string, redirectUrl?: stri
 
 configureSupabase(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
 function redirectTo() {
-  return authRedirectUrl || `${location.origin}/auth/callback`;
+  // PKCE stores its verifier in this origin's browser storage. Always complete the
+  // exchange on the same origin that started it, even when deployment configuration
+  // still names an apex/www alias that redirects here.
+  return authCallbackUrl(authRedirectUrl, location.origin);
 }
 
 export async function completeAuthRedirect() {
