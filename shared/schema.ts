@@ -76,8 +76,12 @@ export const levelSchema = z
       .optional(),
     crossingPlatforms: z.boolean().optional(),
     requireDefeatAll: z.boolean().optional(),
-    powerup: z.enum(['none', 'companion', 'beam', 'boost', 'motorcycle', 'mixed']).optional(),
+    powerup: z
+      .enum(['none', 'companion', 'beam', 'boost', 'phone', 'motorcycle', 'mixed'])
+      .optional(),
     powerupArt: assetUrl.optional(),
+    phoneArt: assetUrl.optional(),
+    /** Legacy field retained so existing saved games keep their uploaded art. */
     motorcycleArt: assetUrl.optional(),
   })
   .strict();
@@ -113,8 +117,9 @@ export const mechanicsSchema = z
     boostDuration: z.number().min(1).max(300).default(14),
     boostMultiplier: z.number().min(1).max(10).default(1.8),
     helpersAtStart: z.boolean().default(false),
-    phoneEvent: z.boolean().default(false),
-    motorcycleSpeed: z.number().min(100).max(3000).default(1120),
+    /** Legacy settings are accepted but no longer exposed or used by the runtime. */
+    phoneEvent: z.boolean().optional(),
+    motorcycleSpeed: z.number().min(100).max(3000).optional(),
     screenShake: z.boolean().default(true),
     combos: z.boolean().default(true),
     healthBars: z.boolean().default(true),
@@ -261,6 +266,7 @@ export function assetReferences(game: Game): { url: string; kind: 'image' | 'aud
     ),
     ...game.levels.map((l) => ({ url: l.background || '', kind: 'image' as const })),
     ...game.levels.map((l) => ({ url: l.powerupArt || '', kind: 'image' as const })),
+    ...game.levels.map((l) => ({ url: l.phoneArt || '', kind: 'image' as const })),
     ...game.levels.map((l) => ({ url: l.motorcycleArt || '', kind: 'image' as const })),
     ...game.animation.frames.map((url) => ({ url, kind: 'image' as const })),
     ...(

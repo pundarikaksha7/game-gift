@@ -29,7 +29,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
   game.levels.forEach((l) => {
     assets[l.id] = l.background || '';
     assets[`powerup-${l.id}`] = l.powerupArt || '';
-    assets[`motorcycle-${l.id}`] = l.motorcycleArt || '/assets/powerups/motorcycle.webp';
+    assets[`phone-helper-${l.id}`] = l.phoneArt || l.motorcycleArt || '';
   });
   const enemyTypes = Object.fromEntries(
     enemies.map((c) => {
@@ -124,8 +124,7 @@ export function runtimeConfig(game: Game, startLevel = 0, camera = 0) {
         width: l.width / WORLD_UNIT,
         groundY: 1080,
         startY: 968,
-        skyColor:
-          l.theme === 'midnight' ? '#241b42' : l.theme === 'sunset' ? '#e5bbaa' : '#87CEEB',
+        skyColor: l.theme === 'midnight' ? '#241b42' : l.theme === 'sunset' ? '#e5bbaa' : '#87CEEB',
         groundColor:
           l.theme === 'midnight' ? '#35374e' : l.theme === 'sunset' ? '#8c8589' : '#618b7a',
         boss: {

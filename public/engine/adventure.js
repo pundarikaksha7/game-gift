@@ -321,19 +321,18 @@ async function run(mode) {
       color: '#37ffb4',
       description: 'Punch + kick damage ×1.8',
     },
-    motorcycle: {
-      name: 'Motorcycle call',
+    phone: {
+      name: 'Helper hotline',
       duration: 0,
       color: '#ff9b35',
-      description: 'A rider sweeps through every villain',
+      description: 'A helper rushes through every villain',
     },
   };
   const powerupTimers = { companion: 0, beam: 0, boost: 0 };
   let companions = [];
   let powerupMessage = '';
   let powerupMessageTimer = 0;
-  let hiddenPhone = null;
-  let motorcycleEvent = null;
+  let helperRush = null;
   let playerDamageFlash = 0;
   let enemySpawned = false;
   let gameOver = false;
@@ -540,7 +539,7 @@ async function run(mode) {
       ) {
         const kind =
           getLevelConfig().powerup === 'mixed'
-            ? ['companion', 'beam', 'boost', 'motorcycle'][levelDropCount % 4]
+            ? ['companion', 'beam', 'boost', 'phone'][levelDropCount % 4]
             : getLevelConfig().powerup;
         dropPowerup(kind, enemy);
         levelDropCount++;
@@ -703,8 +702,6 @@ async function run(mode) {
   const enemyImageStates = Object.fromEntries(
     Object.keys(enemyTypes).map((id) => [id, loadImageAsset(id)]),
   );
-  const specialImageStates = { phone: loadImageAsset('hidden_phone_icon') };
-
   const frameCache = new Map();
   for (const c of cfg.characters)
     for (const url of [
@@ -738,9 +735,6 @@ async function run(mode) {
   const soundUrls = cfg.sounds;
   let soundEnabled = false;
   let levelMusic = null;
-  let motorAudioContext = null;
-  let motorOscillator = null;
-  let motorGain = null;
   // Reuse a small pool of audio elements instead of allocating a new Audio
   // object for every punch/kick/hit. This reduces GC spikes during combat.
   const soundPools = {};
@@ -776,35 +770,6 @@ async function run(mode) {
       levelMusic.volume = Math.max(0, Math.min(1, Number(cfg.audio?.musicVolume ?? 0.18)));
       void levelMusic.play().catch(() => {});
     }
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!motorAudioContext && AudioContextClass) {
-      try {
-        motorAudioContext = new AudioContextClass();
-      } catch (_) {
-        motorAudioContext = null;
-      }
-    }
-    if (motorAudioContext?.state === 'suspended') void motorAudioContext.resume();
-  }
-  function startMotorcycleSound() {
-    if (!soundEnabled || !motorAudioContext || motorOscillator) return;
-    motorOscillator = motorAudioContext.createOscillator();
-    motorGain = motorAudioContext.createGain();
-    motorOscillator.type = 'sawtooth';
-    motorOscillator.frequency.value = 74;
-    motorGain.gain.value = 0.045;
-    motorOscillator.connect(motorGain);
-    motorGain.connect(motorAudioContext.destination);
-    motorOscillator.start();
-  }
-  function stopMotorcycleSound() {
-    if (!motorOscillator) return;
-    try {
-      motorOscillator.stop();
-    } catch (_) {}
-    motorOscillator.disconnect();
-    motorOscillator = null;
-    motorGain = null;
   }
 
   function disposeRuntime() {
@@ -820,9 +785,6 @@ async function run(mode) {
         audio.removeAttribute('src');
         audio.load();
       }
-    stopMotorcycleSound();
-    if (motorAudioContext && motorAudioContext.state !== 'closed') void motorAudioContext.close();
-    motorAudioContext = null;
     for (const state of assetCache.values()) {
       if (!state.image) continue;
       state.image.onload = null;
@@ -1239,10 +1201,7 @@ async function run(mode) {
     completionOverlay.classList.add('is-hidden');
     const level = getLevelConfig();
     generateGroundHoles();
-    hiddenPhone = null;
-    motorcycleEvent = null;
-    stopMotorcycleSound();
-    placeHiddenPhone();
+    helperRush = null;
     player.x = findSafeRespawnX(Number(level.startX ?? cfg.player.startX ?? 120), PLAYER_W);
     player.y = Number(level.startY ?? level.groundY - PLAYER_H - 16);
     // Start flush with the actual ground height, avoiding a spawn fall
@@ -1341,10 +1300,7 @@ async function run(mode) {
     currentLevelIndex = Math.max(0, Math.min(cfg.levels.length - 1, index));
     const level = getLevelConfig();
     generateGroundHoles();
-    hiddenPhone = null;
-    motorcycleEvent = null;
-    stopMotorcycleSound();
-    placeHiddenPhone();
+    helperRush = null;
     player.x = findSafeRespawnX(Number(level.startX ?? cfg.player.startX ?? 120), PLAYER_W);
     player.y = Number(level.startY ?? level.groundY - PLAYER_H - 16);
     // Start flush with the actual ground height, avoiding a spawn fall
@@ -1980,6 +1936,8 @@ async function run(mode) {
     ctx.restore();
   }
   function dropPowerup(kind, enemy) {
+    // Saved games from before the phone power-up rename remain playable.
+    if (kind === 'motorcycle') kind = 'phone';
     const platform = getPlatforms()
       .filter(
         (p) =>
@@ -2002,9 +1960,10 @@ async function run(mode) {
     announcePowerup(`${powerupDefinitions[kind].name} dropped · Ready in 1 second`);
   }
   function activatePowerup(kind) {
+    if (kind === 'motorcycle') kind = 'phone';
     if (!powerupDefinitions[kind]) return;
-    if (kind === 'motorcycle') {
-      startMotorcycleSweep();
+    if (kind === 'phone') {
+      startHelperRush();
       const info = powerupDefinitions[kind];
       announcePowerup(`${info.name} · ${info.description}`);
       return;
@@ -2368,11 +2327,7 @@ async function run(mode) {
       ctx.arc(0, 0, 49, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, item.time));
       ctx.stroke();
       ctx.shadowBlur = 0;
-      const customArt = loadImageAsset(
-        item.kind === 'motorcycle'
-          ? `motorcycle-${getLevelConfig().id}`
-          : `powerup-${getLevelConfig().id}`,
-      );
+      const customArt = loadImageAsset(`powerup-${getLevelConfig().id}`);
       if (customArt?.ready && customArt.image) {
         ctx.save();
         ctx.beginPath();
@@ -2429,9 +2384,12 @@ async function run(mode) {
         ctx.strokeStyle = '#59a62d';
         ctx.lineWidth = 3;
         ctx.stroke();
-      } else {
+      } else if (item.kind === 'phone') {
         ctx.font = '56px system-ui';
-        ctx.fillText('🏍️', 0, 20);
+        ctx.fillText('📱', 0, 20);
+      } else {
+        ctx.font = '800 34px system-ui';
+        ctx.fillText('✦', 0, 12);
       }
       ctx.font = '800 20px ui-rounded, "Arial Rounded MT Bold", sans-serif';
       ctx.fillStyle = '#fff';
@@ -2440,8 +2398,8 @@ async function run(mode) {
       ctx.fillStyle = info.color;
       ctx.fillText(
         ready
-          ? item.kind === 'motorcycle'
-            ? 'PICK UP · INSTANT SWEEP'
+          ? item.kind === 'phone'
+            ? 'PICK UP · HELPER RUSH'
             : `PICK UP · ${info.duration}s`
           : 'CHARGING…',
         0,
@@ -2526,116 +2484,49 @@ async function run(mode) {
     }
   }
 
-  function placeHiddenPhone() {
-    if (!cfg.mechanics.phoneEvent) return;
-    const choices = getPlatforms().filter((platform) => !platform.isGround && platform.w > 120);
-    const platform =
-      choices[Math.floor(choices.length * 0.62)] ||
-      getPlatforms().find((platform) => platform.isGround);
-    if (!platform) return;
-    hiddenPhone = {
-      x: platform.x + platform.w / 2 - 26,
-      y: platform.y - 60,
-      w: 52,
-      h: 58,
-      time: 0,
-      collected: false,
-    };
-  }
-
-  function drawHiddenPhone() {
-    if (!hiddenPhone || hiddenPhone.collected) return;
-    const sx = hiddenPhone.x - cameraX;
-    const sy = hiddenPhone.y + Math.sin(hiddenPhone.time * 4) * 5;
-    const phone = specialImageStates.phone;
-    ctx.save();
-    ctx.shadowColor = 'rgba(73,225,255,.95)';
-    ctx.shadowBlur = 18;
-    if (phone && phone.ready && phone.image) {
-      const drawW = hiddenPhone.h * (phone.image.naturalWidth / phone.image.naturalHeight);
-      ctx.drawImage(phone.image, sx + (hiddenPhone.w - drawW) / 2, sy, drawW, hiddenPhone.h);
-    } else {
-      ctx.fillStyle = '#13253e';
-      ctx.fillRect(sx + 7, sy, 38, 58);
-      ctx.strokeStyle = '#ffe878';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(sx + 7, sy, 38, 58);
-      ctx.fillStyle = '#4be9ff';
-      ctx.fillRect(sx + 12, sy + 10, 28, 34);
-    }
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff4a6';
-    ctx.font = '700 15px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('PHONE', sx + hiddenPhone.w / 2, sy - 9);
-    ctx.restore();
-  }
-
-  function startMotorcycleSweep() {
-    if (motorcycleEvent || gameOver || levelTransition || allLevelsComplete) return;
+  function startHelperRush() {
+    if (helperRush || gameOver || levelTransition || allLevelsComplete) return;
     const groundY = Number(getLevelConfig().groundY ?? 1080);
-    motorcycleEvent = {
+    helperRush = {
       x: cameraX - 250,
       y: groundY - 142,
-      w: 220,
+      w: 130,
       h: 142,
-      speed: cfg.mechanics.motorcycleSpeed,
+      speed: 1120,
       targetX: getLevelLength() + 260,
       hitIds: new Set(),
     };
-    startMotorcycleSound();
   }
 
-  function drawMotorcycleSweep() {
-    if (!motorcycleEvent) return;
-    const event = motorcycleEvent,
+  function drawHelperRush() {
+    if (!helperRush) return;
+    const event = helperRush,
       sx = event.x - cameraX,
-      bike = loadImageAsset(`motorcycle-${getLevelConfig().id}`);
+      custom = loadImageAsset(`phone-helper-${getLevelConfig().id}`),
+      fallback = cfg.helpers[0]
+        ? animatedArt(cfg.helpers[0].id, helperImages[cfg.helpers[0].id], 'run')
+        : null,
+      art = custom?.ready ? custom : fallback;
     ctx.save();
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha = 0.32;
     ctx.fillStyle = '#ff9b35';
-    ctx.fillRect(sx - 110, event.y + event.h - 20, 130, 8);
+    ctx.fillRect(sx - 90, event.y + event.h - 13, 115, 7);
     ctx.globalAlpha = 1;
-    if (bike && bike.ready && bike.image) {
-      const drawW = event.h * (bike.image.naturalWidth / bike.image.naturalHeight);
-      ctx.drawImage(bike.image, sx, event.y, drawW, event.h);
+    if (art?.ready && art.image) {
+      const drawW = event.h * (art.image.naturalWidth / art.image.naturalHeight);
+      ctx.drawImage(art.image, sx, event.y, drawW, event.h);
     } else {
-      ctx.fillStyle = '#ed7927';
-      ctx.fillRect(sx + 40, event.y + 65, 122, 25);
-      ctx.fillStyle = '#1a1c26';
-      ctx.beginPath();
-      ctx.arc(sx + 63, event.y + 100, 22, 0, Math.PI * 2);
-      ctx.arc(sx + 151, event.y + 100, 22, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.font = '96px system-ui';
+      ctx.fillText('🏃', sx, event.y + event.h - 8);
     }
     ctx.restore();
   }
 
-  function updateSpecialEvent(dt) {
-    if (hiddenPhone && !hiddenPhone.collected) {
-      hiddenPhone.time += dt;
-      if (
-        intersects(hiddenPhone, {
-          x: player.x + 8,
-          y: player.y + 8,
-          w: player.w - 16,
-          h: player.h + 8,
-        })
-      ) {
-        hiddenPhone.collected = true;
-        startMotorcycleSweep();
-      }
-    }
-    if (!motorcycleEvent) return;
-    const event = motorcycleEvent,
+  function updateHelperRush(dt) {
+    if (!helperRush) return;
+    const event = helperRush,
       previousX = event.x;
     event.x += event.speed * dt;
-    if (motorOscillator && motorAudioContext)
-      motorOscillator.frequency.setTargetAtTime(
-        76 + Math.sin(event.x * 0.045) * 18,
-        motorAudioContext.currentTime,
-        0.03,
-      );
     for (const enemy of enemies) {
       if (
         event.hitIds.has(enemy.id) ||
@@ -2657,8 +2548,7 @@ async function run(mode) {
       }
     }
     if (event.x > event.targetX) {
-      motorcycleEvent = null;
-      stopMotorcycleSound();
+      helperRush = null;
     }
   }
 
@@ -3021,12 +2911,11 @@ async function run(mode) {
     }
     drawExitGate();
     drawPowerups();
-    drawHiddenPhone();
     drawHealthPickups();
     drawEnemies();
     drawBossWarning();
     drawPlayer();
-    drawMotorcycleSweep();
+    drawHelperRush();
     drawDefeatBursts();
     drawCombatPopups();
     ctx.restore();
@@ -3520,7 +3409,7 @@ async function run(mode) {
     }
     fallRespawnTimer = Math.max(0, fallRespawnTimer - dt);
     updatePowerups(dt);
-    updateSpecialEvent(dt);
+    updateHelperRush(dt);
     updateEnemies(dt);
   }
 

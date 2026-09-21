@@ -19,15 +19,36 @@ export function hasLocalAssets(game: Game) {
 }
 export async function persistLocalAssets(game: Game): Promise<Game> {
   const mapped: Record<string, string> = {};
-  for (const { url, kind } of assetReferences(game)) {
-    if (!isLocalAsset(url) || mapped[url]) continue;
-    const blob = await (await fetch(url)).blob();
-    const type = blob.type || (kind === 'audio' ? 'audio/mpeg' : 'image/png');
-    mapped[url] = await uploadAsset(
-      new File([blob], kind === 'audio' ? 'sound' : 'art', { type }),
-      kind,
-    );
-  }
+  const localAssets = [
+    ...new Map(
+      assetReferences(game)
+        .filter(({ url }) => isLocalAsset(url))
+        .map((asset) => [asset.url, asset]),
+    ).values(),
+  ];
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(3, localAssets.length) }, async () => {
+      while (next < localAssets.length) {
+        const { url, kind } = localAssets[next++];
+        let blob: Blob;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error('Local media is unavailable');
+          blob = await response.blob();
+        } catch {
+          throw new Error(
+            'One of your selected files is no longer available. Choose it again and retry.',
+          );
+        }
+        const type = blob.type || (kind === 'audio' ? 'audio/mpeg' : 'image/png');
+        mapped[url] = await uploadAsset(
+          new File([blob], kind === 'audio' ? 'sound' : 'art', { type }),
+          kind,
+        );
+      }
+    }),
+  );
   return rewriteAssets(game, mapped);
 }
 

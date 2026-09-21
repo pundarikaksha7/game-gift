@@ -19,17 +19,19 @@ const testUsers = {
     id: 'browser-desktop',
     email: 'browser-desktop@example.com',
     name: 'Browser Creator',
+    age: 30,
   },
   'Bearer browser-mobile-token': {
     id: 'browser-mobile',
     email: 'browser-mobile@example.com',
     name: 'Browser Creator',
+    age: 30,
   },
 } as const;
 for (const user of Object.values(testUsers))
   await db.query(
-    "INSERT INTO users(id,email,password,name,auth_provider,auth_subject) VALUES ($1,$2,'!supabase',$3,'supabase',$1)",
-    [user.id, user.email, user.name],
+    "INSERT INTO users(id,email,password,name,age,auth_provider,auth_subject) VALUES ($1,$2,'!supabase',$3,$4,'supabase',$1)",
+    [user.id, user.email, user.name, user.age],
   );
 const server = createApp(db, {
   authenticate: async (authorization) => {

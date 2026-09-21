@@ -9,6 +9,7 @@ import {
   type AvatarConfig,
 } from '../../../shared/avatar';
 import { AvatarRenderer } from './AvatarRenderer';
+import { MediaImage } from '../../media';
 
 function OptionThumbnail({ src }: { src: string }) {
   const [loaded, setLoaded] = useState(false);
@@ -22,10 +23,12 @@ function OptionThumbnail({ src }: { src: string }) {
 
 export function AvatarCreator({
   value,
+  customArt,
   onChange,
   onSave,
 }: {
   value?: AvatarConfig;
+  customArt?: string;
   onChange: (config: AvatarConfig) => void;
   onSave: (config: AvatarConfig) => void;
 }) {
@@ -41,8 +44,13 @@ export function AvatarCreator({
             <h3>Current look</h3>
           </div>
           <div className="avatar-stage-preview">
-            <AvatarRenderer config={config} label="Selected character preview" />
+            {customArt ? (
+              <MediaImage src={customArt} alt="Uploaded character preview" />
+            ) : (
+              <AvatarRenderer config={config} label="Selected character preview" />
+            )}
           </div>
+          {customArt && <span className="custom-art-status">✓ Custom art loaded</span>}
           <div className="avatar-actions">
             <button type="button" className="secondary" onClick={() => onChange(randomizeAvatar())}>
               <Dice5 size={16} /> Surprise me
@@ -68,7 +76,7 @@ export function AvatarCreator({
           </div>
           <div className="avatar-option-grid" aria-label="Available characters" tabIndex={0}>
             {avatarPresets.map((option, index) => {
-              const selected = config.appearance === option.appearance;
+              const selected = !customArt && config.appearance === option.appearance;
               return (
                 <button
                   type="button"

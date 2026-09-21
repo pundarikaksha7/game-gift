@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { X, Upload } from 'lucide-react';
+import { CheckCircle2, X, Upload } from 'lucide-react';
+import { MediaImage } from '../media';
 export function Modal({
   title,
   children,
@@ -72,5 +73,18 @@ export function UploadButton({
         }}
       />
     </label>
+  );
+}
+export function ImageConfirmation({ src, label }: { src?: string; label: string }) {
+  if (!src) return null;
+  return (
+    <div className="asset-confirmation" role="status">
+      <MediaImage src={src} alt={`${label} preview`} />
+      <span>
+        <CheckCircle2 size={15} />
+        <strong>{label}</strong>
+        <small>Loaded and ready to save</small>
+      </span>
+    </div>
   );
 }

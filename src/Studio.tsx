@@ -40,10 +40,10 @@ import {
 } from '../shared/schema';
 import { createTemplate, createStarter, starters, type StarterId } from '../shared/template';
 import { exportLocalGame, importGameExport, stripLocalAssets } from '../shared/export';
-import { api, downloadProject, setUploadProject } from './api';
+import { api, apiWithRetry, ApiError, downloadProject, setUploadProject } from './api';
 import { authenticateWithGoogle, completeAuthRedirect, supabase } from './auth';
 import { track } from './analytics';
-import { hasLocalAssets, persistLocalAssets } from './media';
+import { hasLocalAssets, MediaImage, persistLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
 import { Modal, Field, UploadButton } from './components/UI';
@@ -231,6 +231,7 @@ export default function App() {
       .then((d) => {
         setAiEnabled(d.aiEnabled);
         setGoogleEnabled(d.googleEnabled);
+        if (d.testAuthEnabled) void syncSignedInUser('browser-test-session');
       })
       .catch(() => setCloudUnavailable(true));
     return () => {
@@ -299,16 +300,19 @@ export default function App() {
       return;
     }
     const epoch = draftEpoch.current;
+    let payload = parsed.data;
+    let current = project;
     setBusy(true);
     try {
-      let payload = parsed.data;
-      let current = project;
       if (hasLocalAssets(payload) && !current) {
         current = await api<Project>('/projects', {
           method: 'POST',
           body: JSON.stringify({ game: stripLocalAssets(payload) }),
         });
         setUploadProject(current.id);
+        // Keep the staging project even if a later upload fails, so retrying Save
+        // resumes the same project instead of creating a duplicate.
+        if (epoch === draftEpoch.current) setProject(current);
       } else if (current) setUploadProject(current.id);
       if (hasLocalAssets(payload)) {
         payload = await persistLocalAssets(payload);
@@ -328,6 +332,24 @@ export default function App() {
       notify('Your adventure is saved');
       return p;
     } catch (e) {
+      // A response can be lost after the server commits a save. Confirm the
+      // project before reporting failure so users do not create a conflicting retry.
+      if (current && e instanceof ApiError && e.status === 0 && !hasLocalAssets(payload)) {
+        try {
+          const confirmed = await apiWithRetry<Project>(`/projects/${current.id}`, {}, 2);
+          if (JSON.stringify(confirmed.game) === JSON.stringify(payload)) {
+            if (epoch === draftEpoch.current) {
+              setGame(confirmed.game);
+              setProject(confirmed);
+              setSaved(JSON.stringify(confirmed.game));
+            }
+            notify('Your adventure is saved');
+            return confirmed;
+          }
+        } catch {
+          // Keep the original, more useful network error below.
+        }
+      }
       notify((e as Error).message);
     } finally {
       setBusy(false);
@@ -801,7 +823,11 @@ export default function App() {
                     {game.characters.map((c) => (
                       <button key={c.id} onClick={() => setTab('characters')}>
                         <span className="asset-avatar" style={{ color: c.color }}>
-                          {c.sprite ? <img src={c.sprite} alt={c.name} /> : <Users size={26} />}
+                          {c.sprite ? (
+                            <MediaImage src={c.sprite} alt={c.name} />
+                          ) : (
+                            <Users size={26} />
+                          )}
                         </span>
                         <span>{c.name}</span>
                         <small>{c.role}</small>
@@ -1344,13 +1370,15 @@ export default function App() {
             className="primary full-width"
             disabled={busy}
             onClick={async () => {
-              setBusy(true);
               try {
-                const d = await api(`/projects/${project.id}/publish`, {
+                const current = await save();
+                if (!current) return;
+                setBusy(true);
+                const d = await apiWithRetry(`/projects/${current.id}/publish`, {
                   method: 'POST',
-                  body: JSON.stringify({ revision: project.revision }),
+                  body: JSON.stringify({ revision: current.revision }),
                 });
-                setProject({ ...project, publishedId: d.publishedId, publishedUrl: d.url });
+                setProject({ ...current, publishedId: d.publishedId, publishedUrl: d.url });
                 notify('Your game is published. The adventure is ready to share.');
               } catch (e) {
                 notify((e as Error).message);

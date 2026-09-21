@@ -70,6 +70,7 @@ export function stripLocalAssets(game: Game): Game {
   clean.levels.forEach((level) => {
     if (level.background && local(level.background)) level.background = '';
     if (level.powerupArt && local(level.powerupArt)) level.powerupArt = '';
+    if (level.phoneArt && local(level.phoneArt)) level.phoneArt = '';
     if (level.motorcycleArt && local(level.motorcycleArt)) level.motorcycleArt = '';
   });
   clean.animation.frames = clean.animation.frames.filter((url) => !local(url));

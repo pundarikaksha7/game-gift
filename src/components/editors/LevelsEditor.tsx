@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, Trash2, ArrowUp, ArrowDown, User, Check, Image, Music2 } from 'lucide-react';
 import { newLevel } from '../../../shared/template';
 import { attachAsset } from '../../api';
-import { Field, UploadButton } from '../UI';
+import { Field, ImageConfirmation, UploadButton } from '../UI';
 import type { EditorProps } from './types';
 export function LevelsEditor({
   game,
@@ -175,6 +175,7 @@ export function LevelsEditor({
               }
             }}
           />
+          <ImageConfirmation src={l.background} label="Custom chapter background" />
         </Field>
         {!authed && (
           <p className="muted">Sign in and save to keep this artwork in your Gamegift account.</p>

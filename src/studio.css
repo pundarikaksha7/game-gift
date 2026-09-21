@@ -4643,6 +4643,54 @@ main {
   margin: -10px 0 -8px;
   transform: none;
 }
+.avatar-creator .avatar-stage-preview > img {
+  width: min(168px, 100%);
+  height: 210px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 20px rgba(35, 32, 65, 0.16));
+}
+.custom-art-status {
+  align-self: center;
+  margin: -4px 0 9px;
+  color: #36826d;
+  font-size: 11px;
+  font-weight: 720;
+}
+.asset-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #dce9df;
+  border-radius: 11px;
+  background: #f7fbf8;
+}
+.asset-confirmation > img {
+  width: 64px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+}
+.asset-confirmation > span {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 2px 6px;
+  color: #36826d;
+}
+.asset-confirmation strong {
+  color: #41475b;
+  font-size: 12px;
+}
+.asset-confirmation small {
+  grid-column: 2;
+  color: #738178;
+  font-size: 11px;
+}
 .avatar-creator .avatar-actions {
   position: relative;
   z-index: 2;

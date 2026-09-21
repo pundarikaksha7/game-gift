@@ -175,28 +175,31 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     });
     assert.equal(bad.status, 400);
     const png = new FormData();
-    png.append(
-      'file',
-      new Blob(
-        [
-          new Uint8Array(
-            await sharp({ create: { width: 2, height: 2, channels: 4, background: '#779966' } })
-              .png()
-              .toBuffer(),
-          ),
-        ],
-        { type: 'image/png' },
-      ),
-      'hero.png',
+    const uploadRequestId = randomUUID();
+    const pngBytes = new Uint8Array(
+      await sharp({ create: { width: 2, height: 2, channels: 4, background: '#779966' } })
+        .png()
+        .toBuffer(),
     );
+    png.append('file', new Blob([pngBytes], { type: 'image/png' }), 'hero.png');
     const upload = await fetch(base + '/assets', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${alice}` },
+      headers: { Authorization: `Bearer ${alice}`, 'X-Upload-Id': uploadRequestId },
       body: png,
     });
     assert.equal(upload.status, 201);
     const asset = (await upload.json()) as any;
     assert.equal(asset.mime, 'image/webp');
+    assert.equal(asset.url, `/api/assets/${uploadRequestId}`);
+    const retriedPng = new FormData();
+    retriedPng.append('file', new Blob([pngBytes], { type: 'image/png' }), 'hero.png');
+    const retriedUpload = await fetch(base + '/assets', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${alice}`, 'X-Upload-Id': uploadRequestId },
+      body: retriedPng,
+    });
+    assert.equal(retriedUpload.status, 200);
+    assert.deepEqual(await retriedUpload.json(), asset);
     const wrongSlot = createTemplate();
     wrongSlot.sounds.music = asset.url;
     assert.equal((await request('/projects', 'POST', { game: wrongSlot }, alice)).status, 400);

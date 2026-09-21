@@ -110,21 +110,28 @@ test('background uploads participate in asset authorization and movement options
   assert.equal(gameSchema.safeParse(game).success, true);
 });
 
-test('motorcycle power-ups validate and expose built-in or custom rider art', async () => {
+test('phone power-ups validate and expose optional helper rush art', async () => {
   const { assetReferences } = await import('../shared/schema');
   const { runtimeConfig } = await import('../shared/runtime');
   const game = createTemplate();
-  const rider = '/api/assets/12345678-1234-1234-1234-123456789abc';
-  game.levels[0].powerup = 'motorcycle';
-  game.levels[0].motorcycleArt = rider;
+  const helper = '/api/assets/12345678-1234-1234-1234-123456789abc';
+  game.levels[0].powerup = 'phone';
+  game.levels[0].phoneArt = helper;
   const parsed = gameSchema.parse(game);
-  assert.ok(assetReferences(parsed).some((asset) => asset.url === rider));
-  assert.equal(runtimeConfig(parsed).assets[`motorcycle-${parsed.levels[0].id}`], rider);
+  assert.ok(assetReferences(parsed).some((asset) => asset.url === helper));
+  assert.equal(runtimeConfig(parsed).assets[`phone-helper-${parsed.levels[0].id}`], helper);
 
-  delete game.levels[0].motorcycleArt;
+  delete game.levels[0].phoneArt;
   assert.equal(
-    runtimeConfig(gameSchema.parse(game)).assets[`motorcycle-${game.levels[0].id}`],
-    '/assets/powerups/motorcycle.webp',
+    runtimeConfig(gameSchema.parse(game)).assets[`phone-helper-${game.levels[0].id}`],
+    '',
+  );
+
+  game.levels[0].powerup = 'motorcycle';
+  game.levels[0].motorcycleArt = helper;
+  assert.equal(
+    runtimeConfig(gameSchema.parse(game)).assets[`phone-helper-${game.levels[0].id}`],
+    helper,
   );
 });
 

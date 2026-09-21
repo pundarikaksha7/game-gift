@@ -8,6 +8,7 @@ export class ApiError extends Error {
     super(message);
   }
 }
+type ApiOptions = RequestInit & { timeoutMs?: number };
 let activeProject: string | null = null;
 export function setUploadProject(id: string | null) {
   activeProject = id;
@@ -19,22 +20,34 @@ export async function requestHeaders() {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
-export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
+export async function api<T = any>(url: string, options: ApiOptions = {}): Promise<T> {
   if (supabase && url === '/auth/logout') {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     return { ok: true } as T;
   }
-  const res = await fetch(`${API_BASE_URL}/api${url}`, {
-    signal: AbortSignal.timeout(30000),
-    credentials: supabase ? 'omit' : 'include',
-    ...options,
-    headers: {
-      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(await requestHeaders()),
-      ...options.headers,
-    },
-  });
+  const { timeoutMs = 30000, ...request } = options;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api${url}`, {
+      signal: request.signal || AbortSignal.timeout(timeoutMs),
+      credentials: supabase ? 'omit' : 'include',
+      ...request,
+      headers: {
+        ...(request.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(await requestHeaders()),
+        ...request.headers,
+      },
+    });
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === 'TimeoutError';
+    throw new ApiError(
+      timedOut
+        ? 'The server took too long to respond. Your draft is still here; try again.'
+        : 'Could not reach the server. Your draft is still here; check your connection and try again.',
+      0,
+    );
+  }
   let data: any;
   try {
     data = await res.json();
@@ -45,6 +58,29 @@ export async function api<T = any>(url: string, options: RequestInit = {}): Prom
   if (supabase && url === '/auth/account' && options.method === 'DELETE')
     await supabase.auth.signOut({ scope: 'local' });
   return data;
+}
+function retryable(error: unknown) {
+  return (
+    error instanceof ApiError &&
+    (error.status === 0 || error.status === 408 || error.status === 429 || error.status >= 500)
+  );
+}
+export async function apiWithRetry<T = any>(
+  url: string,
+  options: ApiOptions = {},
+  attempts = 3,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await api<T>(url, options);
+    } catch (error) {
+      lastError = error;
+      if (!retryable(error) || attempt === attempts - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 350 * 2 ** attempt));
+    }
+  }
+  throw lastError;
 }
 export async function downloadProject(id: string) {
   const res = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/export`, {
@@ -66,10 +102,15 @@ export async function uploadAsset(file: File, kind: 'image' | 'audio') {
   if (supabase && !activeProject) throw new Error('Save your game before uploading media.');
   const form = new FormData();
   form.append('file', file);
-  const result = await api<{ url: string; mime: string }>('/assets', {
+  const uploadId = crypto.randomUUID();
+  const result = await apiWithRetry<{ url: string; mime: string }>('/assets', {
     method: 'POST',
     body: form,
-    headers: activeProject ? { 'X-Project-Id': activeProject } : {},
+    headers: {
+      ...(activeProject ? { 'X-Project-Id': activeProject } : {}),
+      'X-Upload-Id': uploadId,
+    },
+    timeoutMs: 120000,
   });
   if (!result.mime.startsWith(kind + '/')) throw new Error(`Choose an ${kind} file`);
   return result.url;

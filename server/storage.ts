@@ -27,7 +27,8 @@ async function storageRequest(id: string, method: string, payload?: Buffer, mime
       apikey: config.key,
       Authorization: `Bearer ${config.key}`,
       ...(mime ? { 'Content-Type': mime } : {}),
-      'x-upsert': 'false',
+      // Stable client-generated upload IDs make a timed-out upload safe to retry.
+      'x-upsert': 'true',
     },
     body: payload ? new Uint8Array(payload) : undefined,
     signal: AbortSignal.timeout(30000),

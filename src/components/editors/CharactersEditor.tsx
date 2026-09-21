@@ -179,6 +179,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
         </div>
         <AvatarCreator
           value={c.avatar}
+          customArt={c.sprite}
           onChange={(avatar) => update({ avatar, sprite: '' })}
           onSave={(avatar) => {
             update({ avatar, sprite: '' });

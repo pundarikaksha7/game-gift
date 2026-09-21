@@ -74,7 +74,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
         .vary('Origin');
       res.set(
         'Access-Control-Allow-Headers',
-        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id, X-Confirm-Account-Deletion',
+        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id, X-Upload-Id, X-Confirm-Account-Deletion',
       );
       res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     }
@@ -124,6 +124,9 @@ export function createApp(db: DB, options: AppOptions = {}) {
       authRedirectUrl: supabaseAuthEnabled() ? '/auth/callback' : undefined,
       aiEnabled: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL),
       paymentsEnabled: paymentsRequired(),
+      // The browser suite injects a scoped fixture token at the network layer.
+      testAuthEnabled:
+        process.env.NODE_ENV === 'test' && !!options.authenticate && !!req.get('authorization'),
     }),
   );
   const authLimit = rateLimit({
@@ -452,6 +455,17 @@ export function createApp(db: DB, options: AppOptions = {}) {
       const projectId = req.get('x-project-id');
       if (projectId) await owned(projectId, res.locals.user.id);
       if (production && !projectId) throw fail(400, 'Save the project before uploading');
+      const requestedId = req.get('x-upload-id');
+      if (requestedId && !/^[a-f0-9-]{36}$/.test(requestedId))
+        throw fail(400, 'Invalid upload identifier');
+      if (requestedId) {
+        const [existing] = await db.query(
+          'SELECT id,mime FROM assets WHERE id=$1 AND owner_id=$2',
+          [requestedId, res.locals.user.id],
+        );
+        if (existing)
+          return res.status(200).json({ url: `/api/assets/${existing.id}`, mime: existing.mime });
+      }
       const f = req.file;
       if (!f) throw fail(400, 'Choose a file');
       const b = f.buffer;
@@ -485,7 +499,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
           );
         }
       }
-      const id = randomUUID();
+      const id = requestedId || randomUUID();
       const storagePath =
         process.env.SUPABASE_URL && projectId
           ? `users/${res.locals.user.id}/projects/${projectId}/${mime.startsWith('audio/') ? 'audio' : 'characters'}/${id}`

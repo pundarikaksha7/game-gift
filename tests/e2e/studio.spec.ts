@@ -136,7 +136,24 @@ test('custom UI assets save and export inside a portable game bundle', async ({
       .png()
       .toBuffer(),
   });
+  await expect(page.getByText('Custom chapter background')).toBeVisible();
+  await expect(page.getByAltText('Custom chapter background preview')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Use atmosphere background' })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Characters/ }).click();
+  await page.getByLabel('Upload art').setInputFiles({
+    name: 'custom-character.png',
+    mimeType: 'image/png',
+    buffer: await sharp({
+      create: { width: 12, height: 20, channels: 4, background: '#6655cc' },
+    })
+      .png()
+      .toBuffer(),
+  });
+  await expect(page.getByText('Custom art loaded')).toBeVisible();
+  await expect(page.getByAltText('Uploaded character preview')).toBeVisible();
+  await expect(page.locator('.character-card.selected img')).toBeVisible();
+
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('All changes saved')).toBeVisible();
 
@@ -151,6 +168,20 @@ test('custom UI assets save and export inside a portable game bundle', async ({
   expect(background).toMatch(/^\/api\/assets\//);
   expect(bundle.assets[background].mime).toBe('image/webp');
   expect(Buffer.from(bundle.assets[background].data, 'base64').length).toBeGreaterThan(0);
+  const character = bundle.game.characters[0].sprite;
+  expect(character).toMatch(/^\/api\/assets\//);
+  expect(bundle.assets[character].mime).toBe('image/webp');
+});
+
+test('phone helper rush is a chapter power-up, not an advanced hidden event', async ({ page }) => {
+  await page.goto('/studio');
+  await page.getByRole('button', { name: /^Levels/ }).click();
+  await page.getByLabel('Chapter power-up').selectOption('phone');
+  await expect(page.getByLabel('Chapter power-up')).toHaveValue('phone');
+  await expect(page.getByText('Phone power-up helper art')).toBeVisible();
+  await page.getByRole('button', { name: 'Game settings', exact: true }).click();
+  await page.getByText('Advanced gameplay').click();
+  await expect(page.getByText(/Hidden phone|Motorcycle sweep/i)).toHaveCount(0);
 });
 
 test('templates create independent projects and viewport updates keep runtime alive', async ({

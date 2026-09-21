@@ -32,7 +32,6 @@ const groups = {
     'boostMultiplier',
     'helpersAtStart',
   ],
-  'Hidden phone & motorcycle': ['phoneEvent', 'motorcycleSpeed'],
 } as const;
 const labels: Record<string, string> = {
   invincibility: 'Invincibility after damage (seconds)',
@@ -44,12 +43,10 @@ const labels: Record<string, string> = {
   beamDuration: 'Beam power-up duration (seconds)',
   boostDuration: 'Damage boost duration (seconds)',
   helpersAtStart: 'Summon helpers at chapter start',
-  phoneEvent: 'Hidden phone summons motorcycle',
   combos: 'Mixed-attack combos and score',
   healthDrops: 'Enemies drop health refills',
   screenShake: 'Attack screen shake',
   healthBars: 'Enemy health bars',
-  motorcycleSpeed: 'Motorcycle sweep speed',
 };
 export function MechanicsEditor({ game, change }: EditorProps) {
   const mechanics = mechanicsSchema.parse(game.mechanics || {});

@@ -4,8 +4,7 @@ import {
   difficultyPresets,
   type DifficultyMode,
 } from '../../../shared/template';
-import { Field } from '../UI';
-import { UploadButton } from '../UI';
+import { Field, ImageConfirmation, UploadButton } from '../UI';
 import { attachAsset } from '../../api';
 import type { EditorProps } from './types';
 export function EncounterEditor({ game, change, level, notify }: EditorProps & { level: number }) {
@@ -133,7 +132,7 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
               ['companion', 'Summon companions'],
               ['beam', 'Energy beam'],
               ['boost', 'Damage boost'],
-              ['motorcycle', 'Hidden phone · motorcycle sweep'],
+              ['phone', 'Mobile phone · helper rush'],
               ['mixed', 'Cycle through all four'],
             ].map(([v, label]) => (
               <option key={v} value={v}>
@@ -143,12 +142,12 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
           </select>
         </Field>
         <Field
-          label="Motorcycle power-up art"
-          hint="Replace the built-in rider artwork used for the hidden-phone motorcycle power-up."
+          label="Phone power-up helper art"
+          hint="Optional: upload art for the helper who rushes across the chapter. Without it, your first companion runs in."
         >
           <div className="inline-actions">
             <UploadButton
-              label={l.motorcycleArt ? 'Replace motorcycle art' : 'Upload motorcycle art'}
+              label={l.phoneArt || l.motorcycleArt ? 'Replace helper art' : 'Upload helper art'}
               accept="image/png,image/jpeg,image/webp"
               onFile={async (file) => {
                 const levelId = l.id;
@@ -156,23 +155,32 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
                   const url = await attachAsset(file, 'image');
                   change((g) => {
                     const chapter = g.levels.find((item) => item.id === levelId);
-                    if (chapter) chapter.motorcycleArt = url;
+                    if (chapter) {
+                      chapter.phoneArt = url;
+                      delete chapter.motorcycleArt;
+                    }
                   });
                 } catch (error) {
                   notify((error as Error).message);
                 }
               }}
             />
-            {l.motorcycleArt && (
+            {(l.phoneArt || l.motorcycleArt) && (
               <button
                 type="button"
                 className="secondary"
-                onClick={() => change((g) => delete g.levels[level].motorcycleArt)}
+                onClick={() =>
+                  change((g) => {
+                    delete g.levels[level].phoneArt;
+                    delete g.levels[level].motorcycleArt;
+                  })
+                }
               >
-                Use built-in rider
+                Use companion
               </button>
             )}
           </div>
+          <ImageConfirmation src={l.phoneArt || l.motorcycleArt} label="Custom helper rush art" />
         </Field>
         <Field
           label="Custom power-up art"
@@ -205,6 +213,7 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
               </button>
             )}
           </div>
+          <ImageConfirmation src={l.powerupArt} label="Custom power-up drop art" />
         </Field>
         <Field label="Final boss">
           <input
