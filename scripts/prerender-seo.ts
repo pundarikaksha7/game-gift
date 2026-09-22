@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { giftGuides, type GiftGuide } from '../src/gift-guides';
 import { OG_IMAGE, SITE_URL, labels, seoPages, type SeoPage } from '../src/seo';
 
 const dist = path.resolve('dist');
@@ -16,6 +17,7 @@ type Meta = {
   title: string;
   description: string;
   robots?: string;
+  ogType?: 'website' | 'article';
   body: string;
   schema?: unknown[];
 };
@@ -25,7 +27,7 @@ function document(meta: Meta) {
     <meta name="description" content="${escape(meta.description)}">
     <meta name="robots" content="${meta.robots || 'index, follow, max-image-preview:large'}">
     <link rel="canonical" href="${canonical}">
-    <meta property="og:type" content="website"><meta property="og:site_name" content="Game Gift">
+    <meta property="og:type" content="${meta.ogType || 'website'}"><meta property="og:site_name" content="Game Gift">
     <meta property="og:title" content="${escape(meta.title)}"><meta property="og:description" content="${escape(meta.description)}">
     <meta property="og:url" content="${canonical}"><meta property="og:image" content="${OG_IMAGE}"><meta property="og:image:width" content="1280"><meta property="og:image:height" content="720"><meta property="og:image:alt" content="A personalized Gamegift adventure in live playtest">
     <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escape(meta.title)}"><meta name="twitter:description" content="${escape(meta.description)}"><meta name="twitter:image" content="${OG_IMAGE}">
@@ -54,7 +56,10 @@ function breadcrumbs(page: SeoPage) {
   };
 }
 function pageBody(page: SeoPage) {
-  return `<header><nav aria-label="Main navigation"><a href="/">Game Gift</a> <a href="/examples">Examples</a> <a href="/studio">Create your game</a></nav></header><main><nav aria-label="Breadcrumb"><a href="/">Home</a> / ${escape(page.h1)}</nav><section><p>${escape(page.eyebrow)}</p><h1>${escape(page.h1)}</h1><p>${escape(page.intro)}</p><a href="/studio">Create your game</a> <a href="/examples">See game examples</a></section>${page.sections.map((s) => `<section><h2>${escape(s.title)}</h2><p>${escape(s.body)}</p></section>`).join('')}<section><h2>How Game Gift works</h2><ol><li>Choose a starting game mode.</li><li>Personalize the characters, story, levels and sound.</li><li>Playtest, publish and share the link.</li></ol></section><section><h2>Frequently asked questions</h2>${page.faqs.map(([q, a]) => `<h3>${escape(q)}</h3><p>${escape(a)}</p>`).join('')}</section><nav aria-label="Related gift ideas">${page.related.map((p) => `<a href="${p}">${escape(labels[p])}</a> `).join('')}</nav></main><footer><a href="/about">About</a> <a href="/contact">Contact</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></footer>`;
+  return `<header><nav aria-label="Main navigation"><a href="/">Game Gift</a> <a href="/examples">Examples</a> <a href="/gift-ideas">Gift ideas</a> <a href="/studio">Create your game</a></nav></header><main><nav aria-label="Breadcrumb"><a href="/">Home</a> / ${escape(page.h1)}</nav><section><p>${escape(page.eyebrow)}</p><h1>${escape(page.h1)}</h1><p>${escape(page.intro)}</p><a href="/studio">Create your game</a> <a href="/examples">See game examples</a></section>${page.sections.map((s) => `<section><h2>${escape(s.title)}</h2><p>${escape(s.body)}</p></section>`).join('')}<section><h2>How Game Gift works</h2><ol><li>Choose a starting game mode.</li><li>Personalize the characters, story, levels and sound.</li><li>Playtest, publish and share the link.</li></ol></section><section><h2>Frequently asked questions</h2>${page.faqs.map(([q, a]) => `<h3>${escape(q)}</h3><p>${escape(a)}</p>`).join('')}</section><nav aria-label="Related gift ideas">${page.related.map((p) => `<a href="${p}">${escape(labels[p] || p)}</a> `).join('')}</nav></main><footer><a href="/gift-ideas">Gift ideas</a> <a href="/about">About</a> <a href="/contact">Contact</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></footer>`;
+}
+function guideBody(guide: GiftGuide) {
+  return `<header><nav aria-label="Main navigation"><a href="/">Game Gift</a> <a href="/examples">Examples</a> <a href="/gift-ideas">Gift ideas</a> <a href="/studio">Create your game</a></nav></header><main><nav aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/gift-ideas">Gift ideas</a> / ${escape(guide.h1)}</nav><article><header><h1>${escape(guide.h1)}</h1><p>${escape(guide.intro)}</p></header>${guide.sections.map((section) => `<section><h2>${escape(section.title)}</h2><p>${escape(section.body)}</p>${section.ideas ? `<ul>${section.ideas.map((idea) => `<li>${escape(idea)}</li>`).join('')}</ul>` : ''}</section>`).join('')}</article><nav aria-label="Related reading">${guide.related.map((route) => `<a href="${route}">${escape(labels[route] || route)}</a> `).join('')}</nav><section><h2>Make a gift from your own story</h2><p>Build a personalized browser game, playtest it and share it by link.</p><a href="/studio">Create your game</a></section></main><footer><a href="/gift-ideas">Gift ideas</a> <a href="/about">About</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></footer>`;
 }
 async function save(route: string, html: string) {
   const dir = path.join(dist, route.replace(/^\//, ''));
@@ -78,7 +83,7 @@ const app = {
   description:
     'A visual builder for creating personalized browser games as gifts with custom characters, levels, stories, images and music.',
 };
-const homeBody = `<header><nav><a href="/">Game Gift</a> <a href="/examples">Examples</a> <a href="/personalized-game-gift">Gift ideas</a> <a href="/studio">Start creating</a></nav></header><main><section><h1>Create a Personalized Game as a Gift</h1><p>Build a one-of-one browser adventure for someone you love. Personalize the characters, world, memories, music and story, then share the finished game by link.</p><a href="/studio">Make a game gift</a></section><section><h2>Turn Your Memories Into a Game</h2><p>Choose a playable starting mode and shape it around shared places, inside jokes and favorite people.</p></section><section><h2>A Birthday Gift They Can Actually Play</h2><p>Create chapters, messages and a final surprise for birthdays, anniversaries and other special occasions.</p></section><section><h2>How Game Gift Works</h2><ol><li>Choose a starting point.</li><li>Personalize the cast, story, world and soundtrack.</li><li>Playtest and send the published link.</li></ol></section><section><h2>Frequently Asked Questions</h2><h3>Do I need to code?</h3><p>No. The visual builder starts with a working game.</p><h3>Does the recipient install anything?</h3><p>No. Published games open in a modern browser.</p></section></main><footer><a href="/about">About</a> <a href="/contact">Contact</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></footer>`;
+const homeBody = `<header><nav><a href="/">Game Gift</a> <a href="/examples">Examples</a> <a href="/gift-ideas">Gift ideas</a> <a href="/personalized-game-gift">What you can make</a> <a href="/studio">Start creating</a></nav></header><main><section><h1>Create a Personalized Game as a Gift</h1><p>Build a one-of-one browser adventure for someone you love. Personalize the characters, world, memories, music and story, then share the finished game by link.</p><a href="/studio">Make a game gift</a></section><section><h2>Turn Your Memories Into a Game</h2><p>Choose a playable starting mode and shape it around shared places, inside jokes and favorite people.</p></section><section><h2>A Birthday Gift They Can Actually Play</h2><p>Create chapters, messages and a final surprise for birthdays, anniversaries and other special occasions.</p></section><section><h2>How Game Gift Works</h2><ol><li>Choose a starting point.</li><li>Personalize the cast, story, world and soundtrack.</li><li>Playtest and send the published link.</li></ol></section><section><h2>Frequently Asked Questions</h2><h3>Do I need to code?</h3><p>No. The visual builder starts with a working game.</p><h3>Does the recipient install anything?</h3><p>No. Published games open in a modern browser.</p></section></main><footer><a href="/gift-ideas">Gift ideas</a> <a href="/about">About</a> <a href="/contact">Contact</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></footer>`;
 await writeFile(
   path.join(dist, 'index.html'),
   document({
@@ -117,6 +122,61 @@ for (const page of seoPages) {
       description: page.description,
       body: pageBody(page),
       schema: [{ '@context': 'https://schema.org', '@graph': graph }],
+    }),
+  );
+}
+
+await save(
+  '/gift-ideas',
+  document({
+    path: '/gift-ideas',
+    title: 'Personal Gift Ideas and Guides | Game Gift',
+    description:
+      'Practical guides to thoughtful birthday, anniversary, digital and long-distance gifts, with ideas you can personalize around the recipient.',
+    body: `<header><nav><a href="/">Game Gift</a> <a href="/examples">Examples</a> <a href="/studio">Create your game</a></nav></header><main><nav aria-label="Breadcrumb"><a href="/">Home</a> / Gift ideas</nav><section><h1>Personal Gift Ideas for the People You Know Best</h1><p>Practical guides for choosing gifts around a person, relationship and occasion—not a generic shopping list.</p></section><section><h2>Gift guides</h2>${giftGuides.map((guide) => `<article><h3><a href="${guide.path}">${escape(guide.h1)}</a></h3><p>${escape(guide.description)}</p></article>`).join('')}</section></main><footer><a href="/about">About</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></footer>`,
+    schema: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Game Gift Ideas',
+        url: `${SITE_URL}/gift-ideas`,
+      },
+    ],
+  }),
+);
+
+for (const guide of giftGuides) {
+  const breadcrumbs = {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Gift ideas', item: `${SITE_URL}/gift-ideas` },
+      { '@type': 'ListItem', position: 3, name: guide.h1, item: `${SITE_URL}${guide.path}` },
+    ],
+  };
+  await save(
+    guide.path,
+    document({
+      path: guide.path,
+      title: guide.title,
+      description: guide.description,
+      ogType: 'article',
+      body: guideBody(guide),
+      schema: [
+        {
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'Article',
+              headline: guide.h1,
+              description: guide.description,
+              mainEntityOfPage: `${SITE_URL}${guide.path}`,
+              publisher: organization,
+            },
+            breadcrumbs,
+          ],
+        },
+      ],
     }),
   );
 }
@@ -192,6 +252,8 @@ await writeFile(path.join(dist, 'private.html'), privateDoc);
 const sitemapRoutes = [
   '/',
   ...seoPages.map((p) => p.path),
+  '/gift-ideas',
+  ...giftGuides.map((guide) => guide.path),
   '/examples',
   '/about',
   '/contact',

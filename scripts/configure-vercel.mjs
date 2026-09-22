@@ -6,12 +6,22 @@ const config = {
   framework: 'vite',
   buildCommand: 'npm run build',
   outputDirectory: 'dist',
+  cleanUrls: true,
+  trailingSlash: false,
+  redirects: [
+    {
+      source: '/:path*',
+      has: [{ type: 'host', value: 'www.game-gift.shop' }],
+      destination: 'https://game-gift.shop/:path*',
+      permanent: true,
+    },
+  ],
   rewrites: [
     { source: '/api/:path*', destination: `${url.origin}/api/:path*` },
-    { source: '/play/:path*', destination: '/index.html' },
-    { source: '/studio', destination: '/index.html' },
-    { source: '/my-games', destination: '/index.html' },
-    { source: '/auth/callback', destination: '/index.html' },
+    { source: '/play/:path*', destination: '/private' },
+    { source: '/studio', destination: '/private' },
+    { source: '/my-games', destination: '/private' },
+    { source: '/auth/callback', destination: '/private' },
   ],
   headers: [
     {

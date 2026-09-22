@@ -6,5 +6,6 @@ Disallow: /auth/
 Disallow: /play/
 Disallow: /g/
 Disallow: /api/
+Disallow: /private
 
 Sitemap: https://game-gift.shop/sitemap.xml

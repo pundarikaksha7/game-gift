@@ -54,6 +54,49 @@ export const seoPages: SeoPage[] = [
     related: ['/birthday-game-gift', '/personalized-digital-gift', '/examples'],
   },
   {
+    path: '/custom-video-game-gift',
+    title: 'Custom Video Game Gift – Build Their Own Adventure | Game Gift',
+    description:
+      'Build a custom video game gift with a personalized hero, story, levels, music and final message. Playtest it and share the finished game by link.',
+    eyebrow: 'A video game built around one person',
+    h1: 'Build a Custom Video Game Gift',
+    intro:
+      'Give them a game where the hero, setting and story feel familiar from the first screen. Start with a working browser game, then reshape it around their personality and the memories you share.',
+    sections: [
+      {
+        title: 'Make them the main character',
+        body: 'Create a recognizable hero, add friends or rivals to the cast and choose the roles each person plays. The game feels personal because its characters come from their world.',
+      },
+      {
+        title: 'Design a story they will recognize',
+        body: 'Turn a favorite trip, running joke or shared milestone into levels and story beats. Use your own words for the messages between challenges and at the ending.',
+      },
+      {
+        title: 'Start with a game that already works',
+        body: 'Choose a platform adventure, story journey or arcade challenge, then customize and playtest it visually. You do not need to program the controls or game engine.',
+      },
+    ],
+    faqs: [
+      [
+        'Do I have to build the game from scratch?',
+        'No. You begin with a playable mode and personalize the parts that make the gift meaningful.',
+      ],
+      [
+        'Can I change the difficulty?',
+        'Yes. The builder includes mechanics and level controls that you can adjust while playtesting.',
+      ],
+      [
+        'How does the recipient play?',
+        'Send the published link. The finished game opens in a modern desktop or mobile browser.',
+      ],
+    ],
+    related: [
+      '/personalized-game-gift',
+      '/examples',
+      '/gift-ideas/how-to-make-a-personalized-game',
+    ],
+  },
+  {
     path: '/birthday-game-gift',
     title: 'Birthday Game Gift – Make a Personalized Birthday Game | Game Gift',
     description:
@@ -210,6 +253,49 @@ export const seoPages: SeoPage[] = [
     related: ['/game-for-girlfriend', '/game-for-boyfriend', '/personalized-digital-gift'],
   },
   {
+    path: '/couples-game-gift',
+    title: 'Couples Game Gift – Create a Game About Your Story | Game Gift',
+    description:
+      'Create a couples game gift from shared memories, favorite places and inside jokes. Build a playful relationship story and share it by link.',
+    eyebrow: 'A game for the two of you',
+    h1: 'Create a Couples Game Gift From Your Story',
+    intro:
+      'Turn the small details of your relationship into something you can play together. Build chapters around how you met, the places you return to and the jokes that need no explanation.',
+    sections: [
+      {
+        title: 'Choose a shared point of view',
+        body: 'Make one partner the hero, place both of you in the cast or build a journey that moves between your perspectives. The structure can be romantic, funny or quietly nostalgic.',
+      },
+      {
+        title: 'Create a date-night reveal',
+        body: 'Play the finished game together on a laptop or share the link before a video call. It works as the main surprise or as the first clue leading to another plan.',
+      },
+      {
+        title: 'Keep the details in your voice',
+        body: 'Write the dialogue and final message yourself, choose the soundtrack and test the pacing before sharing. Specific memories make the experience feel like yours.',
+      },
+    ],
+    faqs: [
+      [
+        'Is this only for anniversaries?',
+        'No. A couples game can mark a birthday, long-distance visit, proposal, ordinary date night or a just-because surprise.',
+      ],
+      [
+        'Can we play it together?',
+        'Yes. Open the published link on a phone or computer and take turns or play through the story side by side.',
+      ],
+      [
+        'Can I keep the game private while creating it?',
+        'Yes. Drafts remain private until you choose to publish a shareable version.',
+      ],
+    ],
+    related: [
+      '/anniversary-game-gift',
+      '/game-for-girlfriend',
+      '/gift-ideas/long-distance-relationship-gifts',
+    ],
+  },
+  {
     path: '/personalized-digital-gift',
     title: 'Personalized Digital Gift – Create a Game They Can Play | Game Gift',
     description:
@@ -250,11 +336,17 @@ export const seoPages: SeoPage[] = [
 export const pageByPath = new Map(seoPages.map((page) => [page.path, page]));
 export const labels: Record<string, string> = {
   '/personalized-game-gift': 'Personalized game gifts',
+  '/custom-video-game-gift': 'Custom video game gifts',
   '/birthday-game-gift': 'Birthday game gifts',
   '/game-for-girlfriend': 'Games for your girlfriend',
   '/game-for-boyfriend': 'Games for your boyfriend',
   '/anniversary-game-gift': 'Anniversary game gifts',
+  '/couples-game-gift': 'Couples game gifts',
   '/personalized-digital-gift': 'Personalized digital gifts',
+  '/gift-ideas': 'Gift ideas and guides',
+  '/gift-ideas/anniversary-gift-ideas': 'Anniversary gift ideas',
+  '/gift-ideas/how-to-make-a-personalized-game': 'How to make a personalized game',
+  '/gift-ideas/long-distance-relationship-gifts': 'Long-distance relationship gifts',
   '/examples': 'Examples',
   '/about': 'About',
   '/contact': 'Contact',
