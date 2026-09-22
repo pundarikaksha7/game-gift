@@ -21,3 +21,4 @@ certs/
 .env.example
 
 package-lock.json
+.vercel/
