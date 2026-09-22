@@ -23,3 +23,13 @@ export function hasAuthResponse(search: string, hash: string) {
     fragment.has('error_description')
   );
 }
+
+export function frontendSurface(
+  path: string,
+  isMarketingPath: boolean,
+  search: string,
+  hash: string,
+): 'landing' | 'marketing' | 'app' {
+  if (!isMarketingPath || hasAuthResponse(search, hash)) return 'app';
+  return path === '/' ? 'landing' : 'marketing';
+}

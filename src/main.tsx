@@ -3,7 +3,7 @@ import '@fontsource-variable/manrope';
 import { Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { initializeAnalytics, track } from './analytics';
-import { hasAuthResponse } from './auth-url';
+import { frontendSurface } from './auth-url';
 import './landing.css';
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false };
@@ -49,8 +49,13 @@ async function boot() {
   // Supabase falls back to the configured Site URL when a requested callback URL is
   // unavailable or not allow-listed. Treat OAuth parameters as an app route even when
   // they arrive at `/`, otherwise the landing page silently discards the auth code.
-  const landing =
-    marketingPaths.has(normalizedPath) && !hasAuthResponse(location.search, location.hash);
+  const surface = frontendSurface(
+    normalizedPath,
+    marketingPaths.has(normalizedPath),
+    location.search,
+    location.hash,
+  );
+  const landing = surface !== 'app';
   void initializeAnalytics().then(() => {
     if (landing) track('seo_landing_view', { path: normalizedPath });
   });
@@ -79,9 +84,9 @@ async function boot() {
     }
   }
   const [{ default: App }] = await Promise.all([
-    normalizedPath === '/'
+    surface === 'landing'
       ? import('./Landing')
-      : landing
+      : surface === 'marketing'
         ? import('./MarketingPage').then(({ MarketingRoute }) => ({ default: MarketingRoute }))
         : import('./Studio'),
     landing ? Promise.resolve() : import('./studio.css'),
