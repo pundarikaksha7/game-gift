@@ -10,3 +10,16 @@ export function authCallbackUrl(configuredUrl: string | undefined, browserOrigin
     return localCallback.toString();
   }
 }
+
+export function hasAuthResponse(search: string, hash: string) {
+  const query = new URLSearchParams(search);
+  const fragment = new URLSearchParams(hash.replace(/^#/, ''));
+  return (
+    query.has('code') ||
+    query.has('error') ||
+    query.has('error_description') ||
+    fragment.has('access_token') ||
+    fragment.has('error') ||
+    fragment.has('error_description')
+  );
+}

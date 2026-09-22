@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { authCallbackUrl } from '../src/auth-url';
+import { authCallbackUrl, hasAuthResponse } from '../src/auth-url';
 
 test('OAuth callback stays on the browser origin that owns the PKCE verifier', () => {
   assert.equal(
@@ -15,4 +15,11 @@ test('OAuth callback stays on the browser origin that owns the PKCE verifier', (
     authCallbackUrl('not a valid URL', 'http://localhost:5173'),
     'http://localhost:5173/auth/callback',
   );
+});
+
+test('OAuth responses are recognized even when Supabase returns them to the Site URL', () => {
+  assert.equal(hasAuthResponse('?code=authorization-code', ''), true);
+  assert.equal(hasAuthResponse('?error=access_denied', ''), true);
+  assert.equal(hasAuthResponse('', '#access_token=token&refresh_token=refresh'), true);
+  assert.equal(hasAuthResponse('?utm_source=google', '#section'), false);
 });

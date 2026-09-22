@@ -31,7 +31,11 @@ export async function completeAuthRedirect() {
   if (!supabase) return false;
   const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
   const query = new URLSearchParams(location.search);
-  const callbackError = hash.get('error_description') || query.get('error_description');
+  const callbackError =
+    hash.get('error_description') ||
+    query.get('error_description') ||
+    hash.get('error') ||
+    query.get('error');
   if (callbackError) {
     history.replaceState(null, '', '/my-games');
     throw new Error(callbackError);
