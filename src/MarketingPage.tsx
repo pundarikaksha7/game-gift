@@ -1,4 +1,5 @@
 import { ArrowRight, Check, Gamepad2, Gift, Music2, Sparkles } from 'lucide-react';
+import { giftGuides, guideByPath, type GiftGuide } from './gift-guides';
 import { labels, pageByPath, type SeoPage } from './seo';
 import { Brand } from './components/Brand';
 
@@ -12,6 +13,7 @@ function Header() {
       </a>
       <nav aria-label="Main navigation">
         <a href="/examples">Examples</a>
+        <a href="/gift-ideas">Gift ideas</a>
         <a href="/personalized-game-gift">What you can make</a>
         <a className="seo-nav-cta" href="/studio" data-analytics="create_game_clicked">
           Create your game
@@ -34,7 +36,13 @@ function Footer() {
         <a href="/personalized-game-gift">Personalized game gift</a>
         <a href="/birthday-game-gift">Birthday game gift</a>
         <a href="/anniversary-game-gift">Anniversary game</a>
+        <a href="/couples-game-gift">Couples game gift</a>
         <a href="/examples">Examples</a>
+      </nav>
+      <nav aria-label="Resources">
+        <a href="/gift-ideas">Gift ideas</a>
+        <a href="/gift-ideas/how-to-make-a-personalized-game">Making a game gift</a>
+        <a href="/gift-ideas/digital-gift-ideas">Digital gift ideas</a>
       </nav>
       <nav aria-label="Company">
         <a href="/about">About</a>
@@ -241,6 +249,114 @@ export function ExamplesPage() {
   );
 }
 
+export function GiftIdeasPage() {
+  return (
+    <div className="seo-shell">
+      <Header />
+      <main>
+        <section className="seo-hero compact">
+          <Breadcrumb current="Gift ideas" />
+          <p className="seo-eyebrow">
+            <Gift size={16} />
+            Useful ideas, thoughtfully chosen
+          </p>
+          <h1>Personal Gift Ideas for the People You Know Best</h1>
+          <p className="seo-lede">
+            Practical guides for choosing gifts around a person, relationship and occasion—not a
+            generic shopping list. Find ideas you can adapt, plus ways to turn shared memories into
+            an interactive gift.
+          </p>
+        </section>
+        <section className="guide-grid" aria-label="Gift idea guides">
+          {giftGuides.map((guide) => (
+            <article key={guide.path}>
+              <p className="seo-kicker">Gift guide</p>
+              <h2>{guide.h1}</h2>
+              <p>{guide.description}</p>
+              <a href={guide.path}>
+                Read the guide <ArrowRight size={16} />
+              </a>
+            </article>
+          ))}
+        </section>
+        <section className="seo-final">
+          <p>Want to make the gift itself?</p>
+          <h2>Turn your shared story into a game.</h2>
+          <a className="seo-button light" href="/studio" data-analytics="create_game_clicked">
+            Create your game <ArrowRight size={18} />
+          </a>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+export function GiftGuidePage({ guide }: { guide: GiftGuide }) {
+  return (
+    <div className="seo-shell">
+      <Header />
+      <main>
+        <article className="guide-article">
+          <nav className="breadcrumbs" aria-label="Breadcrumb">
+            <ol>
+              <li>
+                <a href="/">Home</a>
+              </li>
+              <li>
+                <a href="/gift-ideas">Gift ideas</a>
+              </li>
+              <li aria-current="page">{guide.h1}</li>
+            </ol>
+          </nav>
+          <header>
+            <p className="seo-eyebrow">
+              <Sparkles size={16} />
+              Thoughtful gifting guide
+            </p>
+            <h1>{guide.h1}</h1>
+            <p className="seo-lede">{guide.intro}</p>
+          </header>
+          <div className="guide-body">
+            {guide.sections.map((section) => (
+              <section key={section.title}>
+                <h2>{section.title}</h2>
+                <p>{section.body}</p>
+                {section.ideas ? (
+                  <ul>
+                    {section.ideas.map((idea) => (
+                      <li key={idea}>{idea}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ))}
+          </div>
+        </article>
+        <section className="seo-related">
+          <h2>Keep exploring</h2>
+          <div>
+            {guide.related.map((path) => (
+              <a href={path} key={path}>
+                {labels[path] || guideByPath.get(path)?.h1 || 'Related guide'}
+                <ArrowRight size={16} />
+              </a>
+            ))}
+          </div>
+        </section>
+        <section className="seo-final">
+          <p>A personal story can become something playable.</p>
+          <h2>Build a game gift in your own words.</h2>
+          <a className="seo-button light" href="/studio" data-analytics="create_game_clicked">
+            Create your game <ArrowRight size={18} />
+          </a>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 const info: Record<string, { h1: string; intro: string; sections: [string, string][] }> = {
   '/about': {
     h1: 'About Game Gift',
@@ -348,6 +464,9 @@ export function MarketingRoute() {
   const page = pageByPath.get(path);
   if (page) return <IntentPage page={page} />;
   if (path === '/examples') return <ExamplesPage />;
+  if (path === '/gift-ideas') return <GiftIdeasPage />;
+  const guide = guideByPath.get(path);
+  if (guide) return <GiftGuidePage guide={guide} />;
   if (info[path]) return <InfoPage path={path} />;
   return null;
 }

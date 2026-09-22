@@ -127,6 +127,9 @@ export default function Landing() {
                 <a href="/examples" onClick={() => setMenuOpen(false)}>
                   Examples
                 </a>
+                <a href="/gift-ideas" onClick={() => setMenuOpen(false)}>
+                  Gift ideas
+                </a>
                 <a href="#personalize" onClick={() => setMenuOpen(false)}>
                   What you can make
                 </a>
@@ -495,7 +498,13 @@ export default function Landing() {
                 <Paragraph variant="body-lg" tone="inherit" align="center">
                   Your first playable version is closer than you think.
                 </Paragraph>
-                <Button href="/studio" size="xl" variant="soft" endIcon={<ArrowRight size={18} />}>
+                <Button
+                  href="/studio"
+                  data-analytics="create_game_clicked"
+                  size="xl"
+                  variant="soft"
+                  endIcon={<ArrowRight size={18} />}
+                >
                   Start your game gift
                 </Button>
               </VStack>
@@ -519,7 +528,8 @@ export default function Landing() {
             <HStack gap={5}>
               <a href="/examples">Examples</a>
               <a href="#faq">FAQ</a>
-              <a href="/personalized-game-gift">Gift ideas</a>
+              <a href="/personalized-game-gift">Game gifts</a>
+              <a href="/gift-ideas">Gift guides</a>
               <a href="/about">About</a>
               <a href="/privacy">Privacy</a>
               <a href="/studio">Start creating</a>
