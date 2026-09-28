@@ -53,6 +53,7 @@ export function AdventureRuntime({
     const frame = ref.current!;
     let active = true;
     let interval: ReturnType<typeof setInterval> | undefined;
+    let lastControls = '';
     const receive = async (event: MessageEvent) => {
       if (event.source !== frame.contentWindow || event.origin !== location.origin || !event.data)
         return;
@@ -107,14 +108,13 @@ export function AdventureRuntime({
     window.addEventListener('message', receive);
     frame.src = '/engine/index.html';
     if (playing && controls)
-      interval = setInterval(
-        () =>
-          frame.contentWindow?.postMessage(
-            { type: 'game-gift:keys', keys: [...controls.current] },
-            location.origin,
-          ),
-        16,
-      );
+      interval = setInterval(() => {
+        const next = [...controls.current].sort();
+        const signature = next.join('|');
+        if (signature === lastControls) return;
+        lastControls = signature;
+        frame.contentWindow?.postMessage({ type: 'game-gift:keys', keys: next }, location.origin);
+      }, 32);
     return () => {
       active = false;
       frame.contentWindow?.postMessage({ type: 'game-gift:dispose' }, location.origin);

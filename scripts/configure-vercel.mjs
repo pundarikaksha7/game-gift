@@ -8,14 +8,6 @@ const config = {
   outputDirectory: 'dist',
   cleanUrls: true,
   trailingSlash: false,
-  redirects: [
-    {
-      source: '/:path*',
-      has: [{ type: 'host', value: 'www.game-gift.shop' }],
-      destination: 'https://game-gift.shop/:path*',
-      permanent: true,
-    },
-  ],
   rewrites: [
     { source: '/api/:path*', destination: `${url.origin}/api/:path*` },
     { source: '/play/:path*', destination: '/private' },
@@ -32,7 +24,7 @@ const config = {
         {
           key: 'Content-Security-Policy',
           value:
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.supabase.co; frame-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.supabase.co; frame-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
         },
       ],
     },

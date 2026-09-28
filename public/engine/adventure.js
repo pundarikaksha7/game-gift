@@ -95,6 +95,10 @@ async function run(mode) {
   let worldTime = 0;
   let screenShakeTimer = 0;
   let screenShakePower = 0;
+  let platformCacheTime = Number.NaN;
+  let platformCacheLevel = -1;
+  let platformCache = [];
+  const pitDepthGradients = new Map();
 
   function getLevelConfig(index = currentLevelIndex) {
     return cfg.levels[index] || cfg.levels[0];
@@ -132,12 +136,21 @@ async function run(mode) {
     // Each has a reachable approach, a ferry, and a safe landing ledge.
     const holes = (level.holes || [])
       .filter((h) => h.x + h.w < levelLength - 400)
-      .map((h) => ({
+      .map((h, holeIndex) => ({
         ...h,
         y: groundY,
-        edgeLeft: 14,
-        edgeRight: 18,
-        cracks: [],
+        edgeLeft: 12 + ((holeIndex * 7 + currentLevelIndex * 3) % 12),
+        edgeRight: 13 + ((holeIndex * 11 + currentLevelIndex * 5) % 13),
+        cracks: Array.from({ length: Math.max(2, Math.min(6, Math.round(h.w / 130))) }, (_, i) => ({
+          x: 20 + ((i * 83 + holeIndex * 47 + currentLevelIndex * 29) % Math.max(32, h.w - 40)),
+          side: (i + holeIndex) % 2 ? 1 : -1,
+          length: 14 + ((i * 9 + holeIndex * 5) % 18),
+        })),
+        debris: Array.from({ length: Math.max(3, Math.min(8, Math.round(h.w / 95))) }, (_, i) => ({
+          x: 18 + ((i * 61 + holeIndex * 31) % Math.max(26, h.w - 36)),
+          y: 18 + ((i * 17 + holeIndex * 13) % 62),
+          size: 3 + ((i + holeIndex) % 4),
+        })),
       }));
     crossingPlatforms = (level.crossingPlatforms ? holes : [])
       .filter((h) => h.w > 400)
@@ -1157,15 +1170,29 @@ async function run(mode) {
   );
 
   let hudUpdatedAt = 0;
+  let hudLevel = '';
+  let hudHealth = -1;
+  let hudMaxHealth = -1;
+  let hudPowerupVisible = false;
   function updateHud() {
     const now = performance.now();
     if (now - hudUpdatedAt < 100) return;
     hudUpdatedAt = now;
-    powerupNotice.style.opacity = powerupMessageTimer > 0 ? '1' : '0';
+    const powerupVisible = powerupMessageTimer > 0;
+    if (powerupVisible !== hudPowerupVisible) {
+      powerupNotice.style.opacity = powerupVisible ? '1' : '0';
+      hudPowerupVisible = powerupVisible;
+    }
     const level = getLevelConfig();
-    levelNameEl.textContent = level.name;
+    if (level.name !== hudLevel) {
+      levelNameEl.textContent = level.name;
+      hudLevel = level.name;
+    }
     const maxHealth = Math.max(1, Math.round(Number(cfg.player.maxHealth ?? 5)));
     const full = Math.max(0, Math.min(maxHealth, player.health));
+    if (full === hudHealth && maxHealth === hudMaxHealth) return;
+    hudHealth = full;
+    hudMaxHealth = maxHealth;
     healthRowEl.innerHTML = '';
     for (let i = 0; i < maxHealth; i++) {
       const heart = document.createElement('span');
@@ -1250,6 +1277,8 @@ async function run(mode) {
   }
 
   function getPlatforms(time = worldTime) {
+    if (platformCacheTime === time && platformCacheLevel === currentLevelIndex)
+      return platformCache;
     const level = getLevelConfig();
     const platforms = [
       ...(Array.isArray(level.platforms) ? level.platforms : []),
@@ -1263,7 +1292,7 @@ async function run(mode) {
       isGround: true,
     };
     const ground = groundSegments.length ? groundSegments : [fallbackGround];
-    return [
+    platformCache = [
       ...ground,
       ...platforms.map((platform, index) => {
         const motion = platform.motion;
@@ -1283,6 +1312,9 @@ async function run(mode) {
         };
       }),
     ];
+    platformCacheTime = time;
+    platformCacheLevel = currentLevelIndex;
+    return platformCache;
   }
 
   function beginLevel(index) {
@@ -1545,7 +1577,22 @@ async function run(mode) {
       // Irregular edges, a shallow inner rim, and pavement cracks make
       // these read as believable damaged walkway sections rather than
       // giant rectangular cartoon pits.
-      ctx.fillStyle = level.theme === 'midnight' ? '#160c2a' : '#111923';
+      const depthKey = `${level.theme}:${hole.y}`;
+      let depth = pitDepthGradients.get(depthKey);
+      if (!depth) {
+        depth = ctx.createLinearGradient(0, hole.y, 0, viewportHeight());
+        if (level.theme === 'midnight') {
+          depth.addColorStop(0, '#2c0f3a');
+          depth.addColorStop(0.35, '#13091f');
+          depth.addColorStop(1, '#05040a');
+        } else {
+          depth.addColorStop(0, '#27303a');
+          depth.addColorStop(0.32, '#111923');
+          depth.addColorStop(1, '#05080d');
+        }
+        pitDepthGradients.set(depthKey, depth);
+      }
+      ctx.fillStyle = depth;
       ctx.beginPath();
       ctx.moveTo(left, hole.y);
       ctx.lineTo(left + hole.edgeLeft, hole.y + 7);
@@ -1557,6 +1604,21 @@ async function run(mode) {
       ctx.lineTo(left, viewportHeight() + 80);
       ctx.closePath();
       ctx.fill();
+
+      ctx.save();
+      ctx.globalAlpha = 0.34;
+      ctx.fillStyle = level.theme === 'midnight' ? '#c452bd' : '#7f97a8';
+      for (let band = 0; band < 3; band++) {
+        const bandY = hole.y + 30 + band * 31;
+        ctx.fillRect(left + 8 + band * 7, bandY, Math.max(0, hole.w - 16 - band * 14), 2);
+      }
+      ctx.globalAlpha = 0.76;
+      for (const stone of hole.debris || []) {
+        ctx.beginPath();
+        ctx.arc(left + stone.x, hole.y + stone.y, stone.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
 
       ctx.strokeStyle = level.theme === 'midnight' ? '#b84b9b' : '#505965';
       ctx.lineWidth = 5;
@@ -1582,6 +1644,16 @@ async function run(mode) {
         ctx.lineTo(crackX + crack.side * 13, crackY - 3);
         ctx.lineTo(crackX + crack.side * crack.length, crackY - 12);
         ctx.stroke();
+      }
+
+      ctx.fillStyle = level.theme === 'midnight' ? '#69306f' : '#39434d';
+      for (let x = left + 15; x < right - 12; x += 42) {
+        ctx.beginPath();
+        ctx.moveTo(x, hole.y + 3);
+        ctx.lineTo(x + 8, hole.y + 13 + ((x - left) % 9));
+        ctx.lineTo(x + 16, hole.y + 4);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 

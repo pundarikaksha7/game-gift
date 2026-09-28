@@ -10,6 +10,7 @@
   --muted: #8b9087;
   --cream: #f8f8f5;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -4825,5 +4826,75 @@ main {
   }
   .avatar-library-heading {
     align-items: flex-start;
+  }
+}
+
+/* Published games are the experience itself: keep the game pinned to the
+   viewport and float optional controls over it instead of building a page
+   around it. These rules intentionally follow every studio breakpoint. */
+.public-page.game-page {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #10151f;
+}
+.public-page.game-page .play-game,
+.public-page.game-page .play-surface {
+  width: 100%;
+  height: 100%;
+}
+.public-page.game-page .play-surface {
+  aspect-ratio: auto;
+  border-radius: 0;
+  background: #10151f;
+  box-shadow: none;
+}
+.public-page.game-page .play-surface canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.public-page.game-page .adventure-game-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.public-page.game-page .play-controls {
+  position: absolute;
+  z-index: 8;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(14px, env(safe-area-inset-left));
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 10px;
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(15, 20, 31, 0.72);
+  backdrop-filter: blur(10px);
+}
+.public-page.game-page .play-controls button {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+@media (max-width: 760px) {
+  .public-page.game-page .play-controls {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    padding: 6px;
+  }
+  .public-page.game-page .play-controls > span {
+    display: none;
   }
 }

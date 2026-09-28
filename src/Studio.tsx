@@ -430,44 +430,8 @@ export default function App() {
   if (publicPath)
     return (
       <div className="public-page game-page">
-        <header className="game-page-header">
-          <a className="brand" href="/" aria-label="Gamegift home">
-            <span className="brand-mark">✦</span>
-            <span className="brand-word">
-              game<span>gift</span>
-            </span>
-          </a>
-          <span className="game-page-keepsake">A playable keepsake</span>
-        </header>
         {publicGame ? (
-          <>
-            <section className="game-page-intro">
-              <div>
-                <span className="game-page-eyebrow">
-                  <i /> Made especially for {publicGame.recipient || 'you'}
-                </span>
-                <h1>{publicGame.title}</h1>
-              </div>
-              <p>{publicGame.description}</p>
-            </section>
-            <div className="game-page-frame">
-              <div className="game-page-frame-label">
-                <span>
-                  <i /> Ready to play
-                </span>
-                <span>{publicGame.levels.length} chapters · one little world</span>
-              </div>
-              <PlayGame game={publicGame} />
-            </div>
-            <footer className="game-page-footer">
-              <span>✦</span>
-              <p>
-                Made for {publicGame.recipient || 'you'}, with{' '}
-                <Heart size={13} fill="currentColor" />
-              </p>
-              <a href="/">Make a world for someone</a>
-            </footer>
-          </>
+          <PlayGame game={publicGame} />
         ) : (
           <p role="status">{publicError || 'Opening your adventure…'}</p>
         )}
