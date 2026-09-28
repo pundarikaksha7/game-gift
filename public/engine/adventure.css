@@ -1776,3 +1776,36 @@ canvas {
     letter-spacing: 1px;
   }
 }
+/* Keep decode/downsampling work out of the first playable frames. */
+.asset-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  color: #fff;
+  background: #151a2c;
+  transition: opacity 180ms ease;
+}
+
+.asset-loader span {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #ffffff38;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: asset-loader-spin 700ms linear infinite;
+}
+
+.assets-ready .asset-loader {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes asset-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

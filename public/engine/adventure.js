@@ -681,6 +681,44 @@ async function run(mode) {
   // Load the generated protagonist once at startup; never fetch assets in the game loop.
   const assetCache = new Map();
   const fallbackAssetUrls = cfg.assets;
+  const imageWidth = (image) => Number(image?.naturalWidth || image?.width || 0);
+  const imageHeight = (image) => Number(image?.naturalHeight || image?.height || 0);
+  function preparedImage(url, maxDimension) {
+    const source = new Image();
+    source.decoding = 'async';
+    try {
+      if (new URL(url, location.href).origin !== location.origin) source.crossOrigin = 'anonymous';
+    } catch (_) {}
+    const result = { image: source, source, ready: false, promise: null };
+    result.promise = new Promise((resolve) => {
+      source.onerror = () => resolve(result);
+      source.onload = async () => {
+        try {
+          if (source.decode) await source.decode();
+          const largest = Math.max(source.naturalWidth, source.naturalHeight);
+          if (largest > maxDimension && typeof createImageBitmap === 'function') {
+            const scale = maxDimension / largest;
+            result.image = await createImageBitmap(source, {
+              resizeWidth: Math.max(1, Math.round(source.naturalWidth * scale)),
+              resizeHeight: Math.max(1, Math.round(source.naturalHeight * scale)),
+              resizeQuality: 'high',
+            });
+            // The compact bitmap is now the render source; release the oversized decode.
+            source.onload = null;
+            source.onerror = null;
+            source.src = '';
+          }
+          result.ready = true;
+        } catch (_) {
+          // A decoded HTML image is still a valid fallback when bitmap resizing is unavailable.
+          result.ready = source.complete && source.naturalWidth > 0;
+        }
+        resolve(result);
+      };
+      source.src = url;
+    });
+    return result;
+  }
   function loadImageAsset(id) {
     if (assetCache.has(id)) return assetCache.get(id);
     const info = (window.lib &&
@@ -693,25 +731,15 @@ async function run(mode) {
       assetCache.set(id, missing);
       return missing;
     }
-    const image = new Image();
-    image.decoding = 'async';
-    const result = { image, ready: false };
-    image.onload = () => {
-      result.ready = true;
-    };
-    image.src = info.url;
+    const isBackground = cfg.levels.some((level) => level.id === id);
+    const isEffect = id.startsWith('powerup-') || id.startsWith('phone-helper-');
+    const result = preparedImage(info.url, isBackground ? 1440 : isEffect ? 384 : 640);
     assetCache.set(id, result);
     return result;
   }
 
   const helperImages = Object.fromEntries(cfg.helpers.map((h) => [h.id, loadImageAsset(h.id)]));
   const playerAssetState = loadImageAsset('player_character');
-  const playerImage = playerAssetState.image;
-  let playerImageReady = playerAssetState.ready;
-  if (playerImage)
-    playerImage.onload = () => {
-      playerImageReady = true;
-    };
 
   // Enemy art is loaded once at startup. The small/medium/large variants
   // share one runtime system, while their authored assets keep their silhouettes distinct.
@@ -725,10 +753,7 @@ async function run(mode) {
       ...Object.values(c.sheetFrames || {}).flat(),
     ]) {
       if (!frameCache.has(url)) {
-        const image = new Image();
-        image.decoding = 'async';
-        image.src = url;
-        frameCache.set(url, image);
+        frameCache.set(url, preparedImage(url, 640));
       }
     }
   function animatedArt(id, fallback, motion = 'idle') {
@@ -743,9 +768,20 @@ async function run(mode) {
           : [];
     if (!frames.length) return fallback;
     const fps = motion === 'run' ? Math.max(8, cfg.animation.fps) : motion === 'jump' ? 7 : 4;
-    const image = frameCache.get(frames[Math.floor(worldTime * fps) % frames.length]);
-    return image?.complete && image.naturalWidth ? { image, ready: true } : fallback;
+    const state = frameCache.get(frames[Math.floor(worldTime * fps) % frames.length]);
+    return state?.ready ? state : fallback;
   }
+  // Finish image decoding and one-time downsampling before animation starts. This trades
+  // a deterministic loading moment for eliminating decode/resize stalls during gameplay.
+  const initialLevel = getLevelConfig();
+  loadImageAsset(initialLevel.id);
+  loadImageAsset(`powerup-${initialLevel.id}`);
+  loadImageAsset(`phone-helper-${initialLevel.id}`);
+  await Promise.allSettled([
+    ...[...assetCache.values()].map((state) => state.promise),
+    ...[...frameCache.values()].map((state) => state.promise),
+  ]);
+  document.body.classList.add('assets-ready');
   // Sound is optional and starts only from a gameplay control. Clicking the
   // canvas or advancing story UI must remain silent.
   const soundUrls = cfg.sounds;
@@ -755,16 +791,26 @@ async function run(mode) {
   // object for every punch/kick/hit. This reduces GC spikes during combat.
   const soundPools = {};
   const soundPoolIndex = {};
+  function createSound(name) {
+    const audio = new Audio(soundUrls[name]);
+    audio.preload = 'auto';
+    return audio;
+  }
   function getSoundFromPool(name) {
     if (!soundPools[name]) {
-      soundPools[name] = Array.from({ length: 4 }, () => {
-        const audio = new Audio(soundUrls[name]);
-        audio.preload = 'auto';
-        return audio;
-      });
+      // Start with one decoder. Grow only when the same effect overlaps instead of
+      // allocating and warming four media elements on the first punch or jump.
+      soundPools[name] = [createSound(name)];
       soundPoolIndex[name] = 0;
     }
     const pool = soundPools[name];
+    const available = pool.find((audio) => audio.paused || audio.ended);
+    if (available) return available;
+    if (pool.length < 4) {
+      const audio = createSound(name);
+      pool.push(audio);
+      return audio;
+    }
     const index = soundPoolIndex[name]++ % pool.length;
     return pool[index];
   }
@@ -802,10 +848,20 @@ async function run(mode) {
         audio.load();
       }
     for (const state of assetCache.values()) {
-      if (!state.image) continue;
-      state.image.onload = null;
-      state.image.onerror = null;
-      state.image.src = '';
+      if (typeof state.image?.close === 'function') state.image.close();
+      if (state.source) {
+        state.source.onload = null;
+        state.source.onerror = null;
+        state.source.src = '';
+      }
+    }
+    for (const state of frameCache.values()) {
+      if (typeof state.image?.close === 'function') state.image.close();
+      if (state.source) {
+        state.source.onload = null;
+        state.source.onerror = null;
+        state.source.src = '';
+      }
     }
     frameCache.clear();
   }
@@ -1536,8 +1592,8 @@ async function run(mode) {
   function backgroundLayer(level) {
     const state = loadImageAsset(level.id);
     const image = state && state.image;
-    const hasImage = !!(state && state.ready && image && image.naturalWidth);
-    const key = `${level.id}:${hasImage ? image.currentSrc || image.src : `fallback-${level.theme}`}`;
+    const hasImage = !!(state && state.ready && image && imageWidth(image));
+    const key = `${level.id}:${hasImage ? 'custom' : `fallback-${level.theme}`}`;
     if (backgroundLayers.has(key)) return backgroundLayers.get(key);
     const layer = hasImage ? document.createElement('canvas') : createFallbackBackground(level);
     if (hasImage) {
@@ -1574,9 +1630,9 @@ async function run(mode) {
   function drawPlatforms() {
     const level = getLevelConfig();
     const platforms = getPlatforms();
-    const groundPlatforms = platforms.filter((platform) => platform.isGround);
     ctx.fillStyle = level.groundColor || '#6B8E23';
-    for (const ground of groundPlatforms) {
+    for (const ground of platforms) {
+      if (!ground.isGround) continue;
       ctx.fillRect(ground.x - cameraX, ground.y, ground.w, ground.h);
       ctx.fillStyle =
         level.theme === 'midnight' ? '#8d4b9e' : level.theme === 'sunset' ? '#8da5b8' : '#5cb85c';
@@ -1678,8 +1734,10 @@ async function run(mode) {
       }
     }
 
-    for (const p of platforms.filter((platform) => !platform.isGround)) {
+    for (const p of platforms) {
+      if (p.isGround) continue;
       const px = p.x - cameraX;
+      if (px + p.w < -80 || px > viewportWidth() + 80) continue;
       // Static platforms are solid elevated floors, not floating props.
       // Their supports make the route read like a stepped building/Mario map.
       if (!p.moving) {
@@ -1903,8 +1961,8 @@ async function run(mode) {
       if (state && state.ready && image) {
         const spriteH = enemy.boss ? 210 : enemy.h;
         const spriteW =
-          image.naturalWidth && image.naturalHeight
-            ? spriteH * (image.naturalWidth / image.naturalHeight)
+          imageWidth(image) && imageHeight(image)
+            ? spriteH * (imageWidth(image) / imageHeight(image))
             : enemy.w + 16;
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = isTouchDevice ? 'medium' : 'high';
@@ -2511,7 +2569,7 @@ async function run(mode) {
       const art = animatedArt(ally.id, helperImages[ally.id], motion);
       if (art.ready) {
         const h = (ally.size === 'big' ? 90 : 82) * ally.scale,
-          w = (h * art.image.naturalWidth) / art.image.naturalHeight;
+          w = (h * imageWidth(art.image)) / imageHeight(art.image);
         ctx.save();
         ctx.translate(sx + 27, sy + 102);
         ctx.scale(ally.facingRight ? 1 : -1, 1);
@@ -2607,7 +2665,7 @@ async function run(mode) {
     ctx.fillRect(sx - 90, event.y + event.h - 13, 115, 7);
     ctx.globalAlpha = 1;
     if (art?.ready && art.image) {
-      const drawW = event.h * (art.image.naturalWidth / art.image.naturalHeight);
+      const drawW = event.h * (imageWidth(art.image) / imageHeight(art.image));
       ctx.drawImage(art.image, sx, event.y, drawW, event.h);
     } else {
       ctx.font = '96px system-ui';
@@ -2758,7 +2816,7 @@ async function run(mode) {
           : 'idle';
     const heroArt = animatedArt(
       cfg.characters.find((c) => c.role === 'hero').id,
-      { image: playerImage, ready: playerImageReady },
+      playerAssetState,
       motion,
     );
     const heroImage = heroArt.image;
@@ -2807,8 +2865,8 @@ async function run(mode) {
     if (heroArt.ready) {
       const spriteH = 88 * cfg.player.scale;
       const spriteW =
-        heroImage.naturalWidth && heroImage.naturalHeight
-          ? spriteH * (heroImage.naturalWidth / heroImage.naturalHeight)
+        imageWidth(heroImage) && imageHeight(heroImage)
+          ? spriteH * (imageWidth(heroImage) / imageHeight(heroImage))
           : 72;
       const drawX = px + player.w / 2 - spriteW / 2;
       ctx.imageSmoothingEnabled = true;

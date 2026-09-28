@@ -1,6 +1,24 @@
 import type { Game, Level, Character } from '../../shared/schema';
 import { platformsAt, type Body } from './physics';
 const backgroundCache = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+const spriteCache = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+
+function cachedSprite(image: HTMLImageElement) {
+  const cached = spriteCache.get(image);
+  if (cached) return cached;
+  // Uploaded art can be thousands of pixels wide while characters occupy roughly
+  // 100px on the fixed-resolution canvas. Downsample once, not on every frame.
+  const scale = Math.min(1, 512 / Math.max(image.naturalWidth, image.naturalHeight));
+  const layer = document.createElement('canvas');
+  layer.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  layer.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const layerContext = layer.getContext('2d', { alpha: true })!;
+  layerContext.imageSmoothingEnabled = true;
+  layerContext.imageSmoothingQuality = 'high';
+  layerContext.drawImage(image, 0, 0, layer.width, layer.height);
+  spriteCache.set(image, layer);
+  return layer;
+}
 
 function cachedBackground(image: HTMLImageElement) {
   const cached = backgroundCache.get(image);
@@ -181,12 +199,13 @@ export function drawCharacter(
   ctx.fill();
   ctx.scale(facing * (1 + squash) * c.scale, (1 - squash) * c.scale);
   if (img?.complete && img.naturalWidth) {
+    const sprite = cachedSprite(img);
     const h = body.h + 18,
-      w = (h * img.naturalWidth) / img.naturalHeight;
+      w = (h * sprite.width) / sprite.height;
     ctx.shadowColor = 'rgba(22, 25, 35, 0.32)';
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 2;
-    ctx.drawImage(img, -w / 2, -h, w, h);
+    ctx.drawImage(sprite, -w / 2, -h, w, h);
   } else {
     ctx.fillStyle = c.color;
     ctx.beginPath();

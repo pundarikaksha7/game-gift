@@ -225,7 +225,10 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     assert.equal(assetBundle.assets[asset.url].mime, 'image/webp');
     assert.ok(Buffer.from(assetBundle.assets[asset.url].data, 'base64').length > 0);
     await request(`/projects/${id}/publish`, 'POST', { revision: 5 }, alice);
-    assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 200);
+    const publicAsset = await fetch(base.replace('/api', '') + asset.url);
+    assert.equal(publicAsset.status, 200);
+    assert.equal(publicAsset.headers.get('cache-control'), 'private, max-age=31536000, immutable');
+    assert.equal(publicAsset.headers.get('vary'), 'Authorization');
     await request(`/projects/${id}/publish`, 'DELETE', undefined, alice);
     assert.equal((await request(`/play/alice/${publishedId}`)).status, 404);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 404);

@@ -74,7 +74,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
         .vary('Origin');
       res.set(
         'Access-Control-Allow-Headers',
-        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id, X-Upload-Id, X-Confirm-Account-Deletion',
+        'Authorization, Content-Type, X-game-gift-Request, X-Project-Id, X-Upload-Id, X-Asset-Purpose, X-Confirm-Account-Deletion',
       );
       res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     }
@@ -227,9 +227,15 @@ export function createApp(db: DB, options: AppOptions = {}) {
         }
       : null;
     if (!publicUse && owner?.user_id !== asset.owner_id) throw fail(404, 'Asset not found');
+    // Asset IDs are immutable. Keep them in the browser cache (rather than a shared CDN
+    // cache) so unpublishing still removes anonymous access for new visitors.
     res
       .type(asset.mime)
-      .set('Cache-Control', 'no-store')
+      .set(
+        'Cache-Control',
+        publicUse ? 'private, max-age=31536000, immutable' : 'private, max-age=3600, immutable',
+      )
+      .set('Vary', 'Authorization')
       .send(await readAsset(asset.filename));
   });
   app.use('/api/projects', auth);
@@ -485,11 +491,27 @@ export function createApp(db: DB, options: AppOptions = {}) {
       if (!mime) throw fail(400, 'Use PNG, JPEG, WebP, MP3, WAV or OGG files');
       let payload = b;
       if (mime.startsWith('image/')) {
+        const purpose = req.get('x-asset-purpose');
+        if (purpose && !['background', 'character', 'animation', 'effect'].includes(purpose))
+          throw fail(400, 'Invalid asset purpose');
         try {
+          const dimensions =
+            purpose === 'background'
+              ? { width: 1440, height: 810, quality: 84 }
+              : purpose === 'character' || purpose === 'animation'
+                ? { width: 640, height: 640, quality: 84 }
+                : purpose === 'effect'
+                  ? { width: 384, height: 384, quality: 82 }
+                  : { width: 1280, height: 1280, quality: 84 };
           payload = await sharp(b, { limitInputPixels: 16777216 })
             .rotate()
-            .resize({ width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true })
-            .webp({ quality: 90 })
+            .resize({
+              width: dimensions.width,
+              height: dimensions.height,
+              fit: 'inside',
+              withoutEnlargement: true,
+            })
+            .webp({ quality: dimensions.quality, effort: 4 })
             .toBuffer();
           mime = 'image/webp';
         } catch {

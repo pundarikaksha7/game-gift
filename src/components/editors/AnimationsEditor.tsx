@@ -88,7 +88,7 @@ export function AnimationsEditor({ game, change, notify, authed }: EditorProps) 
             onFile={async (f) => {
               setBusy(true);
               try {
-                const url = await attachAsset(f, 'image');
+                const url = await attachAsset(f, 'image', 'animation');
                 change((g) => g.animation.frames.push(url));
               } catch (e) {
                 notify((e as Error).message);

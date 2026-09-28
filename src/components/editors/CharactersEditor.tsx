@@ -204,7 +204,7 @@ export function CharactersEditor({ game, change, notify }: EditorProps) {
               setUploading(true);
               try {
                 const id = c.id;
-                const sprite = await attachAsset(file, 'image');
+                const sprite = await attachAsset(file, 'image', 'character');
                 change((g) => {
                   const character = g.characters.find((x) => x.id === id);
                   if (character) {

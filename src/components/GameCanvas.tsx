@@ -57,7 +57,9 @@ function ClassicGameCanvas({
     ])
       if (url && !images.has(url)) {
         const img = new Image();
+        img.decoding = 'async';
         img.src = url;
+        void img.decode().catch(() => {});
         images.set(url, img);
       }
     const player: Body = { x: 120, y: 380, vx: 0, vy: 0, w: 34, h: 62, grounded: false };

@@ -165,7 +165,7 @@ export function LevelsEditor({
             onFile={async (file) => {
               const id = l.id;
               try {
-                const url = await attachAsset(file, 'image');
+                const url = await attachAsset(file, 'image', 'background');
                 change((g) => {
                   const chapter = g.levels.find((x) => x.id === id);
                   if (chapter) chapter.background = url;

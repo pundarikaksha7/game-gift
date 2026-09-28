@@ -95,6 +95,9 @@ export function MediaAudio({ src, ...props }: React.AudioHTMLAttributes<HTMLAudi
   return url ? <audio {...props} src={url} /> : null;
 }
 export function useRuntimeMedia(game: Game) {
+  const publicPlayback =
+    typeof location !== 'undefined' &&
+    (location.pathname.startsWith('/play/') || location.pathname.startsWith('/g/'));
   const sources = useMemo(
     () =>
       [...new Set(assetReferences(game).map((a) => a.url))]
@@ -108,6 +111,13 @@ export function useRuntimeMedia(game: Game) {
   useEffect(() => {
     let cancelled = false;
     const objects: string[] = [];
+    // Published assets are already anonymously readable and immutable. Let the browser
+    // stream and cache them directly instead of copying every file into an object URL.
+    if (publicPlayback) {
+      setUrls({});
+      setLoadedKey(key);
+      return;
+    }
     if (!sources.length) {
       setUrls({});
       setLoadedKey(key);
@@ -116,21 +126,25 @@ export function useRuntimeMedia(game: Game) {
     void (async () => {
       const headers = await requestHeaders();
       const mapped: Record<string, string> = {};
+      let next = 0;
       await Promise.all(
-        sources.map(async (url) => {
-          try {
-            const remote = url.startsWith('/api/');
-            const r = await fetch(remote ? `${API_BASE_URL}${url}` : url, {
-              headers: remote ? headers : undefined,
-              credentials: remote ? (supabase ? 'omit' : 'include') : 'omit',
-              signal: AbortSignal.timeout(30000),
-            });
-            if (!r.ok) throw new Error('Media unavailable');
-            const display = URL.createObjectURL(await r.blob());
-            objects.push(display);
-            mapped[url] = display;
-          } catch {
-            mapped[url] = url;
+        Array.from({ length: Math.min(4, sources.length) }, async () => {
+          while (next < sources.length) {
+            const url = sources[next++];
+            try {
+              const remote = url.startsWith('/api/');
+              const r = await fetch(remote ? `${API_BASE_URL}${url}` : url, {
+                headers: remote ? headers : undefined,
+                credentials: remote ? (supabase ? 'omit' : 'include') : 'omit',
+                signal: AbortSignal.timeout(30000),
+              });
+              if (!r.ok) throw new Error('Media unavailable');
+              const display = URL.createObjectURL(await r.blob());
+              objects.push(display);
+              mapped[url] = display;
+            } catch {
+              mapped[url] = url;
+            }
           }
         }),
       );
@@ -145,10 +159,17 @@ export function useRuntimeMedia(game: Game) {
       cancelled = true;
       objects.forEach(URL.revokeObjectURL);
     };
-  }, [key]);
+  }, [key, publicPlayback]);
   return useMemo(() => {
     if (!sources.length) return game;
+    if (publicPlayback)
+      return rewriteAssets(
+        game,
+        Object.fromEntries(
+          sources.map((url) => [url, url.startsWith('/api/') ? `${API_BASE_URL}${url}` : url]),
+        ),
+      );
     if (loadedKey !== key || sources.some((url) => !urls[url])) return null;
     return rewriteAssets(game, urls);
-  }, [game, key, loadedKey, sources, urls]);
+  }, [game, key, loadedKey, publicPlayback, sources, urls]);
 }

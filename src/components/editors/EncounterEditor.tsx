@@ -152,7 +152,7 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
               onFile={async (file) => {
                 const levelId = l.id;
                 try {
-                  const url = await attachAsset(file, 'image');
+                  const url = await attachAsset(file, 'image', 'effect');
                   change((g) => {
                     const chapter = g.levels.find((item) => item.id === levelId);
                     if (chapter) {
@@ -193,7 +193,7 @@ export function EncounterEditor({ game, change, level, notify }: EditorProps & {
               onFile={async (file) => {
                 const levelId = l.id;
                 try {
-                  const url = await attachAsset(file, 'image');
+                  const url = await attachAsset(file, 'image', 'effect');
                   change((g) => {
                     const chapter = g.levels.find((item) => item.id === levelId);
                     if (chapter) chapter.powerupArt = url;

@@ -96,7 +96,9 @@ export async function downloadProject(id: string) {
   const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'experience.game-gift.json';
   return { blob: await res.blob(), filename };
 }
-export async function uploadAsset(file: File, kind: 'image' | 'audio') {
+export type AssetPurpose = 'background' | 'character' | 'animation' | 'effect';
+
+export async function uploadAsset(file: File, kind: 'image' | 'audio', purpose?: AssetPurpose) {
   if (file.size > 10 * 1024 * 1024) throw new Error('Choose a file smaller than 10 MB');
   if (!file.type.startsWith(kind + '/')) throw new Error(`Choose an ${kind} file`);
   if (supabase && !activeProject) throw new Error('Save your game before uploading media.');
@@ -109,6 +111,7 @@ export async function uploadAsset(file: File, kind: 'image' | 'audio') {
     headers: {
       ...(activeProject ? { 'X-Project-Id': activeProject } : {}),
       'X-Upload-Id': uploadId,
+      ...(purpose ? { 'X-Asset-Purpose': purpose } : {}),
     },
     timeoutMs: 120000,
   });
@@ -116,9 +119,9 @@ export async function uploadAsset(file: File, kind: 'image' | 'audio') {
   return result.url;
 }
 /** Hosted upload when a project exists; otherwise a local blob so art still appears in play. */
-export async function attachAsset(file: File, kind: 'image' | 'audio') {
+export async function attachAsset(file: File, kind: 'image' | 'audio', purpose?: AssetPurpose) {
   if (file.size > 10 * 1024 * 1024) throw new Error('Choose a file smaller than 10 MB');
   if (!file.type.startsWith(kind + '/')) throw new Error(`Choose an ${kind} file`);
   if (!activeProject) return URL.createObjectURL(file);
-  return uploadAsset(file, kind);
+  return uploadAsset(file, kind, purpose);
 }
