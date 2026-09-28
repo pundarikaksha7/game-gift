@@ -114,7 +114,7 @@ export function AdventureRuntime({
         if (signature === lastControls) return;
         lastControls = signature;
         frame.contentWindow?.postMessage({ type: 'game-gift:keys', keys: next }, location.origin);
-      }, 32);
+      }, 16);
     return () => {
       active = false;
       frame.contentWindow?.postMessage({ type: 'game-gift:dispose' }, location.origin);

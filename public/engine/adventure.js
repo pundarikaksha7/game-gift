@@ -9,7 +9,9 @@ async function run(mode) {
   let animationFrame = 0;
   const gameWorld = document.getElementById('game-world');
   const canvas = document.getElementById('game-canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'low';
   await Promise.allSettled([
     document.fonts.load('700 24px "Gamegift Arcade"'),
     document.fonts.load('900 42px "Gamegift Arcade"'),
@@ -99,6 +101,7 @@ async function run(mode) {
   let platformCacheLevel = -1;
   let platformCache = [];
   const pitDepthGradients = new Map();
+  const backgroundLayers = new Map();
 
   function getLevelConfig(index = currentLevelIndex) {
     return cfg.levels[index] || cfg.levels[0];
@@ -1459,91 +1462,109 @@ async function run(mode) {
   }
 
   // ── Drawing ──
-  function drawBackground() {
-    const level = getLevelConfig();
-    const groundScreen = Math.min(viewportHeight(), Number(level.groundY ?? 1080) - cameraY());
-    ctx.fillStyle = level.skyColor || '#87CEEB';
-    ctx.fillRect(0, 0, viewportWidth(), viewportHeight());
+  function createFallbackBackground(level) {
+    const layer = document.createElement('canvas');
+    layer.width = VIEW_W;
+    layer.height = VIEW_H;
+    const layerCtx = layer.getContext('2d', { alpha: false });
+    const night = level.theme === 'midnight';
+    const sunset = level.theme === 'sunset';
+    const palette = night
+      ? ['#222345', '#575486', '#74749c', '#424d68']
+      : sunset
+        ? ['#f4ded7', '#dec0cb', '#c5a8b8', '#8d919a']
+        : ['#dceef0', '#bfd7d5', '#9fc1b5', '#6b9f91'];
+    const groundY = Math.min(VIEW_H, Number(level.groundY ?? 1080) * WORLD_SCALE);
+    const gradient = layerCtx.createLinearGradient(0, 0, 0, groundY);
+    gradient.addColorStop(0, palette[0]);
+    gradient.addColorStop(1, night ? '#43415f' : sunset ? '#f7e8cb' : '#f0f4df');
+    layerCtx.fillStyle = gradient;
+    layerCtx.fillRect(0, 0, VIEW_W, VIEW_H);
+    layerCtx.fillStyle = night ? '#fff1d1' : '#fff9df';
+    layerCtx.beginPath();
+    layerCtx.arc(VIEW_W * 0.77, groundY * 0.26, night ? 26 : 37, 0, Math.PI * 2);
+    layerCtx.fill();
+    if (night) {
+      layerCtx.fillStyle = '#e6def6';
+      for (let i = 0; i < 32; i++) {
+        layerCtx.globalAlpha = 0.4 + (i % 4) * 0.12;
+        layerCtx.beginPath();
+        layerCtx.arc(
+          (i * 193 + 45) % VIEW_W,
+          18 + ((i * 97) % (groundY * 0.62)),
+          1 + (i % 2),
+          0,
+          Math.PI * 2,
+        );
+        layerCtx.fill();
+      }
+      layerCtx.globalAlpha = 1;
+    }
+    for (let hill = 0; hill < 3; hill++) {
+      layerCtx.fillStyle = palette[hill + 1];
+      layerCtx.beginPath();
+      layerCtx.moveTo(0, groundY);
+      for (let x = 0; x <= VIEW_W + 10; x += 10) {
+        const y =
+          groundY * (0.56 + hill * 0.13) +
+          Math.sin(x / (98 - hill * 19) + hill) * 36 +
+          Math.cos(x / 175) * 21;
+        layerCtx.lineTo(x, y);
+      }
+      layerCtx.lineTo(VIEW_W + 10, groundY);
+      layerCtx.closePath();
+      layerCtx.fill();
+    }
+    for (let i = 0; i < 7; i++) {
+      const x = i * 150;
+      layerCtx.strokeStyle = night ? '#435c64' : '#4a8177';
+      layerCtx.lineWidth = 5;
+      layerCtx.beginPath();
+      layerCtx.moveTo(x, groundY);
+      layerCtx.lineTo(x, groundY - 49);
+      layerCtx.stroke();
+      layerCtx.fillStyle = night ? '#557279' : '#6b9c85';
+      layerCtx.beginPath();
+      layerCtx.ellipse(x, groundY - 62, 21, 32, -0.15, 0, Math.PI * 2);
+      layerCtx.fill();
+    }
+    layerCtx.fillStyle = night ? 'rgba(22,12,36,0.32)' : 'rgba(255,255,255,0.08)';
+    layerCtx.fillRect(0, 0, VIEW_W, Math.max(0, groundY));
+    return layer;
+  }
 
+  function backgroundLayer(level) {
     const state = loadImageAsset(level.id);
     const image = state && state.image;
-    if (state && state.ready && image) {
-      // Fill the entire responsive canvas and tile only horizontally for
-      // the long world. No fixed aspect-ratio crop limits the map view.
-      const bgW = Math.max(viewportWidth(), 1);
-      const bgH = Math.max(viewportHeight(), groundScreen, 1);
-      const offset = (((cameraX * 0.36) % bgW) + bgW) % bgW;
-      const top = 0;
+    const hasImage = !!(state && state.ready && image && image.naturalWidth);
+    const key = `${level.id}:${hasImage ? image.currentSrc || image.src : `fallback-${level.theme}`}`;
+    if (backgroundLayers.has(key)) return backgroundLayers.get(key);
+    const layer = hasImage ? document.createElement('canvas') : createFallbackBackground(level);
+    if (hasImage) {
+      layer.width = VIEW_W;
+      layer.height = VIEW_H;
+      const layerCtx = layer.getContext('2d', { alpha: false });
+      layerCtx.imageSmoothingEnabled = true;
+      layerCtx.imageSmoothingQuality = 'medium';
+      layerCtx.drawImage(image, 0, 0, VIEW_W, VIEW_H);
+    }
+    backgroundLayers.set(key, layer);
+    return layer;
+  }
+
+  function drawBackground() {
+    const level = getLevelConfig();
+    const layer = backgroundLayer(level);
+    const state = loadImageAsset(level.id);
+    if (state && state.ready && state.image) {
+      const offset = (((cameraX * WORLD_SCALE * 0.36) % VIEW_W) + VIEW_W) % VIEW_W;
       ctx.globalAlpha = 0.98;
-      ctx.drawImage(image, -offset, top, bgW, bgH);
-      ctx.drawImage(image, bgW - offset, top, bgW, bgH);
+      ctx.drawImage(layer, -offset, 0);
+      ctx.drawImage(layer, VIEW_W - offset, 0);
       ctx.globalAlpha = 1;
     } else {
-      const night = level.theme === 'midnight';
-      const sunset = level.theme === 'sunset';
-      const palette = night
-        ? ['#222345', '#575486', '#74749c', '#424d68']
-        : sunset
-          ? ['#f4ded7', '#dec0cb', '#c5a8b8', '#8d919a']
-          : ['#dceef0', '#bfd7d5', '#9fc1b5', '#6b9f91'];
-      const gradient = ctx.createLinearGradient(0, 0, 0, groundScreen);
-      gradient.addColorStop(0, palette[0]);
-      gradient.addColorStop(1, night ? '#43415f' : sunset ? '#f7e8cb' : '#f0f4df');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, viewportWidth(), viewportHeight());
-      ctx.fillStyle = night ? '#fff1d1' : '#fff9df';
-      ctx.beginPath();
-      ctx.arc(viewportWidth() * 0.77, groundScreen * 0.26, night ? 60 : 86, 0, Math.PI * 2);
-      ctx.fill();
-      if (night) {
-        ctx.fillStyle = '#e6def6';
-        for (let i = 0; i < 40; i++) {
-          ctx.globalAlpha = 0.3 + (Math.sin(i + worldTime * 0.4) + 1) * 0.25;
-          ctx.beginPath();
-          ctx.arc(
-            (i * 193 + 45) % viewportWidth(),
-            40 + ((i * 97) % (groundScreen * 0.62)),
-            2 + (i % 3),
-            0,
-            Math.PI * 2,
-          );
-          ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-      }
-      for (let layer = 0; layer < 3; layer++) {
-        ctx.fillStyle = palette[layer + 1];
-        ctx.beginPath();
-        ctx.moveTo(0, groundScreen);
-        for (let x = 0; x <= viewportWidth() + 20; x += 20) {
-          const worldX = x + cameraX * (0.08 + layer * 0.1);
-          const y =
-            groundScreen * (0.56 + layer * 0.13) +
-            Math.sin(worldX / (230 - layer * 45) + layer) * 85 +
-            Math.cos(worldX / 410) * 50;
-          ctx.lineTo(x, y);
-        }
-        ctx.lineTo(viewportWidth() + 20, groundScreen);
-        ctx.closePath();
-        ctx.fill();
-      }
-      for (let i = 0; i < 10; i++) {
-        const x = i * 300 - ((cameraX * 0.55) % 300);
-        const y = groundScreen;
-        ctx.strokeStyle = night ? '#435c64' : '#4a8177';
-        ctx.lineWidth = 12;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x, y - 115);
-        ctx.stroke();
-        ctx.fillStyle = night ? '#557279' : '#6b9c85';
-        ctx.beginPath();
-        ctx.ellipse(x, y - 145, 48, 75, -0.15, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.drawImage(layer, 0, 0);
     }
-    ctx.fillStyle = level.theme === 'midnight' ? 'rgba(22,12,36,0.32)' : 'rgba(255,255,255,0.08)';
-    ctx.fillRect(0, 0, viewportWidth(), Math.max(0, groundScreen));
   }
 
   function cameraY() {
@@ -1833,6 +1854,7 @@ async function run(mode) {
   function drawEnemies() {
     for (const enemy of enemies) {
       if (enemy.defeatTimer <= 0 && enemy.x + enemy.w < cameraX - 100) continue;
+      if (enemy.defeatTimer <= 0 && enemy.x > cameraX + viewportWidth() + 100) continue;
       const spec = enemyTypes[enemy.type];
       const sx = enemy.x - cameraX;
       const sy = enemy.y + Math.sin(enemy.animTime * 8) * (enemy.defeatTimer > 0 ? 0 : 1);
@@ -2957,10 +2979,10 @@ async function run(mode) {
             y: (Math.random() - 0.5) * screenShakePower,
           }
         : { x: 0, y: 0 };
+    drawBackground();
     ctx.save();
     ctx.scale(WORLD_SCALE, WORLD_SCALE);
     ctx.translate(shake.x, shake.y);
-    drawBackground();
     drawPlatforms();
     if (mode === 'preview' && cfg.grid) {
       ctx.save();

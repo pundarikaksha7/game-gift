@@ -29,7 +29,9 @@ function ClassicGameCanvas({
   end.current = onEnd;
   useEffect(() => {
     const canvas = ref.current!,
-      ctx = canvas.getContext('2d')!;
+      ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'low';
     const level = game.levels[levelIndex] || game.levels[0];
     const hero = game.characters.find((c) => c.role === 'hero')!;
     const enemyTypes = game.characters.filter((c) => c.role === 'enemy');

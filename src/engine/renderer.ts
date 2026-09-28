@@ -1,5 +1,24 @@
 import type { Game, Level, Character } from '../../shared/schema';
 import { platformsAt, type Body } from './physics';
+const backgroundCache = new WeakMap<HTMLImageElement, HTMLCanvasElement>();
+
+function cachedBackground(image: HTMLImageElement) {
+  const cached = backgroundCache.get(image);
+  if (cached) return cached;
+  const layer = document.createElement('canvas');
+  layer.width = 960;
+  layer.height = 460;
+  const layerContext = layer.getContext('2d', { alpha: false })!;
+  layerContext.imageSmoothingEnabled = true;
+  layerContext.imageSmoothingQuality = 'medium';
+  const scale = Math.max(960 / image.naturalWidth, 460 / image.naturalHeight);
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  layerContext.drawImage(image, (960 - width) / 2, (460 - height) / 2, width, height);
+  backgroundCache.set(image, layer);
+  return layer;
+}
+
 export const palettes = {
   meadow: {
     sky: '#dfe9e0',
@@ -82,10 +101,7 @@ export function drawWorld(
     ctx.fill();
   }
   if (background?.complete && background.naturalWidth) {
-    const scale = Math.max(960 / background.naturalWidth, 460 / background.naturalHeight);
-    const w = background.naturalWidth * scale,
-      h = background.naturalHeight * scale;
-    ctx.drawImage(background, (960 - w) / 2, (460 - h) / 2, w, h);
+    ctx.drawImage(cachedBackground(background), 0, 0);
   }
   for (const plat of platformsAt(level, time)) {
     ctx.fillStyle = p.ground;
