@@ -1,30 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Game } from '../../shared/schema';
 import { runtimeConfig, WORLD_UNIT } from '../../shared/runtime';
-import { composeAvatar } from '../avatar/compose';
-
-const MAX_COMPOSED_AVATARS = 24;
-const composedAvatarCache = new Map<string, Promise<string>>();
-
-function cachedAvatar(avatar: NonNullable<Game['characters'][number]['avatar']>) {
-  const key = JSON.stringify(avatar);
-  const cached = composedAvatarCache.get(key);
-  if (cached) {
-    composedAvatarCache.delete(key);
-    composedAvatarCache.set(key, cached);
-    return cached;
-  }
-  const composed = composeAvatar(avatar).catch((error) => {
-    composedAvatarCache.delete(key);
-    throw error;
-  });
-  composedAvatarCache.set(key, composed);
-  if (composedAvatarCache.size > MAX_COMPOSED_AVATARS) {
-    const oldest = composedAvatarCache.keys().next().value;
-    if (oldest) composedAvatarCache.delete(oldest);
-  }
-  return composed;
-}
 export function AdventureRuntime({
   game,
   levelIndex = 0,
@@ -51,10 +27,9 @@ export function AdventureRuntime({
   viewport.current = { camera, grid };
   useEffect(() => {
     const frame = ref.current!;
-    let active = true;
     let interval: ReturnType<typeof setInterval> | undefined;
     let lastControls = '';
-    const receive = async (event: MessageEvent) => {
+    const receive = (event: MessageEvent) => {
       if (event.source !== frame.contentWindow || event.origin !== location.origin || !event.data)
         return;
       if (event.data.type === 'game-gift:ready') {
@@ -63,21 +38,6 @@ export function AdventureRuntime({
           Math.min(levelIndex, game.levels.length - 1),
           viewport.current.camera,
         );
-        const composed = await Promise.allSettled(
-          game.characters
-            .filter((character) => character.avatar && !character.sprite)
-            .map(async (character) => ({
-              character,
-              texture: await cachedAvatar(character.avatar!),
-            })),
-        );
-        if (!active) return;
-        for (const result of composed) {
-          if (result.status !== 'fulfilled') continue;
-          const { character, texture } = result.value;
-          config.assets[character.id] = texture;
-          if (character.role === 'hero') config.assets.player_character = texture;
-        }
         frame.contentWindow?.postMessage(
           {
             type: 'game-gift:init',
@@ -116,7 +76,6 @@ export function AdventureRuntime({
         frame.contentWindow?.postMessage({ type: 'game-gift:keys', keys: next }, location.origin);
       }, 32);
     return () => {
-      active = false;
       frame.contentWindow?.postMessage({ type: 'game-gift:dispose' }, location.origin);
       window.removeEventListener('message', receive);
       clearInterval(interval);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { putAsset, readAsset, deleteAsset } from '../server/storage';
+import { putAsset, readAsset, deleteAsset, createAssetReadUrl } from '../server/storage';
 test('private cloud media uses authenticated endpoints and fails on provider errors', async () => {
   const savedFetch = globalThis.fetch;
   const saved = {
@@ -14,18 +14,27 @@ test('private cloud media uses authenticated endpoints and fails on provider err
   process.env.SUPABASE_STORAGE_BUCKET = 'private-media';
   globalThis.fetch = (async (url, options = {}) => {
     calls.push({ url: String(url), options });
+    if (String(url).includes('/object/sign/'))
+      return Response.json({
+        signedURL: '/storage/v1/object/sign/private-media/tokenized?token=x',
+      });
     return new Response('media');
   }) as typeof fetch;
   const id = '12345678-1234-1234-1234-123456789abc';
   try {
     await putAsset(id, Buffer.from('media'), 'image/webp');
     assert.equal((await readAsset(id)).toString(), 'media');
+    assert.equal(
+      await createAssetReadUrl(id),
+      'https://storage-test.example/storage/v1/object/sign/private-media/tokenized?token=x',
+    );
     await deleteAsset(id);
     assert.deepEqual(
       calls.map((c) => c.options.method),
-      ['POST', 'GET', 'DELETE'],
+      ['POST', 'GET', 'POST', 'DELETE'],
     );
     assert.ok(calls[1].url.includes('/object/authenticated/private-media/'));
+    assert.ok(calls[2].url.includes('/object/sign/private-media/'));
     assert.ok(calls.every((c) => !c.url.includes('/public/')));
     assert.equal(
       (calls[0].options.headers as Record<string, string>).Authorization,

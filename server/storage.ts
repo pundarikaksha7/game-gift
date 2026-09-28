@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
+const signedReads = new Map<string, { url: string; expiresAt: number }>();
+
 /** Keep storage private; all reads go through the API's ownership/publication check. */
 function remote() {
   const url = process.env.SUPABASE_URL;
@@ -52,7 +54,48 @@ async function storageRequest(id: string, method: string, payload?: Buffer, mime
   }
   return response;
 }
+export async function createAssetReadUrl(id: string) {
+  const config = remote();
+  if (!config) return null;
+  if (
+    !/^(?:users\/[a-f0-9-]{36}\/projects\/[a-f0-9-]{36}\/(?:characters|audio|animations)\/)?[a-f0-9-]{36}$/.test(
+      id,
+    )
+  )
+    throw new Error('Invalid storage key');
+  const cached = signedReads.get(id);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
+  const encodedPath = id.split('/').map(encodeURIComponent).join('/');
+  const response = await fetch(
+    `${config.url}/storage/v1/object/sign/${encodeURIComponent(config.bucket)}/${encodedPath}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: config.key,
+        Authorization: `Bearer ${config.key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn: 600 }),
+      signal: AbortSignal.timeout(10000),
+    },
+  );
+  if (!response.ok)
+    throw Object.assign(new Error('Media delivery is unavailable. Try again shortly.'), {
+      status: 503,
+    });
+  const body = (await response.json()) as { signedURL?: string; signedUrl?: string };
+  const signed = body.signedURL || body.signedUrl;
+  if (!signed) throw Object.assign(new Error('Media delivery is unavailable.'), { status: 503 });
+  const url = new URL(signed, config.url).toString();
+  signedReads.set(id, { url, expiresAt: Date.now() + 8 * 60 * 1000 });
+  if (signedReads.size > 500) {
+    const oldest = signedReads.keys().next().value;
+    if (oldest) signedReads.delete(oldest);
+  }
+  return url;
+}
 export async function putAsset(id: string, payload: Buffer, mime: string) {
+  signedReads.delete(id);
   if (remote()) {
     await storageRequest(id, 'POST', payload, mime);
     return;
@@ -66,6 +109,7 @@ export async function readAsset(id: string) {
   return readFile(localPath(id));
 }
 export async function deleteAsset(id: string) {
+  signedReads.delete(id);
   if (remote()) {
     await storageRequest(id, 'DELETE');
     return;

@@ -680,14 +680,19 @@ async function run(mode) {
   // ── Cached character art ──
   // Load the generated protagonist once at startup; never fetch assets in the game loop.
   const assetCache = new Map();
+  const preparedImageCache = new Map();
   const fallbackAssetUrls = cfg.assets;
   const imageWidth = (image) => Number(image?.naturalWidth || image?.width || 0);
   const imageHeight = (image) => Number(image?.naturalHeight || image?.height || 0);
   function preparedImage(url, maxDimension) {
+    const cacheKey = `${url}:${maxDimension}`;
+    if (preparedImageCache.has(cacheKey)) return preparedImageCache.get(cacheKey);
     const source = new Image();
     source.decoding = 'async';
     try {
-      if (new URL(url, location.href).origin !== location.origin) source.crossOrigin = 'anonymous';
+      // Public API asset URLs may redirect to Supabase's CDN. Opt into CORS before
+      // assigning src so redirected images remain eligible for bitmap downsampling.
+      if (!/^(?:data|blob):/i.test(url)) source.crossOrigin = 'anonymous';
     } catch (_) {}
     const result = { image: source, source, ready: false, promise: null };
     result.promise = new Promise((resolve) => {
@@ -717,6 +722,7 @@ async function run(mode) {
       };
       source.src = url;
     });
+    preparedImageCache.set(cacheKey, result);
     return result;
   }
   function loadImageAsset(id) {
@@ -864,6 +870,7 @@ async function run(mode) {
       }
     }
     frameCache.clear();
+    preparedImageCache.clear();
   }
 
   // ── Input state ──
@@ -1965,7 +1972,7 @@ async function run(mode) {
             ? spriteH * (imageWidth(image) / imageHeight(image))
             : enemy.w + 16;
         ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = isTouchDevice ? 'medium' : 'high';
+        ctx.imageSmoothingQuality = isTouchDevice ? 'low' : 'medium';
         ctx.drawImage(
           image,
           sx + enemy.w / 2 - spriteW / 2,
@@ -2870,7 +2877,7 @@ async function run(mode) {
           : 72;
       const drawX = px + player.w / 2 - spriteW / 2;
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = isTouchDevice ? 'medium' : 'high';
+      ctx.imageSmoothingQuality = isTouchDevice ? 'low' : 'medium';
       ctx.translate(px + player.w / 2, drawY + player.h + 16);
       const squash =
         cfg.animation.preset === 'none' ? 0 : Math.sin(player.animTime * 7) * cfg.animation.squash;
@@ -2922,6 +2929,7 @@ async function run(mode) {
 
   // ── Game loop ──
   let lastTime = 0;
+  let lastPreviewFrame = 0;
   let paused = false;
   const pauseButton = document.createElement('button');
   pauseButton.textContent = 'Pause / Resume';
@@ -2970,6 +2978,13 @@ async function run(mode) {
 
   function gameLoop(timestamp) {
     if (disposed) return;
+    // Editor previews do not need a full 60 fps simulation. Keeping them at 30 fps
+    // leaves the main thread responsive while fields, drawers and asset pickers are used.
+    if (mode === 'preview' && timestamp - lastPreviewFrame < 1000 / 30) {
+      animationFrame = requestAnimationFrame(gameLoop);
+      return;
+    }
+    lastPreviewFrame = timestamp;
     const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
     lastTime = timestamp;
     // World time advances with physics below.
@@ -2999,13 +3014,15 @@ async function run(mode) {
       player.animState = player.onGround && Math.abs(player.vx) < 1 ? 'idle' : 'moving';
     }
     if (attackStateEl) {
-      attackStateEl.textContent = player.attack
+      const nextAttackState = player.attack
         ? player.attack.type === 'beam'
           ? 'ENERGY BEAM'
           : player.attack.type === 'punch'
             ? 'PUNCH!'
             : 'KICK!'
         : '';
+      if (attackStateEl.textContent !== nextAttackState)
+        attackStateEl.textContent = nextAttackState;
     }
 
     // Camera

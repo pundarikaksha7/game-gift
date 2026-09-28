@@ -4879,8 +4879,10 @@ main {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
   color: rgba(255, 255, 255, 0.82);
-  background: rgba(15, 20, 31, 0.72);
-  backdrop-filter: blur(10px);
+  background: rgba(15, 20, 31, 0.94);
+  /* Blurring a live canvas forces the browser to re-rasterize the strip every frame. */
+  backdrop-filter: none;
+  contain: layout paint;
 }
 .public-page.game-page .play-controls button {
   border-color: rgba(255, 255, 255, 0.22);

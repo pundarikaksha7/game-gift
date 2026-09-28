@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import { randomUUID, randomBytes } from 'node:crypto';
-import { putAsset, readAsset, deleteAsset } from './storage';
+import { putAsset, readAsset, deleteAsset, createAssetReadUrl } from './storage';
 import path from 'node:path';
 import { z, ZodError } from 'zod';
 import type { DB } from './db';
@@ -53,8 +53,17 @@ export function createApp(db: DB, options: AppOptions = {}) {
               defaultSrc: ["'self'"],
               scriptSrc: ["'self'"],
               styleSrc: ["'self'", "'unsafe-inline'"],
-              imgSrc: ["'self'", 'blob:', 'data:'],
-              mediaSrc: ["'self'", 'blob:'],
+              imgSrc: [
+                "'self'",
+                'blob:',
+                'data:',
+                ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : []),
+              ],
+              mediaSrc: [
+                "'self'",
+                'blob:',
+                ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : []),
+              ],
               connectSrc: [
                 "'self'",
                 ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : []),
@@ -227,6 +236,12 @@ export function createApp(db: DB, options: AppOptions = {}) {
         }
       : null;
     if (!publicUse && owner?.user_id !== asset.owner_id) throw fail(404, 'Asset not found');
+    if (publicUse) {
+      // Keep authorization on this stable endpoint, then send the bytes directly from
+      // Supabase's CDN instead of buffering them through the Render service.
+      const direct = await createAssetReadUrl(asset.filename).catch(() => null);
+      if (direct) return res.set('Cache-Control', 'no-store').redirect(307, direct);
+    }
     // Asset IDs are immutable. Keep them in the browser cache (rather than a shared CDN
     // cache) so unpublishing still removes anonymous access for new visitors.
     res
