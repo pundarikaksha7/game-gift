@@ -12,9 +12,14 @@ async function run(mode) {
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'low';
-  await Promise.allSettled([
-    document.fonts.load('700 24px "Gamegift Arcade"'),
-    document.fonts.load('900 42px "Gamegift Arcade"'),
+  // Fonts improve presentation but must not hold the runtime hostage on a slow
+  // connection. They continue loading after this short startup budget expires.
+  await Promise.race([
+    Promise.allSettled([
+      document.fonts.load('700 24px "Gamegift Arcade"'),
+      document.fonts.load('900 42px "Gamegift Arcade"'),
+    ]),
+    new Promise((resolve) => setTimeout(resolve, 1000)),
   ]);
   const isTouchDevice =
     window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -24,6 +29,9 @@ async function run(mode) {
   let averageFrameTime = 1000 / 60;
   let slowFrameTime = 0;
   let stableFrameTime = 0;
+  let frameSampleTime = 0;
+  let frameSampleCount = 0;
+  let worstSampleTime = 0;
   const mobileLandscapeQuery = window.matchMedia(
     '(orientation: landscape) and (max-height: 620px)',
   );
@@ -106,6 +114,7 @@ async function run(mode) {
   let platformCacheTime = Number.NaN;
   let platformCacheLevel = -1;
   let platformCache = [];
+  const levelLengthCache = new Map();
   const pitDepthGradients = new Map();
   const backgroundLayers = new Map();
 
@@ -114,8 +123,13 @@ async function run(mode) {
   }
 
   function getLevelLength(index = currentLevelIndex) {
+    if (levelLengthCache.has(index)) return levelLengthCache.get(index);
     const level = getLevelConfig(index);
-    if (level.width) return level.width;
+    if (level.width) {
+      const authoredWidth = Number(level.width);
+      levelLengthCache.set(index, authoredWidth);
+      return authoredWidth;
+    }
     const globalMultiplier = Number(cfg.level?.lengthMultiplier ?? 1);
     const localMultiplier = Number(level.lengthMultiplier ?? 1);
     const scaledLength =
@@ -125,7 +139,9 @@ async function run(mode) {
       3200,
     );
     // Never place an exit beyond the final built section of the route.
-    return Math.max(3200, Math.min(scaledLength, routeEnd + 460));
+    const length = Math.max(3200, Math.min(scaledLength, routeEnd + 460));
+    levelLengthCache.set(index, length);
+    return length;
   }
 
   function getEnemyCount() {
@@ -700,7 +716,19 @@ async function run(mode) {
     // and requiring an ACAO response would make otherwise valid published art disappear.
     const result = { image: source, source, ready: false, promise: null };
     result.promise = new Promise((resolve) => {
-      source.onerror = () => resolve(result);
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        resolve(result);
+      };
+      // A missing or slow private asset must never strand the game on its
+      // loading screen. The request may still finish and populate the cache.
+      const timeout = setTimeout(finish, 1500);
+      source.onerror = () => {
+        clearTimeout(timeout);
+        finish();
+      };
       source.onload = async () => {
         try {
           if (source.decode) await source.decode();
@@ -722,7 +750,8 @@ async function run(mode) {
           // A decoded HTML image is still a valid fallback when bitmap resizing is unavailable.
           result.ready = source.complete && source.naturalWidth > 0;
         }
-        resolve(result);
+        clearTimeout(timeout);
+        finish();
       };
       source.src = url;
     });
@@ -757,6 +786,8 @@ async function run(mode) {
     Object.keys(enemyTypes).map((id) => [id, loadImageAsset(id)]),
   );
   const frameCache = new Map();
+  const emptyFrames = Object.freeze([]);
+  const charactersById = new Map(cfg.characters.map((character) => [character.id, character]));
   for (const c of cfg.characters)
     for (const url of [
       ...(c.frames?.length ? c.frames : c.role === 'hero' ? cfg.animation.frames : []),
@@ -767,15 +798,15 @@ async function run(mode) {
       }
     }
   function animatedArt(id, fallback, motion = 'idle') {
-    const c = cfg.characters.find((c) => c.id === id);
-    const authored = c?.sheetFrames?.[motion] || c?.sheetFrames?.idle || [];
+    const c = charactersById.get(id);
+    const authored = c?.sheetFrames?.[motion] || c?.sheetFrames?.idle || emptyFrames;
     const frames = authored.length
       ? authored
       : c?.frames?.length
         ? c.frames
         : c?.role === 'hero'
           ? cfg.animation.frames
-          : [];
+          : emptyFrames;
     if (!frames.length) return fallback;
     const fps = motion === 'run' ? Math.max(8, cfg.animation.fps) : motion === 'jump' ? 7 : 4;
     const state = frameCache.get(frames[Math.floor(worldTime * fps) % frames.length]);
@@ -783,12 +814,21 @@ async function run(mode) {
   }
   // Finish image decoding and one-time downsampling before animation starts. This trades
   // a deterministic loading moment for eliminating decode/resize stalls during gameplay.
+  // Await first-level art, which is needed immediately. Start the remaining
+  // chapters now as background prefetches so transitions never initiate decode.
   const initialLevel = getLevelConfig();
   loadImageAsset(initialLevel.id);
   loadImageAsset(`powerup-${initialLevel.id}`);
   loadImageAsset(`phone-helper-${initialLevel.id}`);
+  const startupAssetPromises = [...assetCache.values()].map((state) => state.promise);
+  for (const level of cfg.levels) {
+    if (level === initialLevel) continue;
+    loadImageAsset(level.id);
+    loadImageAsset(`powerup-${level.id}`);
+    loadImageAsset(`phone-helper-${level.id}`);
+  }
   await Promise.allSettled([
-    ...[...assetCache.values()].map((state) => state.promise),
+    ...startupAssetPromises,
     ...[...frameCache.values()].map((state) => state.promise),
   ]);
   document.body.classList.add('assets-ready');
@@ -823,6 +863,13 @@ async function run(mode) {
     }
     const index = soundPoolIndex[name]++ % pool.length;
     return pool[index];
+  }
+  // Allocate the first player for each effect during setup, not on the input
+  // frame that first uses it. Media loading remains asynchronous.
+  for (const name of Object.keys(soundUrls)) {
+    if (name === 'music' || !soundUrls[name]) continue;
+    soundPools[name] = [createSound(name)];
+    soundPoolIndex[name] = 0;
   }
   function playSound(name, volume = 0.55) {
     if (!soundEnabled || !soundUrls[name]) return;
@@ -2212,7 +2259,8 @@ async function run(mode) {
         item.collected = true;
       }
     }
-    powerups = powerups.filter((item) => !item.collected);
+    for (let index = powerups.length - 1; index >= 0; index--)
+      if (powerups[index].collected) powerups.splice(index, 1);
     updateCompanions(dt);
   }
 
@@ -2742,7 +2790,8 @@ async function run(mode) {
         pickup.collected = true;
       }
     }
-    healthPickups = healthPickups.filter((pickup) => !pickup.collected);
+    for (let index = healthPickups.length - 1; index >= 0; index--)
+      if (healthPickups[index].collected) healthPickups.splice(index, 1);
   }
 
   function drawAttackEffect(px, drawY) {
@@ -2997,7 +3046,23 @@ async function run(mode) {
     // changing quality for one expensive frame or a brief browser interruption.
     if (lastTime && rawFrameTime > 0 && rawFrameTime < 100) {
       averageFrameTime += (rawFrameTime - averageFrameTime) * 0.05;
-      if (averageFrameTime > 20) {
+      frameSampleTime += rawFrameTime;
+      frameSampleCount++;
+      worstSampleTime = Math.max(worstSampleTime, rawFrameTime);
+      if (frameSampleTime >= 1000) {
+        canvas.dataset.frameTime = (frameSampleTime / frameSampleCount).toFixed(2);
+        canvas.dataset.worstFrameTime = worstSampleTime.toFixed(2);
+        canvas.dataset.renderQuality = String(renderQuality);
+        frameSampleTime = 0;
+        frameSampleCount = 0;
+        worstSampleTime = 0;
+      }
+      if (rawFrameTime >= 28 && renderQuality > 0) {
+        // Favor the very next frame after a hitch. Recovery is deliberately slower.
+        renderQuality--;
+        slowFrameTime = 0;
+        stableFrameTime = 0;
+      } else if (averageFrameTime > 20) {
         slowFrameTime += rawFrameTime;
         stableFrameTime = 0;
         if (slowFrameTime >= 1000 && renderQuality > 0) {
@@ -3024,12 +3089,12 @@ async function run(mode) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (mode === 'play' && !paused) {
-      // Run game logic at up to 60 Hz and cap catch-up work.
-      // This prevents a slow frame from triggering a large burst of AI/physics
-      // updates that makes subsequent frames even slower (spiral of death).
-      let remaining = Math.min(dt, 1 / 20);
+      // Run game logic at up to 60 Hz, but never do more than two ticks in one
+      // animation frame. Dropping excess catch-up time is less noticeable than
+      // turning one scheduling hitch into several overloaded frames.
+      let remaining = Math.min(dt, 1 / 30);
       let substeps = 0;
-      while (remaining > 0.0001 && substeps < 3) {
+      while (remaining > 0.0001 && substeps < 2) {
         const step = Math.min(1 / 60, remaining);
         worldTime += step;
         updatePlayer(step);
@@ -3078,17 +3143,13 @@ async function run(mode) {
       });
     }
 
-    const shake =
-      cfg.mechanics.screenShake && screenShakeTimer > 0
-        ? {
-            x: (Math.random() - 0.5) * screenShakePower,
-            y: (Math.random() - 0.5) * screenShakePower,
-          }
-        : { x: 0, y: 0 };
+    const shakeActive = cfg.mechanics.screenShake && screenShakeTimer > 0;
+    const shakeX = shakeActive ? (Math.random() - 0.5) * screenShakePower : 0;
+    const shakeY = shakeActive ? (Math.random() - 0.5) * screenShakePower : 0;
     drawBackground();
     ctx.save();
     ctx.scale(WORLD_SCALE, WORLD_SCALE);
-    ctx.translate(shake.x, shake.y);
+    ctx.translate(shakeX, shakeY);
     drawPlatforms();
     if (mode === 'preview' && cfg.grid) {
       ctx.save();
@@ -3437,8 +3498,10 @@ async function run(mode) {
 
     updateHealthPickups(dt);
     for (const burst of defeatBursts) burst.time += dt;
-    defeatBursts = defeatBursts.filter((burst) => burst.time < burst.duration);
-    enemies = enemies.filter((enemy) => enemy.defeatTimer > 0 || enemy.health > 0);
+    for (let index = defeatBursts.length - 1; index >= 0; index--)
+      if (defeatBursts[index].time >= defeatBursts[index].duration) defeatBursts.splice(index, 1);
+    for (let index = enemies.length - 1; index >= 0; index--)
+      if (enemies[index].defeatTimer <= 0 && enemies[index].health <= 0) enemies.splice(index, 1);
     // `every` correctly treats an emptied roster as cleared. The previous
     // `enemies.length > 0` guard stranded the game after the last KO faded.
     const levelBossRequired = !!getLevelConfig().boss?.enabled;
@@ -3477,7 +3540,10 @@ async function run(mode) {
     }
     styleTimer = Math.max(0, styleTimer - dt);
     if (!styleTimer) styleChain = 0;
-    combatPopups = combatPopups.filter((p) => (p.life -= dt) > 0);
+    for (let index = combatPopups.length - 1; index >= 0; index--) {
+      combatPopups[index].life -= dt;
+      if (combatPopups[index].life <= 0) combatPopups.splice(index, 1);
+    }
     player.hurtTimer = Math.max(0, player.hurtTimer - dt);
     player.damageFlash = Math.max(0, player.damageFlash - dt);
     const speed = Number(cfg.player.moveSpeed ?? 400);
