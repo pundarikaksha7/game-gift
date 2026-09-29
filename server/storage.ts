@@ -86,7 +86,15 @@ export async function createAssetReadUrl(id: string) {
   const body = (await response.json()) as { signedURL?: string; signedUrl?: string };
   const signed = body.signedURL || body.signedUrl;
   if (!signed) throw Object.assign(new Error('Media delivery is unavailable.'), { status: 503 });
-  const url = new URL(signed, config.url).toString();
+  // The Storage REST API returns paths such as `/object/sign/...`, relative to its
+  // `/storage/v1` base rather than the Supabase project origin. Preserve absolute URLs
+  // and already-prefixed responses while normalizing the current relative response.
+  const signedPath = /^https?:\/\//i.test(signed)
+    ? signed
+    : signed.startsWith('/storage/v1/')
+      ? signed
+      : `/storage/v1/${signed.replace(/^\/+/, '')}`;
+  const url = new URL(signedPath, config.url).toString();
   signedReads.set(id, { url, expiresAt: Date.now() + 8 * 60 * 1000 });
   if (signedReads.size > 500) {
     const oldest = signedReads.keys().next().value;

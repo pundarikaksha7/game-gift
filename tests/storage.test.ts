@@ -16,7 +16,8 @@ test('private cloud media uses authenticated endpoints and fails on provider err
     calls.push({ url: String(url), options });
     if (String(url).includes('/object/sign/'))
       return Response.json({
-        signedURL: '/storage/v1/object/sign/private-media/tokenized?token=x',
+        // Supabase returns this relative to the Storage API's /storage/v1 base.
+        signedURL: '/object/sign/private-media/tokenized?token=x',
       });
     return new Response('media');
   }) as typeof fetch;
