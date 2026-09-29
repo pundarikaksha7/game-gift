@@ -18,12 +18,12 @@ async function run(mode) {
   ]);
   const isTouchDevice =
     window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-  const deviceMemory = Number(navigator.deviceMemory || 0);
-  const processorCount = Number(navigator.hardwareConcurrency || 0);
-  const constrainedDevice =
-    isTouchDevice ||
-    (deviceMemory > 0 && deviceMemory <= 4) ||
-    (processorCount > 0 && processorCount <= 4);
+  // Keep gameplay responsive on every device. Quality is adjusted from measured
+  // frame pressure below; touch and hardware hints do not predict render speed.
+  let renderQuality = 2; // 2 = full, 1 = reduced effects, 0 = minimal effects
+  let averageFrameTime = 1000 / 60;
+  let slowFrameTime = 0;
+  let stableFrameTime = 0;
   const mobileLandscapeQuery = window.matchMedia(
     '(orientation: landscape) and (max-height: 620px)',
   );
@@ -1693,20 +1693,22 @@ async function run(mode) {
       ctx.closePath();
       ctx.fill();
 
-      ctx.save();
-      ctx.globalAlpha = 0.34;
-      ctx.fillStyle = level.theme === 'midnight' ? '#c452bd' : '#7f97a8';
-      for (let band = 0; band < 3; band++) {
-        const bandY = hole.y + 30 + band * 31;
-        ctx.fillRect(left + 8 + band * 7, bandY, Math.max(0, hole.w - 16 - band * 14), 2);
+      if (renderQuality > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.34;
+        ctx.fillStyle = level.theme === 'midnight' ? '#c452bd' : '#7f97a8';
+        for (let band = 0; band < 3; band++) {
+          const bandY = hole.y + 30 + band * 31;
+          ctx.fillRect(left + 8 + band * 7, bandY, Math.max(0, hole.w - 16 - band * 14), 2);
+        }
+        ctx.globalAlpha = 0.76;
+        for (const stone of hole.debris || []) {
+          ctx.beginPath();
+          ctx.arc(left + stone.x, hole.y + stone.y, stone.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
       }
-      ctx.globalAlpha = 0.76;
-      for (const stone of hole.debris || []) {
-        ctx.beginPath();
-        ctx.arc(left + stone.x, hole.y + stone.y, stone.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
 
       ctx.strokeStyle = level.theme === 'midnight' ? '#b84b9b' : '#505965';
       ctx.lineWidth = 5;
@@ -1720,18 +1722,20 @@ async function run(mode) {
       ctx.lineTo(right - 2, hole.y + 1);
       ctx.stroke();
 
-      ctx.strokeStyle =
-        level.theme === 'midnight' ? 'rgba(235,113,210,0.38)' : 'rgba(131,143,153,0.48)';
-      ctx.lineWidth = 2;
-      for (const crack of hole.cracks || []) {
-        const crackX = left + crack.x;
-        const crackY = hole.y - 2;
-        ctx.beginPath();
-        ctx.moveTo(crackX, crackY);
-        ctx.lineTo(crackX + crack.side * 7, crackY - 7);
-        ctx.lineTo(crackX + crack.side * 13, crackY - 3);
-        ctx.lineTo(crackX + crack.side * crack.length, crackY - 12);
-        ctx.stroke();
+      if (renderQuality > 0) {
+        ctx.strokeStyle =
+          level.theme === 'midnight' ? 'rgba(235,113,210,0.38)' : 'rgba(131,143,153,0.48)';
+        ctx.lineWidth = 2;
+        for (const crack of hole.cracks || []) {
+          const crackX = left + crack.x;
+          const crackY = hole.y - 2;
+          ctx.beginPath();
+          ctx.moveTo(crackX, crackY);
+          ctx.lineTo(crackX + crack.side * 7, crackY - 7);
+          ctx.lineTo(crackX + crack.side * 13, crackY - 3);
+          ctx.lineTo(crackX + crack.side * crack.length, crackY - 12);
+          ctx.stroke();
+        }
       }
 
       ctx.fillStyle = level.theme === 'midnight' ? '#69306f' : '#39434d';
@@ -1788,6 +1792,7 @@ async function run(mode) {
   }
 
   function drawRunDust(x, y, phase, color) {
+    if (renderQuality === 0) return;
     const stride = Math.sin(phase);
     ctx.save();
     ctx.globalAlpha = 0.48;
@@ -2049,8 +2054,10 @@ async function run(mode) {
       if (sx + pickup.w < -60 || sx > viewportWidth() + 60) continue;
       const sy = pickup.baseY + Math.sin(pickup.time * 5.5) * 6;
       ctx.save();
-      ctx.shadowColor = 'rgba(255, 82, 126, 0.8)';
-      ctx.shadowBlur = 16;
+      if (renderQuality === 2) {
+        ctx.shadowColor = 'rgba(255, 82, 126, 0.8)';
+        ctx.shadowBlur = 16;
+      }
       ctx.fillStyle = '#ff5f87';
       ctx.font = '700 36px Fredoka';
       ctx.textAlign = 'center';
@@ -2078,15 +2085,17 @@ async function run(mode) {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(8, 12, 22, .72)';
-    ctx.shadowBlur = 5;
+    if (renderQuality === 2) {
+      ctx.shadowColor = 'rgba(8, 12, 22, .72)';
+      ctx.shadowBlur = 5;
+    }
     ctx.font = '900 40px "Gamegift Arcade", ui-rounded, sans-serif';
     ctx.letterSpacing = '.5px';
     ctx.lineWidth = 5;
     ctx.strokeStyle = 'rgba(10, 14, 24, .66)';
     ctx.strokeText(name, x, y);
     ctx.fillStyle = '#fff';
-    ctx.shadowBlur = 3;
+    if (renderQuality === 2) ctx.shadowBlur = 3;
     ctx.fillText(name, x, y);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = accent;
@@ -2478,8 +2487,10 @@ async function run(mode) {
       ctx.save();
       ctx.translate(sx + 40, sy + 42);
       ctx.textAlign = 'center';
-      ctx.shadowColor = info.color;
-      ctx.shadowBlur = ready ? 24 : 10;
+      if (renderQuality === 2) {
+        ctx.shadowColor = info.color;
+        ctx.shadowBlur = ready ? 24 : 10;
+      }
       ctx.fillStyle = 'rgba(12,22,42,.88)';
       ctx.beginPath();
       ctx.arc(0, 0, 49, 0, Math.PI * 2);
@@ -2746,7 +2757,7 @@ async function run(mode) {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    if (player.blueBoost && player.attack.type !== 'beam') {
+    if (renderQuality === 2 && player.blueBoost && player.attack.type !== 'beam') {
       ctx.shadowColor = player.attack.type === 'kick' ? '#ff43df' : '#32ffc5';
       ctx.shadowBlur = 18;
     }
@@ -2933,9 +2944,6 @@ async function run(mode) {
 
   // ── Game loop ──
   let lastTime = 0;
-  let lastRenderedFrame = 0;
-  const minimumFrameInterval =
-    mode === 'preview' || (mode === 'play' && constrainedDevice) ? 1000 / 30 : 0;
   let paused = false;
   const pauseButton = document.createElement('button');
   pauseButton.textContent = 'Pause / Resume';
@@ -2984,15 +2992,31 @@ async function run(mode) {
 
   function gameLoop(timestamp) {
     if (disposed) return;
-    // Editor previews and constrained devices use a steady 30 fps render budget. Physics
-    // still advances by elapsed time, avoiding the unstable frame pacing users experience
-    // when a device repeatedly misses a 60 fps target.
-    if (minimumFrameInterval && timestamp - lastRenderedFrame < minimumFrameInterval - 1) {
-      animationFrame = requestAnimationFrame(gameLoop);
-      return;
+    const rawFrameTime = timestamp - lastTime;
+    // React to sustained frame pressure, not device categories. Hysteresis avoids
+    // changing quality for one expensive frame or a brief browser interruption.
+    if (lastTime && rawFrameTime > 0 && rawFrameTime < 100) {
+      averageFrameTime += (rawFrameTime - averageFrameTime) * 0.05;
+      if (averageFrameTime > 20) {
+        slowFrameTime += rawFrameTime;
+        stableFrameTime = 0;
+        if (slowFrameTime >= 1000 && renderQuality > 0) {
+          renderQuality--;
+          slowFrameTime = 0;
+        }
+      } else if (averageFrameTime < 18) {
+        stableFrameTime += rawFrameTime;
+        slowFrameTime = 0;
+        if (stableFrameTime >= 4000 && renderQuality < 2) {
+          renderQuality++;
+          stableFrameTime = 0;
+        }
+      } else {
+        slowFrameTime = 0;
+        stableFrameTime = 0;
+      }
     }
-    lastRenderedFrame = timestamp;
-    const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+    const dt = Math.min(rawFrameTime / 1000, 0.05);
     lastTime = timestamp;
     // World time advances with physics below.
     screenShakeTimer = Math.max(0, screenShakeTimer - dt);
