@@ -18,6 +18,12 @@ async function run(mode) {
   ]);
   const isTouchDevice =
     window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  const deviceMemory = Number(navigator.deviceMemory || 0);
+  const processorCount = Number(navigator.hardwareConcurrency || 0);
+  const constrainedDevice =
+    isTouchDevice ||
+    (deviceMemory > 0 && deviceMemory <= 4) ||
+    (processorCount > 0 && processorCount <= 4);
   const mobileLandscapeQuery = window.matchMedia(
     '(orientation: landscape) and (max-height: 620px)',
   );
@@ -689,11 +695,9 @@ async function run(mode) {
     if (preparedImageCache.has(cacheKey)) return preparedImageCache.get(cacheKey);
     const source = new Image();
     source.decoding = 'async';
-    try {
-      // Public API asset URLs may redirect to Supabase's CDN. Opt into CORS before
-      // assigning src so redirected images remain eligible for bitmap downsampling.
-      if (!/^(?:data|blob):/i.test(url)) source.crossOrigin = 'anonymous';
-    } catch (_) {}
+    // These images are only drawn; pixels are never read back. Do not opt into CORS here:
+    // a same-origin /api/assets URL can redirect to a short-lived private Storage URL,
+    // and requiring an ACAO response would make otherwise valid published art disappear.
     const result = { image: source, source, ready: false, promise: null };
     result.promise = new Promise((resolve) => {
       source.onerror = () => resolve(result);
@@ -739,7 +743,7 @@ async function run(mode) {
     }
     const isBackground = cfg.levels.some((level) => level.id === id);
     const isEffect = id.startsWith('powerup-') || id.startsWith('phone-helper-');
-    const result = preparedImage(info.url, isBackground ? 1440 : isEffect ? 384 : 640);
+    const result = preparedImage(info.url, isBackground ? 1440 : isEffect ? 384 : 384);
     assetCache.set(id, result);
     return result;
   }
@@ -759,7 +763,7 @@ async function run(mode) {
       ...Object.values(c.sheetFrames || {}).flat(),
     ]) {
       if (!frameCache.has(url)) {
-        frameCache.set(url, preparedImage(url, 640));
+        frameCache.set(url, preparedImage(url, 384));
       }
     }
   function animatedArt(id, fallback, motion = 'idle') {
@@ -2929,7 +2933,9 @@ async function run(mode) {
 
   // ── Game loop ──
   let lastTime = 0;
-  let lastPreviewFrame = 0;
+  let lastRenderedFrame = 0;
+  const minimumFrameInterval =
+    mode === 'preview' || (mode === 'play' && constrainedDevice) ? 1000 / 30 : 0;
   let paused = false;
   const pauseButton = document.createElement('button');
   pauseButton.textContent = 'Pause / Resume';
@@ -2978,13 +2984,14 @@ async function run(mode) {
 
   function gameLoop(timestamp) {
     if (disposed) return;
-    // Editor previews do not need a full 60 fps simulation. Keeping them at 30 fps
-    // leaves the main thread responsive while fields, drawers and asset pickers are used.
-    if (mode === 'preview' && timestamp - lastPreviewFrame < 1000 / 30) {
+    // Editor previews and constrained devices use a steady 30 fps render budget. Physics
+    // still advances by elapsed time, avoiding the unstable frame pacing users experience
+    // when a device repeatedly misses a 60 fps target.
+    if (minimumFrameInterval && timestamp - lastRenderedFrame < minimumFrameInterval - 1) {
       animationFrame = requestAnimationFrame(gameLoop);
       return;
     }
-    lastPreviewFrame = timestamp;
+    lastRenderedFrame = timestamp;
     const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
     lastTime = timestamp;
     // World time advances with physics below.
