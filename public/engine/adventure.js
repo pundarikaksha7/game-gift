@@ -836,9 +836,54 @@ async function run(mode) {
   // canvas or advancing story UI must remain silent.
   const soundUrls = cfg.sounds;
   let soundEnabled = false;
-  let levelMusic = null;
-  // Reuse a small pool of audio elements instead of allocating a new Audio
-  // object for every punch/kick/hit. This reduces GC spikes during combat.
+  // Prepare streaming music before play begins. Creating and warming the media
+  // pipeline on the first jump used to turn that input frame into a visible hitch.
+  let levelMusic = soundUrls.music ? new Audio(soundUrls.music) : null;
+  if (levelMusic) {
+    levelMusic.preload = 'auto';
+    levelMusic.loop = true;
+    levelMusic.volume = Math.max(0, Math.min(1, Number(cfg.audio?.musicVolume ?? 0.18)));
+    levelMusic.load();
+  }
+
+  // Decode short effects once during the story/setup screen. Web Audio playback is
+  // allocation-light and does not ask the media element pipeline to decode MP3s in
+  // the middle of jump, attack, or multi-enemy frames.
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  let audioContext = null;
+  try {
+    if (AudioContextClass) audioContext = new AudioContextClass({ latencyHint: 'interactive' });
+  } catch (_) {}
+  const decodedSounds = new Map();
+  const failedSoundDecodes = new Set();
+  const soundDecodePromises = new Map();
+  const lastSoundAt = new Map();
+  if (audioContext) {
+    for (const url of new Set(
+      Object.entries(soundUrls)
+        .filter(([name, value]) => name !== 'music' && value)
+        .map(([, value]) => value),
+    )) {
+      const pending = fetch(url)
+        .then((response) => {
+          if (!response.ok) throw new Error('Sound unavailable');
+          return response.arrayBuffer();
+        })
+        .then((bytes) => audioContext.decodeAudioData(bytes))
+        .then((buffer) => {
+          decodedSounds.set(url, buffer);
+          canvas.dataset.audioReady = String(decodedSounds.size);
+        })
+        .catch(() => failedSoundDecodes.add(url));
+      soundDecodePromises.set(url, pending);
+    }
+    canvas.dataset.audioBackend = 'web-audio';
+  } else {
+    canvas.dataset.audioBackend = 'html-audio';
+  }
+
+  // Compatibility fallback for browsers without Web Audio or effects that fail
+  // to decode. Reuse a small pool instead of allocating players during combat.
   const soundPools = {};
   const soundPoolIndex = {};
   function createSound(name) {
@@ -864,15 +909,31 @@ async function run(mode) {
     const index = soundPoolIndex[name]++ % pool.length;
     return pool[index];
   }
-  // Allocate the first player for each effect during setup, not on the input
-  // frame that first uses it. Media loading remains asynchronous.
-  for (const name of Object.keys(soundUrls)) {
-    if (name === 'music' || !soundUrls[name]) continue;
-    soundPools[name] = [createSound(name)];
-    soundPoolIndex[name] = 0;
-  }
   function playSound(name, volume = 0.55) {
     if (!soundEnabled || !soundUrls[name]) return;
+    const now = performance.now();
+    const minimumGap = name === 'villainAttack' ? 110 : name === 'heroAttack' ? 45 : 0;
+    if (minimumGap && now - (lastSoundAt.get(name) || 0) < minimumGap) return;
+    lastSoundAt.set(name, now);
+    const buffer = decodedSounds.get(soundUrls[name]);
+    if (audioContext && buffer) {
+      const source = audioContext.createBufferSource();
+      const gain = audioContext.createGain();
+      source.buffer = buffer;
+      gain.gain.value = Math.max(0, Math.min(1, volume * Number(cfg.audio?.sfxVolume ?? 0.65)));
+      source.connect(gain);
+      gain.connect(audioContext.destination);
+      source.onended = () => {
+        source.disconnect();
+        gain.disconnect();
+      };
+      source.start();
+      return;
+    }
+    // Do not fall back while a decode is in flight: skipping the first optional
+    // effect is preferable to stalling the input frame that triggered it.
+    if (soundDecodePromises.has(soundUrls[name]) && !failedSoundDecodes.has(soundUrls[name]))
+      return;
     const audio = getSoundFromPool(name);
     audio.pause();
     try {
@@ -883,12 +944,8 @@ async function run(mode) {
   }
   function enableSound() {
     soundEnabled = true;
-    if (!levelMusic && soundUrls.music) {
-      levelMusic = new Audio(soundUrls.music);
-      levelMusic.loop = true;
-      levelMusic.volume = Math.max(0, Math.min(1, Number(cfg.audio?.musicVolume ?? 0.18)));
-      void levelMusic.play().catch(() => {});
-    }
+    if (audioContext?.state === 'suspended') void audioContext.resume().catch(() => {});
+    if (levelMusic?.paused) void levelMusic.play().catch(() => {});
   }
 
   function disposeRuntime() {
@@ -898,6 +955,8 @@ async function run(mode) {
     levelMusic?.pause();
     if (levelMusic) levelMusic.src = '';
     levelMusic = null;
+    if (audioContext) void audioContext.close().catch(() => {});
+    audioContext = null;
     for (const pool of Object.values(soundPools))
       for (const audio of pool) {
         audio.pause();
