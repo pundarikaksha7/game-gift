@@ -234,10 +234,18 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
       headers: { 'Cache-Control': 'no-cache' },
     });
     assert.equal(uncachedPublicAsset.status, 200);
-    assert.deepEqual(
-      Buffer.from(await uncachedPublicAsset.arrayBuffer()),
-      Buffer.from(assetBundle.assets[asset.url].data, 'base64'),
-    );
+    const publicBytes = Buffer.from(await uncachedPublicAsset.arrayBuffer());
+    assert.deepEqual(publicBytes, Buffer.from(assetBundle.assets[asset.url].data, 'base64'));
+    const signedInVisitorAsset = await fetch(base.replace('/api', '') + asset.url, {
+      headers: { Authorization: `Bearer ${bob}`, 'Cache-Control': 'no-cache' },
+    });
+    assert.equal(signedInVisitorAsset.status, 200);
+    assert.deepEqual(Buffer.from(await signedInVisitorAsset.arrayBuffer()), publicBytes);
+    const staleSessionVisitorAsset = await fetch(base.replace('/api', '') + asset.url, {
+      headers: { Authorization: 'Bearer expired-token', 'Cache-Control': 'no-cache' },
+    });
+    assert.equal(staleSessionVisitorAsset.status, 200);
+    assert.deepEqual(Buffer.from(await staleSessionVisitorAsset.arrayBuffer()), publicBytes);
     await request(`/projects/${id}/publish`, 'DELETE', undefined, alice);
     assert.equal((await request(`/play/alice/${publishedId}`)).status, 404);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 404);

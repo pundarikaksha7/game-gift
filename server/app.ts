@@ -250,14 +250,14 @@ export function createApp(db: DB, options: AppOptions = {}) {
     const [asset] = await db.query('SELECT * FROM assets WHERE id=$1', [req.params.id]);
     if (!asset) throw fail(404, 'Asset not found');
     const publicUse = await publishedAssetUse(asset.id);
-    const owner = req.get('authorization')
-      ? {
-          user_id: options.authenticate
-            ? (await options.authenticate(req.get('authorization'))).id
-            : (await authenticateSupabase(db, req.get('authorization'))).id,
-        }
-      : null;
-    if (!publicUse && owner?.user_id !== asset.owner_id) throw fail(404, 'Asset not found');
+    if (!publicUse) {
+      const authorization = req.get('authorization');
+      if (!authorization) throw fail(404, 'Asset not found');
+      const ownerId = options.authenticate
+        ? (await options.authenticate(authorization)).id
+        : (await authenticateSupabase(db, authorization)).id;
+      if (ownerId !== asset.owner_id) throw fail(404, 'Asset not found');
+    }
     if (publicUse) {
       // Keep authorization on this stable endpoint, then send the bytes directly from
       // Supabase's CDN instead of buffering them through the Render service.
