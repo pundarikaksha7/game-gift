@@ -229,6 +229,15 @@ test('account isolation, revisions, uploads, publication and session lifecycle',
     assert.equal(publicAsset.status, 200);
     assert.equal(publicAsset.headers.get('cache-control'), 'private, max-age=31536000, immutable');
     assert.equal(publicAsset.headers.get('vary'), 'Authorization');
+    await db.query('DELETE FROM published_assets WHERE asset_id=$1', [uploadRequestId]);
+    const uncachedPublicAsset = await fetch(base.replace('/api', '') + asset.url, {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    assert.equal(uncachedPublicAsset.status, 200);
+    assert.deepEqual(
+      Buffer.from(await uncachedPublicAsset.arrayBuffer()),
+      Buffer.from(assetBundle.assets[asset.url].data, 'base64'),
+    );
     await request(`/projects/${id}/publish`, 'DELETE', undefined, alice);
     assert.equal((await request(`/play/alice/${publishedId}`)).status, 404);
     assert.equal((await fetch(base.replace('/api', '') + asset.url)).status, 404);

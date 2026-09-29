@@ -221,13 +221,35 @@ export function createApp(db: DB, options: AppOptions = {}) {
     res.json({ game: JSON.parse(p.published_game) });
   });
   const uploads = path.resolve(process.env.DATA_DIR || '.data', 'uploads');
+  async function publishedAssetUse(assetId: string) {
+    const assetUrl = `/api/assets/${assetId}`;
+    const [indexed] = await db.query(
+      "SELECT projects.id FROM published_assets JOIN projects ON projects.id=published_assets.project_id WHERE published_assets.asset_id=$1 AND projects.published_id IS NOT NULL AND projects.publication_status='active'",
+      [assetId],
+    );
+    if (indexed) return indexed;
+
+    // Treat the published snapshot as the source of truth. The index can be absent for
+    // publications created before the ACL migration (or after an interrupted backfill),
+    // which otherwise makes media appear only to a signed-in owner with a warm cache.
+    const candidates = await db.query(
+      "SELECT id,published_game FROM projects WHERE published_game IS NOT NULL AND published_id IS NOT NULL AND publication_status='active' AND published_game LIKE $1",
+      [`%${assetUrl}%`],
+    );
+    for (const candidate of candidates) {
+      try {
+        const game = gameSchema.parse(JSON.parse(candidate.published_game));
+        if (assetReferences(game).some(({ url }) => url === assetUrl)) return candidate;
+      } catch {
+        // A malformed legacy snapshot must not grant public access to any media.
+      }
+    }
+    return null;
+  }
   app.get('/api/assets/:id', async (req, res) => {
     const [asset] = await db.query('SELECT * FROM assets WHERE id=$1', [req.params.id]);
     if (!asset) throw fail(404, 'Asset not found');
-    const [publicUse] = await db.query(
-      "SELECT projects.id FROM published_assets JOIN projects ON projects.id=published_assets.project_id WHERE published_assets.asset_id=$1 AND projects.published_id IS NOT NULL AND projects.publication_status='active'",
-      [asset.id],
-    );
+    const publicUse = await publishedAssetUse(asset.id);
     const owner = req.get('authorization')
       ? {
           user_id: options.authenticate
