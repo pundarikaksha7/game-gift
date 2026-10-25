@@ -672,6 +672,7 @@ export function createApp(db: DB, options: AppOptions = {}) {
     '/contact',
     '/privacy',
     '/terms',
+    '/refund-policy',
   ]);
   app.get('/{*path}', (req, res) => {
     const route = req.path.replace(/\/$/, '') || '/';
@@ -679,9 +680,16 @@ export function createApp(db: DB, options: AppOptions = {}) {
       return res
         .set('Cache-Control', 'no-cache')
         .sendFile(path.resolve('dist', route.slice(1), 'index.html'));
-    if (['/studio', '/my-games', '/auth/callback'].includes(route) || route.startsWith('/play/'))
+    if (
+      ['/studio', '/my-games', '/auth/callback', '/thank-you'].includes(route) ||
+      route.startsWith('/play/')
+    )
       return res.set('Cache-Control', 'no-cache').sendFile(path.resolve('dist/private.html'));
-    if (route !== '/') return res.status(404).type('text').send('Page not found');
+    if (route !== '/')
+      return res
+        .status(404)
+        .set('Cache-Control', 'no-cache')
+        .sendFile(path.resolve('dist/404.html'));
     return res.set('Cache-Control', 'no-cache').sendFile(path.resolve('dist/index.html'));
   });
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

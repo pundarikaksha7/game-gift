@@ -14,6 +14,7 @@ const config = {
     { source: '/studio', destination: '/private' },
     { source: '/my-games', destination: '/private' },
     { source: '/auth/callback', destination: '/private' },
+    { source: '/thank-you', destination: '/private' },
   ],
   headers: [
     {

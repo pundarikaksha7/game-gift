@@ -26,3 +26,11 @@ test('OAuth responses are recognized even when Supabase returns them to the Site
   assert.equal(frontendSurface('/', true, '', ''), 'landing');
   assert.equal(frontendSurface('/examples', true, '', ''), 'marketing');
 });
+
+test('Only known app routes load the studio; anything else is a 404', () => {
+  assert.equal(frontendSurface('/studio', false, '', ''), 'app');
+  assert.equal(frontendSurface('/thank-you', false, '?play=/play/a/b', ''), 'app');
+  assert.equal(frontendSurface('/play/owner/game', false, '', ''), 'app');
+  assert.equal(frontendSurface('/no-such-page', false, '', ''), 'not-found');
+  assert.equal(frontendSurface('/no-such-page', false, '?code=authorization-code', ''), 'app');
+});

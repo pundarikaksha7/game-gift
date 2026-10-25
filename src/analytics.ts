@@ -5,6 +5,7 @@ type EventName =
   | 'signup_started'
   | 'signup_completed'
   | 'game_creation_started'
+  | 'game_published'
   | 'checkout_started'
   | 'purchase_completed';
 

@@ -46,6 +46,7 @@ import { track } from './analytics';
 import { hasLocalAssets, MediaImage, persistLocalAssets } from './media';
 import { GameCanvas } from './components/GameCanvas';
 import { PlayGame } from './components/PlayModal';
+import { ThankYou } from './components/ThankYou';
 import { Modal, Field, UploadButton } from './components/UI';
 import {
   CharactersEditor,
@@ -427,6 +428,7 @@ export default function App() {
     });
   }
   const props = { game, change, notify, authed: !!user };
+  if (location.pathname === '/thank-you') return <ThankYou />;
   if (publicPath)
     return (
       <div className="public-page game-page">
@@ -1343,6 +1345,11 @@ export default function App() {
                   body: JSON.stringify({ revision: current.revision }),
                 });
                 setProject({ ...current, publishedId: d.publishedId, publishedUrl: d.url });
+                if (!current.publishedId) {
+                  track('game_published');
+                  location.assign(`/thank-you?play=${encodeURIComponent(d.url)}`);
+                  return;
+                }
                 notify('Your game is published. The adventure is ready to share.');
               } catch (e) {
                 notify((e as Error).message);

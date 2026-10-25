@@ -63,9 +63,17 @@ test('create, edit, save, reopen, publish, play, unpublish and delete account', 
   await expect(page.getByText('All changes saved')).toHaveCount(1);
   await page.getByRole('button', { name: 'Publish game', exact: true }).click();
   await page.getByRole('button', { name: 'Publish this adventure' }).click();
-  const publicUrl = await page
-    .getByRole('link', { name: 'Open published game' })
-    .getAttribute('href');
+  await expect(page).toHaveURL(/\/thank-you\?play=/);
+  await expect(page.getByRole('heading', { name: 'Your game gift is live' })).toBeVisible();
+  const publicUrl = await page.getByRole('link', { name: 'Play it yourself' }).getAttribute('href');
+  expect(publicUrl).toMatch(/^\/play\/[^/]+\/[^/]+$/);
+  await page.getByRole('link', { name: 'Back to the studio' }).click();
+  await expect(page.getByText('All changes saved')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Publish game', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Open published game' })).toHaveAttribute(
+    'href',
+    publicUrl!,
+  );
   const visitor = await browser.newContext();
   const publicPage = await visitor.newPage();
   await publicPage.goto(`http://127.0.0.1:4173${publicUrl}`);
