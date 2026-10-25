@@ -448,6 +448,10 @@ a {
 .landing-footer a:hover {
   text-decoration: underline;
 }
+.landing-footer .footer-links {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
 
 /* Public search-intent pages extend the established Game Gift visual language. */
 .seo-shell {

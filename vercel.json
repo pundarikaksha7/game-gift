@@ -24,6 +24,10 @@
     {
       "source": "/auth/callback",
       "destination": "/private"
+    },
+    {
+      "source": "/thank-you",
+      "destination": "/private"
     }
   ],
   "headers": [

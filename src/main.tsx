@@ -54,6 +54,7 @@ async function boot() {
     '/contact',
     '/privacy',
     '/terms',
+    '/refund-policy',
   ]);
   const normalizedPath = location.pathname.replace(/\/$/, '') || '/';
   // Supabase falls back to the configured Site URL when a requested callback URL is
@@ -67,7 +68,8 @@ async function boot() {
   );
   const landing = surface !== 'app';
   void initializeAnalytics().then(() => {
-    if (landing) track('seo_landing_view', { path: normalizedPath });
+    if (surface === 'landing' || surface === 'marketing')
+      track('seo_landing_view', { path: normalizedPath });
   });
   document.addEventListener('click', (event) => {
     const link = (event.target as Element).closest<HTMLElement>('[data-analytics]');
@@ -75,6 +77,10 @@ async function boot() {
     if (name === 'create_game_clicked') track(name, { path: normalizedPath });
     if (name === 'example_viewed') track(name, { path: normalizedPath });
   });
+  if (surface === 'not-found') {
+    document.title = 'Page not found | Game Gift';
+    document.querySelector('meta[name="robots"]')?.setAttribute('content', 'noindex');
+  }
   if (location.pathname === '/studio') {
     document.title = 'Gamegift Studio – Build Your Personalized Game';
     document.querySelector('meta[name="robots"]')?.setAttribute('content', 'noindex, nofollow');
@@ -96,7 +102,7 @@ async function boot() {
   const [{ default: App }] = await Promise.all([
     surface === 'landing'
       ? import('./Landing')
-      : surface === 'marketing'
+      : surface === 'marketing' || surface === 'not-found'
         ? import('./MarketingPage').then(({ MarketingRoute }) => ({ default: MarketingRoute }))
         : import('./Studio'),
     landing ? Promise.resolve() : import('./studio.css'),

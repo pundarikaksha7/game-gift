@@ -1,5 +1,6 @@
-import { ArrowRight, Check, Gamepad2, Gift, Music2, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, Gamepad2, Gift, Mail, Music2, Sparkles } from 'lucide-react';
 import { giftGuides, guideByPath, type GiftGuide } from './gift-guides';
+import { infoPages, SUPPORT_EMAIL } from './info-pages';
 import { labels, pageByPath, type SeoPage } from './seo';
 import { Brand } from './components/Brand';
 
@@ -49,6 +50,7 @@ function Footer() {
         <a href="/contact">Contact</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
+        <a href="/refund-policy">Refunds</a>
       </nav>
     </footer>
   );
@@ -357,85 +359,8 @@ export function GiftGuidePage({ guide }: { guide: GiftGuide }) {
   );
 }
 
-const info: Record<string, { h1: string; intro: string; sections: [string, string][] }> = {
-  '/about': {
-    h1: 'About Game Gift',
-    intro:
-      'Game Gift is a visual builder for turning memories, characters and messages into a personalized browser game.',
-    sections: [
-      [
-        'Why it exists',
-        'Some stories deserve more than a card or slideshow. Game Gift helps people make a small playable world for someone they care about, without needing to write code.',
-      ],
-      [
-        'How it works',
-        'Creators choose a game mode, customize the cast and story, playtest their work and publish a link when the gift is ready. Drafts stay private until the creator publishes them.',
-      ],
-    ],
-  },
-  '/contact': {
-    h1: 'Contact Game Gift',
-    intro: 'Need help with the builder, a published game, privacy or a payment?',
-    sections: [
-      [
-        'Support',
-        'Use the contact details shown in your Game Gift account or purchase receipt. If those are unavailable, contact the person who shared the Game Gift link so they can reach support from their creator account.',
-      ],
-      [
-        'Report a published game',
-        'Published games include a report option for inappropriate content, harassment, copyright or privacy concerns. Reports are reviewed by the service operator.',
-      ],
-    ],
-  },
-  '/privacy': {
-    h1: 'Game Gift Privacy',
-    intro:
-      'This page explains the information Game Gift uses to provide creator accounts, saved projects and published games.',
-    sections: [
-      [
-        'Account and project data',
-        'Google sign-in supplies basic account identity. Game Gift also asks for and stores your name and age, along with projects, uploaded media, revision history and publication state, so creators can save, edit and share their work.',
-      ],
-      [
-        'Published games',
-        'Drafts are private. When a creator publishes a game, anyone with its link can access that published version and the media it uses. Do not include information or media you do not have permission to share.',
-      ],
-      [
-        'Service providers',
-        'Game Gift uses Supabase for authentication, database and private media storage. Production hosting may use Vercel and Render. Payment information, when checkout is enabled, is processed by Razorpay; Game Gift records order and payment status rather than card details.',
-      ],
-      [
-        'Your choices',
-        'Creators can unpublish games and delete their account from the application. Account deletion removes application records and queues associated stored media and authentication records for deletion.',
-      ],
-    ],
-  },
-  '/terms': {
-    h1: 'Game Gift Terms',
-    intro:
-      'These basic terms describe responsible use of the Game Gift creator and published-game service.',
-    sections: [
-      [
-        'Your content',
-        'Only upload or publish text, images and audio you have the right to use. You are responsible for the games you create and share.',
-      ],
-      [
-        'Acceptable use',
-        'Do not use Game Gift for unlawful, abusive, harassing, privacy-invasive or infringing content, or to interfere with the service. Published games may be reported and disabled.',
-      ],
-      [
-        'Availability and changes',
-        'The service may change as the product develops. Keep your own copy of important material and playtest a game before sharing it.',
-      ],
-      [
-        'Payments',
-        'When paid publishing is enabled, the price and currency are shown before checkout. Payment status is verified with the payment provider before publishing access is granted. Any refund terms presented during checkout or in your receipt apply to that purchase.',
-      ],
-    ],
-  },
-};
 export function InfoPage({ path }: { path: string }) {
-  const page = info[path];
+  const page = infoPages[path];
   return (
     <div className="seo-shell">
       <Header />
@@ -444,6 +369,13 @@ export function InfoPage({ path }: { path: string }) {
           <Breadcrumb current={page.h1} />
           <h1>{page.h1}</h1>
           <p className="seo-lede">{page.intro}</p>
+          {path === '/contact' ? (
+            <div className="seo-actions">
+              <a className="seo-button" href={`mailto:${SUPPORT_EMAIL}`}>
+                <Mail size={18} /> {SUPPORT_EMAIL}
+              </a>
+            </div>
+          ) : null}
         </section>
         <section className="info-content">
           {page.sections.map(([h, b]) => (
@@ -459,6 +391,43 @@ export function InfoPage({ path }: { path: string }) {
   );
 }
 
+export function NotFoundPage() {
+  return (
+    <div className="seo-shell">
+      <Header />
+      <main>
+        <section className="seo-hero compact">
+          <h1>This page wandered off</h1>
+          <p className="seo-lede">
+            The link may be mistyped, or the page has moved. If someone shared a game with you, ask
+            them to send the link again.
+          </p>
+          <div className="seo-actions">
+            <a className="seo-button" href="/studio" data-analytics="create_game_clicked">
+              Create your game <ArrowRight size={18} />
+            </a>
+            <a className="seo-button secondary" href="/">
+              Back to home
+            </a>
+          </div>
+        </section>
+        <section className="seo-related">
+          <h2>Popular pages</h2>
+          <div>
+            {['/personalized-game-gift', '/examples', '/gift-ideas', '/contact'].map((path) => (
+              <a href={path} key={path}>
+                {labels[path]}
+                <ArrowRight size={16} />
+              </a>
+            ))}
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 export function MarketingRoute() {
   const path = location.pathname.replace(/\/$/, '') || '/';
   const page = pageByPath.get(path);
@@ -467,6 +436,6 @@ export function MarketingRoute() {
   if (path === '/gift-ideas') return <GiftIdeasPage />;
   const guide = guideByPath.get(path);
   if (guide) return <GiftGuidePage guide={guide} />;
-  if (info[path]) return <InfoPage path={path} />;
-  return null;
+  if (infoPages[path]) return <InfoPage path={path} />;
+  return <NotFoundPage />;
 }

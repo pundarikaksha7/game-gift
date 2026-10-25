@@ -525,13 +525,16 @@ export default function Landing() {
               <Brand />
             </a>
             <Paragraph tone="muted">A little world, made for one very important person.</Paragraph>
-            <HStack gap={5}>
+            <HStack gap={5} className="footer-links">
               <a href="/examples">Examples</a>
               <a href="#faq">FAQ</a>
               <a href="/personalized-game-gift">Game gifts</a>
               <a href="/gift-ideas">Gift guides</a>
               <a href="/about">About</a>
+              <a href="/contact">Contact</a>
               <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+              <a href="/refund-policy">Refunds</a>
               <a href="/studio">Start creating</a>
             </HStack>
           </Stack>

@@ -352,4 +352,5 @@ export const labels: Record<string, string> = {
   '/contact': 'Contact',
   '/privacy': 'Privacy',
   '/terms': 'Terms',
+  '/refund-policy': 'Refund policy',
 };

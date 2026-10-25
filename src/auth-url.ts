@@ -24,12 +24,16 @@ export function hasAuthResponse(search: string, hash: string) {
   );
 }
 
+const appPaths = new Set(['/studio', '/my-games', '/auth/callback', '/thank-you']);
+
 export function frontendSurface(
   path: string,
   isMarketingPath: boolean,
   search: string,
   hash: string,
-): 'landing' | 'marketing' | 'app' {
-  if (!isMarketingPath || hasAuthResponse(search, hash)) return 'app';
+): 'landing' | 'marketing' | 'app' | 'not-found' {
+  if (hasAuthResponse(search, hash) || appPaths.has(path) || path.startsWith('/play/'))
+    return 'app';
+  if (!isMarketingPath) return 'not-found';
   return path === '/' ? 'landing' : 'marketing';
 }

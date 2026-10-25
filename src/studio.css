@@ -1543,6 +1543,28 @@ input[type='color'] {
 .public-page .muted svg {
   vertical-align: middle;
 }
+.thank-you {
+  max-width: 560px;
+}
+.thank-you .publish-art {
+  margin-top: 30px;
+}
+.thank-you h1 {
+  margin-top: 10px;
+}
+.thank-you-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+.thank-you-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
 .spin {
   animation: spin 1s linear infinite;
 }
